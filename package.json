@@ -1,0 +1,20 @@
+{
+  "name": "tokenized_strategy_ape_mix",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^4.8.2",
+    "@commitlint/cli": "^17.0.0",
+    "@commitlint/config-conventional": "^17.0.0",
+    "hardhat": "^2.12.2",
+    "solc": "^0.8.14",
+    "prettier": "^2.5.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "pretty-quick": "^3.1.3",
+    "solhint": "^3.3.7",
+    "solhint-plugin-prettier": "^0.0.5"
+  },
+  "scripts": {
+    "format": "prettier --write '**/*.sol' '**/*.json'",
+    "format:check": "prettier --check '**/*.sol' ''**/*.json''",
+    "lint": "solhint 'contracts/**/*.sol'"
+  }
+}
