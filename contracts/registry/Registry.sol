@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 interface IFactory {
@@ -18,6 +17,14 @@ interface IFactory {
     ) external returns (address);
 }
 
+interface IReleaseRegistry {
+    function factories(uint256 _releaseTarget) external view returns (address);
+
+    function numReleases() external view returns (uint256);
+
+    function releaseTargets(string memory) external view returns (uint256);
+}
+
 interface IVault {
     function asset() external view returns (address);
 
@@ -28,25 +35,16 @@ interface IStrategy {
     function apiVersion() external view returns (string memory);
 }
 
-// TODO: Add strategy stuff
-contract Registry is Ownable {
-    event NewVault(address indexed asset, address vault, string apiVersion);
+contract Registry {
+    event NewVault(address vault, address indexed asset, string apiVersion);
 
-    event NewEndorsedVault(
+    event NewStrategy(
+        address indexed strategy,
         address indexed asset,
-        address indexed vault,
         string apiVersion
     );
 
-    event NewRelease(
-        uint256 indexed releaseId,
-        address indexed factory,
-        string apiVersion
-    );
-
-    // For each new release a new factory will be deployed
-    uint256 public numReleases;
-    mapping(uint256 => address) public factories;
+    address public immutable releaseRegistry;
 
     address[] public assets;
     mapping(address => bool) public assetIsUsed;
@@ -59,6 +57,10 @@ contract Registry is Ownable {
     mapping(address => address[]) public strategies;
     mapping(address => mapping(uint256 => address[]))
         public strategiesByVersion;
+
+    constructor(address _releaseRegistry) {
+        releaseRegistry = _releaseRegistry;
+    }
 
     function numassets() external view returns (uint256) {
         return assets.length;
@@ -150,28 +152,6 @@ contract Registry is Ownable {
         }
     }
 
-    function newRelease(address _factory) external onlyOwner {
-        // Check if the release is different from the current one
-        uint256 releaseId = numReleases;
-
-        if (releaseId > 0) {
-            // Make sure this isnt the same as the last one
-            require(
-                keccak256(
-                    bytes(IFactory(factories[releaseId - 1]).api_version())
-                ) != keccak256(bytes(IFactory(_factory).api_version())),
-                "VaultRegistry: same api version"
-            );
-        }
-
-        // Update latest release
-        factories[releaseId] = _factory;
-        numReleases = releaseId + 1;
-
-        // Log the release for external listeners
-        emit NewRelease(releaseId, _factory, IFactory(_factory).api_version());
-    }
-
     function newVault(
         address _asset,
         string memory _name,
@@ -179,7 +159,8 @@ contract Registry is Ownable {
         address _roleManager,
         uint256 _profitMaxUnlockTime
     ) external returns (address) {
-        uint256 _releaseTarget = numReleases - 1;
+        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+            .numReleases() - 1;
 
         return
             _newVault(
@@ -200,7 +181,10 @@ contract Registry is Ownable {
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
     ) external returns (address) {
-        uint256 _releaseTarget = numReleases - 1 - _releaseDelta;
+        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+            .numReleases() -
+            1 -
+            _releaseDelta;
 
         return
             _newVault(
@@ -221,7 +205,9 @@ contract Registry is Ownable {
         uint256 _profitMaxUnlockTime,
         uint256 _releaseTarget
     ) internal returns (address vault) {
-        address factory = factories[_releaseTarget];
+        address factory = IReleaseRegistry(releaseRegistry).factories(
+            _releaseTarget
+        );
         require(factory != address(0), "VaultRegistry: unknown release");
         string memory apiVersion = IFactory(factory).api_version();
 
@@ -244,8 +230,13 @@ contract Registry is Ownable {
         address _asset,
         uint256 _releaseDelta
     ) external {
-        uint256 _releaseTarget = numReleases - 1 - _releaseDelta;
-        address factory = factories[_releaseTarget];
+        IReleaseRegistry _releaseRegistry = IReleaseRegistry(releaseRegistry);
+
+        uint256 _releaseTarget = _releaseRegistry.numReleases() -
+            1 -
+            _releaseDelta;
+        address factory = _releaseRegistry.factories(_releaseTarget);
+
         require(factory != address(0), "VaultRegistry: unknown release");
 
         bytes memory vaultCode = _vault.code;
@@ -277,8 +268,15 @@ contract Registry is Ownable {
 
     function newStrategy(address _strategy, address _asset) external {
         string memory apiVersion = IStrategy(_strategy).apiVersion();
-        uint256 _releaseTarget = strategies[_asset].push(_strategy);
+
+        strategies[_asset].push(_strategy);
+
+        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+            .releaseTargets(apiVersion);
+
         strategiesByVersion[_asset][_releaseTarget].push(_strategy);
+
+        emit NewStrategy(_strategy, _asset, apiVersion);
 
         if (!assetIsUsed[_asset]) {
             // We have a new asset to add

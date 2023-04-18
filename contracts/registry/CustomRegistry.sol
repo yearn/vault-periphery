@@ -29,16 +29,23 @@ interface IVault {
     function api_version() external view returns (string memory);
 }
 
-// TODO: Add strategy stuff
-contract Registry is Ownable {
+contract CustomRegistry is Ownable {
     event EndorsedVault(
         address indexed asset,
         address indexed vault,
         uint256 releaseVersion
     );
 
+    struct VaultInfo {
+        address asset;
+        uint256 releaseVersion;
+        uint256 deploymentTimeStamp;
+    }
+
+    string public name;
+
     // Address used to deploy the new vaults through
-    address public immutable registry;
+    address public registry;
 
     // Array of all tokens used as the underlying.
     address[] public assets;
@@ -53,7 +60,12 @@ contract Registry is Ownable {
     mapping(address => mapping(uint256 => address[]))
         public endorsedVaultsByVersion;
 
-    constructor(address _registry) {
+    mapping(address => VaultInfo) public vaultInfo;
+
+    function initialize(string memory _name, address _registry) external {
+        require(registry == address(0), "!initialized");
+
+        name = _name;
         registry = _registry;
     }
 
@@ -191,7 +203,7 @@ contract Registry is Ownable {
             1 -
             _releaseDelta; // dev: no releases
 
-        _registerVault(_asset, vault, releaseTarget);
+        _registerVault(_asset, vault, releaseTarget, block.timestamp);
     }
 
     /**
@@ -203,11 +215,13 @@ contract Registry is Ownable {
      *    Throws if `vault`'s api version does not match the release specified.
      *    Emits a `EndorsedVault` event.
      * @param _vault The vault that will be endorsed by the Registry.
-     * @param _releaseDelta Specify the number of releases prior to the latest to use as a target. DEFAULT_TYPE is latest.
+     * @param _releaseDelta Specify the number of releases prior to the latest to use as a target.
+     * @param _deploymentTimestamp The timestamp of when the vault was deployed for FE use.
      */
     function endorseVault(
         address _vault,
-        uint256 _releaseDelta
+        uint256 _releaseDelta,
+        uint256 _deploymentTimestamp
     ) public onlyOwner {
         // NOTE: Underflow if no releases created yet, or targeting prior to release history
         uint256 releaseTarget = IRegistry(registry).numReleases() -
@@ -224,20 +238,32 @@ contract Registry is Ownable {
         );
 
         // Add to the end of the list of vaults for asset
-        _registerVault(_vault, IVault(_vault).asset(), releaseTarget);
+        _registerVault(
+            _vault,
+            IVault(_vault).asset(),
+            releaseTarget,
+            _deploymentTimestamp
+        );
     }
 
     function endorseVault(address _vault) external {
-        endorseVault(_vault, 0);
+        endorseVault(_vault, 0, 0);
     }
 
     function _registerVault(
         address _vault,
         address _asset,
-        uint256 _releaseTarget
+        uint256 _releaseTarget,
+        uint256 _deploymentTimestamp
     ) internal {
         endorsedVaults[_asset].push(_vault);
         endorsedVaultsByVersion[_asset][_releaseTarget].push(_vault);
+
+        vaultInfo[_vault] = VaultInfo({
+            asset: _asset,
+            releaseVersion: _releaseTarget,
+            deploymentTimeStamp: _deploymentTimestamp
+        });
 
         if (!assetIsUsed[_asset]) {
             // We have a new asset to add
