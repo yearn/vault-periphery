@@ -24,6 +24,10 @@ interface IVault {
     function api_version() external view returns (string memory);
 }
 
+interface IStrategy {
+    function apiVersion() external view returns (string memory);
+}
+
 // TODO: Add strategy stuff
 contract Registry is Ownable {
     event NewVault(address indexed asset, address vault, string apiVersion);
@@ -51,11 +55,20 @@ contract Registry is Ownable {
     mapping(address => address[]) public vaults;
     mapping(address => mapping(uint256 => address[])) public vaultsByVersion;
 
+    // asset => array of all the vaults
+    mapping(address => address[]) public strategies;
+    mapping(address => mapping(uint256 => address[]))
+        public strategiesByVersion;
+
     function numassets() external view returns (uint256) {
         return assets.length;
     }
 
     function numVaults(address _asset) public view returns (uint256) {
+        return vaults[_asset].length;
+    }
+
+    function numStrategies(address _asset) public view returns (uint256) {
         return vaults[_asset].length;
     }
 
@@ -74,6 +87,19 @@ contract Registry is Ownable {
         uint256 _versionDelta
     ) external view returns (address[] memory) {
         return vaultsByVersion[_asset][_versionDelta];
+    }
+
+    function getStrategiess(
+        address _asset
+    ) external view returns (address[] memory) {
+        return strategies[_asset];
+    }
+
+    function getStrategiessByVersion(
+        address _asset,
+        uint256 _versionDelta
+    ) external view returns (address[] memory) {
+        return strategiesByVersion[_asset][_versionDelta];
     }
 
     /**
@@ -97,6 +123,30 @@ contract Registry is Ownable {
         allVaults = new address[][](length);
         for (uint256 i; i < length; ++i) {
             allVaults[i] = vaults[allAssets[i]];
+        }
+    }
+
+    /**
+     * @notice Get all strategies attached to the Registry.
+     * @dev This will return a nested array of all vaults deployed
+     * seperated by their underlying asset.
+     *
+     * This is only meant for off chain viewing and should not be used during any
+     * on chain tx's.
+     *
+     * @return allStrategies A nested array containing all vaults.
+     */
+    function getAllStrategies()
+        external
+        view
+        returns (address[][] memory allStrategies)
+    {
+        address[] memory allAssets = assets;
+        uint256 length = assets.length;
+
+        allStrategies = new address[][](length);
+        for (uint256 i; i < length; ++i) {
+            allStrategies[i] = strategies[allAssets[i]];
         }
     }
 
@@ -217,6 +267,18 @@ contract Registry is Ownable {
     ) internal {
         vaults[_asset].push(_vault);
         vaultsByVersion[_asset][_releaseTarget].push(_vault);
+
+        if (!assetIsUsed[_asset]) {
+            // We have a new asset to add
+            assets.push(_asset);
+            assetIsUsed[_asset] = true;
+        }
+    }
+
+    function newStrategy(address _strategy, address _asset) external {
+        string memory apiVersion = IStrategy(_strategy).apiVersion();
+        uint256 _releaseTarget = strategies[_asset].push(_strategy);
+        strategiesByVersion[_asset][_releaseTarget].push(_strategy);
 
         if (!assetIsUsed[_asset]) {
             // We have a new asset to add
