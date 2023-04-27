@@ -4,29 +4,36 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-interface IRegistry {
+interface IReleaseRegistry {
     function numReleases() external view returns (uint256);
 
     function factories(uint256) external view returns (address);
-
-    function newVault(
-        address _asset,
-        string memory _name,
-        string memory _symbol,
-        address _roleManager,
-        uint256 _profitMaxUnlockTime,
-        uint256 _releaseDelta
-    ) external returns (address);
 }
 
 interface IFactory {
     function api_version() external view returns (string memory);
+
+    function vault_blueprint() external view returns (address);
+
+    function deploy_new_vault(
+        ERC20 asset,
+        string calldata name,
+        string calldata symbol,
+        address roleManager,
+        uint256 profitMaxUnlockTime
+    ) external returns (address);
 }
 
 interface IVault {
     function asset() external view returns (address);
 
     function api_version() external view returns (string memory);
+}
+
+interface IStrategy {
+    function asset() external view returns (address);
+
+    function apiVersion() external view returns (string memory);
 }
 
 contract CustomRegistry is Ownable {
@@ -36,16 +43,23 @@ contract CustomRegistry is Ownable {
         uint256 releaseVersion
     );
 
-    struct VaultInfo {
+    event EndorsedStrategy(
+        address indexed asset,
+        address indexed vault,
+        uint256 releaseVersion
+    );
+
+    struct Info {
         address asset;
         uint256 releaseVersion;
         uint256 deploymentTimeStamp;
     }
 
+    // Custom name for this Registry.
     string public name;
 
-    // Address used to deploy the new vaults through
-    address public registry;
+    // Address used to get the specific versions from.
+    address public releaseRegistry;
 
     // Array of all tokens used as the underlying.
     address[] public assets;
@@ -56,19 +70,45 @@ contract CustomRegistry is Ownable {
     // asset => array of all endorsed vaults.
     mapping(address => address[]) public endorsedVaults;
 
-    // asset => release number => array of vaults
+    // asset => array of all endorsed strategies.
+    mapping(address => address[]) public endorsedStrategies;
+
+    // asset => release number => array of endorsed vaults
     mapping(address => mapping(uint256 => address[]))
         public endorsedVaultsByVersion;
 
-    mapping(address => VaultInfo) public vaultInfo;
+    // asset => release number => array of endorsed strategies
+    mapping(address => mapping(uint256 => address[]))
+        public endorsedStrategiesByVersion;
 
-    function initialize(string memory _name, address _registry) external {
-        require(registry == address(0), "!initialized");
+    // vault/strategy address => Info stuct.
+    mapping(address => Info) public info;
 
+    /**
+     * @notice Initializes the Custom registry.
+     * @dev Should be called atomiclly by the factory after creation.
+     *
+     * @param _name The custom string for this custom registry to be called.
+     * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
+     */
+    function initialize(
+        string memory _name,
+        address _releaseRegistry
+    ) external {
+        // Can't initialize twice.
+        require(releaseRegistry == address(0), "!initialized");
+
+        // Set name.
         name = _name;
-        registry = _registry;
+
+        // Set releaseRegistry.
+        releaseRegistry = _releaseRegistry;
     }
 
+    /**
+     * @notice Returns the total numer of assets being used as the underlying.
+     * @return The amount of assets.
+     */
     function numassets() external view returns (uint256) {
         return assets.length;
     }
@@ -90,6 +130,16 @@ contract CustomRegistry is Ownable {
     }
 
     /**
+     * @notice The amount of endorsed strategies for a specific token.
+     * @return The amount of endorsed strategies.
+     */
+    function numEndorsedStrategies(
+        address _asset
+    ) public view returns (uint256) {
+        return endorsedStrategies[_asset].length;
+    }
+
+    /**
      * @notice Get the number of endorsed vaults for an asset of a specific API version.
      * @return The amount of endorsed vaults.
      */
@@ -97,8 +147,24 @@ contract CustomRegistry is Ownable {
         address _asset,
         uint256 _versionDelta
     ) public view returns (uint256) {
-        uint256 version = IRegistry(registry).numReleases() - 1 - _versionDelta;
+        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+            1 -
+            _versionDelta;
         return endorsedVaultsByVersion[_asset][version].length;
+    }
+
+    /**
+     * @notice Get the number of endorsed strategies for an asset of a specific API version.
+     * @return The amount of endorsed strategies.
+     */
+    function nuwEndorsedStrategiesByVersion(
+        address _asset,
+        uint256 _versionDelta
+    ) public view returns (uint256) {
+        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+            1 -
+            _versionDelta;
+        return endorsedStrategiesByVersion[_asset][version].length;
     }
 
     /**
@@ -113,6 +179,17 @@ contract CustomRegistry is Ownable {
     }
 
     /**
+     * @notice Get the full array of strategies that are endorsed for an `asset`.
+     * @param _asset The token used as the underlying for the strategies.
+     * @return The endorsed strategies.
+     */
+    function getStrategies(
+        address _asset
+    ) external view returns (address[] memory) {
+        return endorsedStrategies[_asset];
+    }
+
+    /**
      * @notice Get the array of vaults endorsed for an `asset` of a specific API.
      * @param _asset The underlying token used by the vaults.
      * @param _versionDelta The difference from the most recent API version.
@@ -122,8 +199,26 @@ contract CustomRegistry is Ownable {
         address _asset,
         uint256 _versionDelta
     ) public view returns (address[] memory) {
-        uint256 version = IRegistry(registry).numReleases() - 1 - _versionDelta;
+        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+            1 -
+            _versionDelta;
         return endorsedVaultsByVersion[_asset][version];
+    }
+
+    /**
+     * @notice Get the array of strategies endorsed for an `asset` of a specific API.
+     * @param _asset The underlying token used by the strategies.
+     * @param _versionDelta The difference from the most recent API version.
+     * @return The endorsed strategies.
+     */
+    function getStrategiesByVersion(
+        address _asset,
+        uint256 _versionDelta
+    ) public view returns (address[] memory) {
+        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+            1 -
+            _versionDelta;
+        return endorsedStrategiesByVersion[_asset][version];
     }
 
     /**
@@ -151,17 +246,27 @@ contract CustomRegistry is Ownable {
     }
 
     /**
-     * @notice Returns the latest deployed vault for the given asset.
-     * @dev Return zero if no vault is associated with the asset
-     * @param _asset The asset address to find the latest vault for.
-     * @return The address of the latest vault for the given asset.
+     * @notice Get all strategies endorsed through this registry.
+     * @dev This will return a nested array of all endorsed strategies seperated by their
+     * underlying asset.
+     *
+     * This is only meant for off chain viewing and should not be used during any
+     * on chain tx's.
+     *
+     * @return allEndorsedStrategies A nested array containing all strategies.
      */
-    function latestEndorsedVault(
-        address _asset
-    ) external view returns (address) {
-        uint256 length = numEndorsedVaults(_asset);
+    function getAllEndorsedStrategies()
+        external
+        view
+        returns (address[][] memory allEndorsedStrategies)
+    {
+        address[] memory allAssets = assets;
+        uint256 length = assets.length;
 
-        return endorsedVaults[_asset][length - 1];
+        allEndorsedStrategies = new address[][](length);
+        for (uint256 i; i < length; ++i) {
+            allEndorsedStrategies[i] = endorsedStrategies[allAssets[i]];
+        }
     }
 
     /**
@@ -190,20 +295,31 @@ contract CustomRegistry is Ownable {
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
     ) public onlyOwner returns (address vault) {
-        vault = IRegistry(registry).newVault(
-            _asset,
+        // Get the target release based on the delta given.
+        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+            .numReleases() -
+            1 -
+            _releaseDelta;
+
+        // Get the factory address for that specific Api version.
+        address factory = IReleaseRegistry(releaseRegistry).factories(
+            _releaseTarget
+        );
+
+        // Make sure we got an actual factory
+        require(factory != address(0), "Registry: unknown release");
+
+        // Deploy New vault.
+        vault = IFactory(factory).deploy_new_vault(
+            ERC20(_asset),
             _name,
             _symbol,
             _roleManager,
-            _profitMaxUnlockTime,
-            _releaseDelta
+            _profitMaxUnlockTime
         );
 
-        uint256 releaseTarget = IRegistry(registry).numReleases() -
-            1 -
-            _releaseDelta; // dev: no releases
-
-        _registerVault(_asset, vault, releaseTarget, block.timestamp);
+        // Register the vault with this Registry
+        _registerVault(vault, _asset, _releaseTarget, block.timestamp);
     }
 
     /**
@@ -224,12 +340,13 @@ contract CustomRegistry is Ownable {
         uint256 _deploymentTimestamp
     ) public onlyOwner {
         // NOTE: Underflow if no releases created yet, or targeting prior to release history
-        uint256 releaseTarget = IRegistry(registry).numReleases() -
+        uint256 releaseTarget = IReleaseRegistry(releaseRegistry)
+            .numReleases() -
             1 -
             _releaseDelta; // dev: no releases
 
         string memory apiVersion = IFactory(
-            IRegistry(registry).factories(releaseTarget)
+            IReleaseRegistry(releaseRegistry).factories(releaseTarget)
         ).api_version();
 
         require(
@@ -246,6 +363,13 @@ contract CustomRegistry is Ownable {
         );
     }
 
+    /**
+     * @notice Endorse an already deployed vault.
+     * @dev To be used with default values for `_releaseDelta` and
+     * `_deploymentTimestamp`.
+     *
+     * @param _vault Address of the vault to endorse.
+     */
     function endorseVault(address _vault) external {
         endorseVault(_vault, 0, 0);
     }
@@ -259,7 +383,7 @@ contract CustomRegistry is Ownable {
         endorsedVaults[_asset].push(_vault);
         endorsedVaultsByVersion[_asset][_releaseTarget].push(_vault);
 
-        vaultInfo[_vault] = VaultInfo({
+        info[_vault] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
             deploymentTimeStamp: _deploymentTimestamp
@@ -272,5 +396,57 @@ contract CustomRegistry is Ownable {
         }
 
         emit EndorsedVault(_vault, _asset, _releaseTarget);
+    }
+
+    /**
+     * @notice
+     *    Adds an existing strategy to the list of "endorsed" strategies for that asset.
+     * @dev
+     *   Throws if caller isn't `owner`.
+     *    Throws if no releases are registered yet.
+     *    Throws if `strategies`'s api version does not match the release specified.
+     *    Emits a `EndorsedStrategy` event.
+     * @param _strategy The strategy that will be endorsed by the Registry.
+     * @param _releaseDelta Specify the number of releases prior to the latest to use as a target.
+     * @param _deploymentTimestamp The timestamp of when the strategy was deployed for FE use.
+     */
+    function endorseStrategy(
+        address _strategy,
+        uint256 _releaseDelta,
+        uint256 _deploymentTimestamp
+    ) external onlyOwner {
+        // NOTE: Underflow if no releases created yet, or targeting prior to release history
+        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+            .numReleases() -
+            1 -
+            _releaseDelta; // dev: no releases
+
+        string memory apiVersion = IFactory(
+            IReleaseRegistry(releaseRegistry).factories(_releaseTarget)
+        ).api_version();
+
+        require(
+            keccak256(bytes((IStrategy(_strategy).apiVersion()))) ==
+                keccak256(bytes((apiVersion)))
+        );
+
+        address _asset = IStrategy(_strategy).asset();
+
+        endorsedStrategies[_asset].push(_strategy);
+        endorsedStrategiesByVersion[_asset][_releaseTarget].push(_strategy);
+
+        info[_strategy] = Info({
+            asset: _asset,
+            releaseVersion: _releaseTarget,
+            deploymentTimeStamp: _deploymentTimestamp
+        });
+
+        if (!assetIsUsed[_asset]) {
+            // We have a new asset to add
+            assets.push(_asset);
+            assetIsUsed[_asset] = true;
+        }
+
+        emit EndorsedStrategy(_strategy, _asset, _releaseTarget);
     }
 }

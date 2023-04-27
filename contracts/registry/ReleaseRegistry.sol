@@ -7,6 +7,7 @@ interface IFactory {
     function api_version() external view returns (string memory);
 }
 
+// Make upgradeable?
 contract ReleaseRegistry is Ownable {
     event NewRelease(
         uint256 indexed releaseId,

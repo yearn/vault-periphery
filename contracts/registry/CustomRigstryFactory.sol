@@ -8,15 +8,15 @@ contract CustomRegistryFactory {
 
     address public immutable original;
 
-    address public immutable registry;
+    address public immutable releaseRegistry;
 
-    constructor(string memory _name, address _registry) {
-        registry = _registry;
+    constructor(string memory _name, address _releaseRegistry) {
+        releaseRegistry = _releaseRegistry;
 
         CustomRegistry _original = new CustomRegistry();
 
         // Initialize original
-        _original.initialize(_name, _registry);
+        _original.initialize(_name, _releaseRegistry);
 
         // Set correct owner
         _original.transferOwnership(msg.sender);
@@ -52,7 +52,7 @@ contract CustomRegistryFactory {
         }
 
         // Initialize original
-        CustomRegistry(newCustomRegistry).initialize(_name, registry);
+        CustomRegistry(newCustomRegistry).initialize(_name, releaseRegistry);
 
         // Set correct owner
         CustomRegistry(newCustomRegistry).transferOwnership(msg.sender);
