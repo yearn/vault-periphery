@@ -168,28 +168,6 @@ contract CustomRegistry is Ownable {
     }
 
     /**
-     * @notice Get the full array of vaults that are endorsed for an `asset`.
-     * @param _asset The token used as the underlying for the vaults.
-     * @return The endorsed vaults.
-     */
-    function getVaults(
-        address _asset
-    ) external view returns (address[] memory) {
-        return endorsedVaults[_asset];
-    }
-
-    /**
-     * @notice Get the full array of strategies that are endorsed for an `asset`.
-     * @param _asset The token used as the underlying for the strategies.
-     * @return The endorsed strategies.
-     */
-    function getStrategies(
-        address _asset
-    ) external view returns (address[] memory) {
-        return endorsedStrategies[_asset];
-    }
-
-    /**
      * @notice Get the array of vaults endorsed for an `asset` of a specific API.
      * @param _asset The underlying token used by the vaults.
      * @param _versionDelta The difference from the most recent API version.

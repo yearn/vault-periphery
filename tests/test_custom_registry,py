@@ -1,0 +1,7 @@
+import ape
+import pytest
+
+def test_factory(project, daddy, release_registry):
+    factory = daddy.deploy(project.CustomRegistryFactory, "Test Registry", release_registry)
+
+    
