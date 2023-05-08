@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: 16
       - uses: ApeWorX/github-action@v2
-      - run: ape compile --force --size
+        with:
+          ape-version-pin: "==0.6.7"
+      - run: ape compile --size
       - run: npm install hardhat
       - run: ape test
         timeout-minutes: 10
