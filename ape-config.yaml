@@ -6,7 +6,7 @@ plugins:
   - name: etherscan
   - name: hardhat
   - name: infura
-  
+
 default_ecosystem: ethereum
 
 dependencies:
@@ -18,13 +18,13 @@ dependencies:
     branch: master
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    branch: test
+    ref: test
     contracts_folder: src
     exclude:
      - src/test/**/*
   - name: periphery
     github: schlagonia/tokenized-strategy-periphery
-    branch: master
+    ref: master
 
 solidity:
   import_remapping:
