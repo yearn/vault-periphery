@@ -16,10 +16,7 @@ contract RegistryFactory {
         Registry _original = new Registry();
 
         // Initialize original
-        _original.initialize(_name, _releaseRegistry);
-
-        // Set correct owner
-        _original.transferOwnership(msg.sender);
+        _original.initialize(msg.sender, _name, _releaseRegistry);
 
         original = address(_original);
 
@@ -52,10 +49,7 @@ contract RegistryFactory {
         }
 
         // Initialize original
-        Registry(newRegistry).initialize(_name, releaseRegistry);
-
-        // Set correct owner
-        Registry(newRegistry).transferOwnership(msg.sender);
+        Registry(newRegistry).initialize(msg.sender, _name, releaseRegistry);
 
         emit NewRegistry(newRegistry);
     }

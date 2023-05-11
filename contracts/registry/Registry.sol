@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 interface IReleaseRegistry {
@@ -36,7 +35,7 @@ interface IStrategy {
     function apiVersion() external view returns (string memory);
 }
 
-contract Registry is Ownable {
+contract Registry {
     event NewEndorsedVault(
         address indexed asset,
         address indexed vault,
@@ -54,6 +53,14 @@ contract Registry is Ownable {
         uint256 releaseVersion;
         uint256 deploymentTimeStamp;
     }
+
+    modifier onlyGovernance() {
+        require(msg.sender == governance, "!Authorized");
+        _;
+    }
+
+    // Owner of this Registry
+    address public governance;
 
     // Custom name for this Registry.
     string public name;
@@ -92,11 +99,15 @@ contract Registry is Ownable {
      * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
      */
     function initialize(
+        address _governance,
         string memory _name,
         address _releaseRegistry
     ) external {
         // Can't initialize twice.
         require(releaseRegistry == address(0), "!initialized");
+
+        // Set governance
+        governance = _governance;
 
         // Set name.
         name = _name;
@@ -292,7 +303,7 @@ contract Registry is Ownable {
         address _roleManager,
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
-    ) public onlyOwner returns (address vault) {
+    ) public onlyGovernance returns (address vault) {
         // Get the target release based on the delta given.
         uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -336,7 +347,7 @@ contract Registry is Ownable {
         address _vault,
         uint256 _releaseDelta,
         uint256 _deploymentTimestamp
-    ) public onlyOwner {
+    ) public onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
         uint256 releaseTarget = IReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -416,7 +427,7 @@ contract Registry is Ownable {
         address _strategy,
         uint256 _releaseDelta,
         uint256 _deploymentTimestamp
-    ) external onlyOwner {
+    ) external onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
         uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -453,5 +464,12 @@ contract Registry is Ownable {
         }
 
         emit NewEndorsedStrategy(_strategy, _asset, _releaseTarget);
+    }
+
+    function transferGovernance(
+        address _newGovernance
+    ) external onlyGovernance {
+        require(_newGovernance != address(0));
+        governance = _newGovernance;
     }
 }
