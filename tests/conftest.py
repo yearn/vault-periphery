@@ -49,14 +49,13 @@ def asset(create_token):
 
 @pytest.fixture(scope="session")
 def amount(asset):
-    # Use 1M
     return 1_000 * 10 ** asset.decimals()
 
 
 @pytest.fixture(scope="session")
 def vault_blueprint(project, daddy):
     blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
-        project.VaultV3.contract_type.deployment_bytecode.bytecode
+        project.dependencies["yearn-vaults"]["master"].VaultV3.contract_type.deployment_bytecode.bytecode
     )  # ERC5202
     len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
     deploy_bytecode = HexBytes(
@@ -81,8 +80,29 @@ def vault_factory(project, daddy, vault_blueprint):
 
 
 @pytest.fixture(scope="session")
-def release_registry(project, daddy):
-    yield daddy.deploy(project.ReleaseRegistry)
+def release_registry(project, daddy, vault_factory):
+    release_registry = daddy.deploy(project.ReleaseRegistry)
+
+    #release_registry.newRelease(vault_factory.address, sender=daddy)
+    #assert release_registry.numReleases() == 1
+
+    return release_registry
+
+
+@pytest.fixture(scope="session")
+def registry(project, daddy, release_registry):
+    yield daddy.deploy(project.Registry, release_registry.address)
+
+
+@pytest.fixture(scope="session")
+def custom_registry_factory(daddy, project, release_registry):
+    yield daddy.deploy(project.CustomRegistryFactory, "Test Custom Regiostry", release_registry.address)
+
+
+@pytest.fixture(scope="session")
+def custom_registry(custom_registry_factory):
+    yield custom_registry_factory.original()
+
 
 @pytest.fixture(scope="session")
 def create_vault(project, daddy, vault_factory):
