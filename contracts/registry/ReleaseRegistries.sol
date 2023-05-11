@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 interface IFactory {
     function api_version() external view returns (string memory);
 }
 
-contract ReleaseRegistry is Ownable {
+contract ReleaseRegistry is Ownable2Step {
     event NewRelease(
         uint256 indexed releaseId,
         address indexed factory,
@@ -24,7 +24,7 @@ contract ReleaseRegistry is Ownable {
     // Mapping of the API version for a specific release to the
     // place in the order it was released.
     mapping(string => uint256) public releaseTargets;
-    
+
     /**
      * @notice Returns the latest factory.
      * @dev Throws if no releases are registered yet.
@@ -66,7 +66,7 @@ contract ReleaseRegistry is Ownable {
                 keccak256(
                     bytes(IFactory(factories[releaseId - 1]).api_version())
                 ) != keccak256(bytes(apiVersion)),
-                "VaultRegistry: same api version"
+                "ReleaseRegistry: same api version"
             );
         }
 

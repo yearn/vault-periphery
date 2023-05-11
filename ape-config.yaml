@@ -24,7 +24,7 @@ dependencies:
      - src/test/**/*
   - name: periphery
     github: schlagonia/tokenized-strategy-periphery
-    ref: master
+    branch: master
 
 solidity:
   import_remapping:
