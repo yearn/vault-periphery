@@ -6,9 +6,9 @@ plugins:
   - name: etherscan
   - name: hardhat
   - name: infura
-  - name: alchemy
-
+  
 default_ecosystem: ethereum
+
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts

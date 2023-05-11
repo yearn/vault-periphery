@@ -8,8 +8,10 @@ interface IRegistry {
 }
 
 contract MockStrategy is ERC4626Mock {
-
-    constructor(IERC20Metadata _asset, address _registry) ERC4626Mock(_asset, "test strategy", "tsStrat") {
+    constructor(
+        IERC20Metadata _asset,
+        address _registry
+    ) ERC4626Mock(_asset, "test strategy", "tsStrat") {
         // Issue a call to the Registry
         IRegistry(_registry).newStrategy(address(this), address(_asset));
     }

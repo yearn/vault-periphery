@@ -82,26 +82,24 @@ def vault_factory(project, daddy, vault_blueprint):
 @pytest.fixture(scope="session")
 def release_registry(project, daddy, vault_factory):
     release_registry = daddy.deploy(project.ReleaseRegistry)
-
-    #release_registry.newRelease(vault_factory.address, sender=daddy)
-    #assert release_registry.numReleases() == 1
-
-    return release_registry
+    release_registry.newRelease(vault_factory.address, sender=daddy)
+    assert release_registry.numReleases() == 1
+    yield release_registry
 
 
 @pytest.fixture(scope="session")
-def registry(project, daddy, release_registry):
-    yield daddy.deploy(project.Registry, release_registry.address)
+def new_registry(daddy, registry_factory):
+    yield registry_factory.createNewRegistry("New test Registry")
 
 
 @pytest.fixture(scope="session")
-def custom_registry_factory(daddy, project, release_registry):
-    yield daddy.deploy(project.CustomRegistryFactory, "Test Custom Regiostry", release_registry.address)
+def registry_factory(daddy, project, release_registry):
+    yield daddy.deploy(project.RegistryFactory, "Test Registry", release_registry.address)
 
 
 @pytest.fixture(scope="session")
-def custom_registry(custom_registry_factory):
-    yield custom_registry_factory.original()
+def registry(registry_factory):
+    yield registry_factory.original()
 
 
 @pytest.fixture(scope="session")

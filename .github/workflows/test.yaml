@@ -20,7 +20,7 @@ jobs:
         with:
           ape-version-pin: "==0.6.7"
       - run: ape compile --size
-      - run: npm install hardhat
+      - run: npm install hardhat@v2.13.1
       - run: ape test
         timeout-minutes: 10
         env:

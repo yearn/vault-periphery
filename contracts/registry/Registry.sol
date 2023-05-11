@@ -144,7 +144,9 @@ contract Registry is Ownable {
      * @param _asset The underlying token used by the vaults.
      * @return The endorsed vaults.
      */
-    function getEndorsedVaults(address _asset) external view returns (address[] memory) {
+    function getEndorsedVaults(
+        address _asset
+    ) external view returns (address[] memory) {
         return _endorsedVaults[_asset];
     }
 
@@ -153,7 +155,9 @@ contract Registry is Ownable {
      * @param _asset The underlying token used by the strategies.
      * @return The endorsed strategies.
      */
-    function getEndorsedStrategies(address _asset) external view returns (address[] memory) {
+    function getEndorsedStrategies(
+        address _asset
+    ) external view returns (address[] memory) {
         return _endorsedStrategies[_asset];
     }
 
@@ -219,7 +223,7 @@ contract Registry is Ownable {
 
     /**
      * @notice Get all endorsed vaults deployed using the Registry.
-     * @dev This will return a nested array of all vaults deployed 
+     * @dev This will return a nested array of all vaults deployed
      * seperated by their underlying asset.
      *
      * This is only meant for off chain viewing and should not be used during any
@@ -243,7 +247,7 @@ contract Registry is Ownable {
 
     /**
      * @notice Get all strategies endorsed through this registry.
-     * @dev This will return a nested array of all endorsed strategies 
+     * @dev This will return a nested array of all endorsed strategies
      * seperated by their underlying asset.
      *
      * This is only meant for off chain viewing and should not be used during any
@@ -267,7 +271,7 @@ contract Registry is Ownable {
 
     /**
      * @notice
-     *    Create a new vault for the given asset using a given release in the 
+     *    Create a new vault for the given asset using a given release in the
      *     release registry.
      * @dev
      *   Throws if caller isn't `owner`.
@@ -346,8 +350,8 @@ contract Registry is Ownable {
 
         require(
             keccak256(bytes(IVault(_vault).api_version())) ==
-                keccak256(bytes((apiVersion))), 
-                    "Wrong API Version"
+                keccak256(bytes((apiVersion))),
+            "Wrong API Version"
         );
 
         // Add to the end of the list of vaults for asset
@@ -428,7 +432,7 @@ contract Registry is Ownable {
         require(
             keccak256(bytes((IStrategy(_strategy).apiVersion()))) ==
                 keccak256(bytes((apiVersion))),
-                    "Wrong API Version"
+            "Wrong API Version"
         );
 
         address _asset = IStrategy(_strategy).asset();
