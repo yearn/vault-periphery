@@ -21,11 +21,11 @@ def test__clone_registry(registry_factory, release_registry, management):
     # create a new registry
     tx = registry_factory.createNewRegistry(new_name, sender=management)
 
-    new_registry = tx.return_value
-    new_registry = project.Registry.at(new_registry)
+    # new_registry = tx.return_value
+    # new_registry = project.Registry.at(new_registry)
 
     event = list(tx.decode_logs(registry_factory.NewRegistry))
-    # new_registry = project.Registry.at(event[0].newRegistry)
+    new_registry = project.Registry.at(event[0].newRegistry)
 
     assert len(event) == 1
     assert event[0].newRegistry == new_registry
