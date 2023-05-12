@@ -165,8 +165,8 @@ def vault(asset, create_vault):
 
 @pytest.fixture
 def create_strategy(project, management, asset):
-    def create_strategy(token=asset):
-        strategy = management.deploy(project.MockStrategy, token.address)
+    def create_strategy(token=asset, apiVersion="3.1.0"):
+        strategy = management.deploy(project.MockStrategy, token.address, apiVersion)
 
         return strategy
 
@@ -175,7 +175,7 @@ def create_strategy(project, management, asset):
 
 @pytest.fixture(scope="function")
 def strategy(asset, create_strategy):
-    strategy = create_strategy(asset)
+    strategy = create_strategy(asset, "3.1.0")
     yield strategy
 
 

@@ -8,11 +8,12 @@ interface IRegistry {
 }
 
 contract MockStrategy is ERC4626Mock {
+    string public apiVersion;
+
     constructor(
         IERC20Metadata _asset,
-        address _registry
+        string memory _apiVersion
     ) ERC4626Mock(_asset, "test strategy", "tsStrat") {
-        // Issue a call to the Registry
-        IRegistry(_registry).newStrategy(address(this), address(_asset));
+        apiVersion = _apiVersion;
     }
 }

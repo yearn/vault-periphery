@@ -427,7 +427,7 @@ contract Registry {
         address _strategy,
         uint256 _releaseDelta,
         uint256 _deploymentTimestamp
-    ) external onlyGovernance {
+    ) public onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
         uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -464,6 +464,17 @@ contract Registry {
         }
 
         emit NewEndorsedStrategy(_strategy, _asset, _releaseTarget);
+    }
+
+    /**
+     * @notice Endorse an already deployed strategy.
+     * @dev To be used with default values for `_releaseDelta` and
+     * `_deploymentTimestamp`.
+     *
+     * @param _strategy Address of the strategy to endorse.
+     */
+    function endorseStrategy(address _strategy) external {
+        endorseStrategy(_strategy, 0, 0);
     }
 
     function transferGovernance(
