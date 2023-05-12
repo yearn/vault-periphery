@@ -48,6 +48,8 @@ contract Registry {
         uint256 releaseVersion
     );
 
+    event GovernanceUpdated(address indexed newGovernance);
+
     struct Info {
         address asset;
         uint256 releaseVersion;
@@ -480,7 +482,9 @@ contract Registry {
     function transferGovernance(
         address _newGovernance
     ) external onlyGovernance {
-        require(_newGovernance != address(0));
+        require(_newGovernance != address(0), "ZERO_ADDRESS");
         governance = _newGovernance;
+
+        emit GovernanceUpdated(_newGovernance);
     }
 }
