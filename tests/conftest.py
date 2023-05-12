@@ -30,7 +30,7 @@ def create_token(project, daddy, user, amount):
         name="Test Token", symbol="yTest", initialUser=user, initialAmount=amount
     ):
         token = daddy.deploy(
-            project.dependencies["openzeppelin"]["4.8.2"]["mocks"].ERC20Mock,
+            project.MockERC20,
             name,
             symbol,
             initialUser,
@@ -48,8 +48,8 @@ def asset(create_token):
 
 
 @pytest.fixture(scope="session")
-def amount(asset):
-    return 1_000 * 10 ** asset.decimals()
+def amount():
+    return int(1_000 * 1e18)
 
 
 @pytest.fixture(scope="session")
@@ -90,7 +90,9 @@ def release_registry(project, daddy):
 
 @pytest.fixture(scope="session")
 def new_registry(daddy, registry_factory):
-    yield project.Registry.at(registry_factory.createNewRegistry("New test Registry"))
+    yield project.Registry.at(
+        registry_factory.createNewRegistry("New test Registry", sender=daddy)
+    )
 
 
 @pytest.fixture(scope="session")

@@ -21,11 +21,12 @@ jobs:
         with:
           python-version: '3.10'
           ape-version-pin: "==0.6.3"
+        ape-plugins-list: 'solidity==0.6.0 vyper==0.6.1 hardhat==0.6.0'
 
       - name: install vyper
         run: pip install git+https://github.com/vyperlang/vyper
 
-      - run: ape compile --size
+      - run: ape compile --force --size
 
       - run: npm install hardhat@v2.13.0
       

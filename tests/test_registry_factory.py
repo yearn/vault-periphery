@@ -12,6 +12,7 @@ def test__factory_set_up(registry_factory, release_registry, daddy):
     # make sure the original registry was setup correctly
     assert original_registry.governance() == daddy
     assert original_registry.releaseRegistry() == release_registry
+    assert original_registry.numAssets() == 0
 
 
 def test__clone_registry(registry_factory, release_registry, management):
@@ -20,14 +21,13 @@ def test__clone_registry(registry_factory, release_registry, management):
     # create a new registry
     tx = registry_factory.createNewRegistry(new_name, sender=management)
 
-    event = list(tx.decode_logs(registry_factory.NewRegistry))
-
     new_registry = tx.return_value
-    print(f"New registry {new_registry}")
-
     new_registry = project.Registry.at(new_registry)
 
-    assert len(event) == 0
+    event = list(tx.decode_logs(registry_factory.NewRegistry))
+    # new_registry = project.Registry.at(event[0].newRegistry)
+
+    assert len(event) == 1
     assert event[0].newRegistry == new_registry
 
     # make sure it is set up correctly
@@ -35,9 +35,7 @@ def test__clone_registry(registry_factory, release_registry, management):
     assert new_registry.releaseRegistry() == release_registry
     assert new_registry.name() == new_name
     assert new_registry.numAssets() == 0
-    assert new_registry.numEndorsedStrategies() == 0
-    assert new_registry.numEndorsedVaults() == 0
 
     # make sure we can't re initialize the registry
     with ape.reverts("!initialized"):
-        new_registry.initialize("testing", management, sender=management)
+        new_registry.initialize(management, "testing", management, sender=management)

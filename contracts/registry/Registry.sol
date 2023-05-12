@@ -37,14 +37,14 @@ interface IStrategy {
 
 contract Registry {
     event NewEndorsedVault(
-        address indexed asset,
         address indexed vault,
+        address indexed asset,
         uint256 releaseVersion
     );
 
     event NewEndorsedStrategy(
+        address indexed strategy,
         address indexed asset,
-        address indexed vault,
         uint256 releaseVersion
     );
 
@@ -120,7 +120,7 @@ contract Registry {
      * @notice Returns the total numer of assets being used as the underlying.
      * @return The amount of assets.
      */
-    function numassets() external view returns (uint256) {
+    function numAssets() external view returns (uint256) {
         return assets.length;
     }
 
@@ -176,7 +176,7 @@ contract Registry {
      * @notice Get the number of endorsed vaults for an asset of a specific API version.
      * @return The amount of endorsed vaults.
      */
-    function nuwEndorsedVaultsByVersion(
+    function numEndorsedVaultsByVersion(
         address _asset,
         uint256 _versionDelta
     ) public view returns (uint256) {
@@ -190,7 +190,7 @@ contract Registry {
      * @notice Get the number of endorsed strategies for an asset of a specific API version.
      * @return The amount of endorsed strategies.
      */
-    function nuwEndorsedStrategiesByVersion(
+    function numEndorsedStrategiesByVersion(
         address _asset,
         uint256 _versionDelta
     ) public view returns (uint256) {
@@ -206,7 +206,7 @@ contract Registry {
      * @param _versionDelta The difference from the most recent API version.
      * @return The endorsed vaults.
      */
-    function getVaultsByVersion(
+    function getEndorsedVaultsByVersion(
         address _asset,
         uint256 _versionDelta
     ) public view returns (address[] memory) {
@@ -222,7 +222,7 @@ contract Registry {
      * @param _versionDelta The difference from the most recent API version.
      * @return The endorsed strategies.
      */
-    function getStrategiesByVersion(
+    function getEndorsedStrategiesByVersion(
         address _asset,
         uint256 _versionDelta
     ) public view returns (address[] memory) {
@@ -294,7 +294,7 @@ contract Registry {
      * @param _roleManager The address authorized for guardian interactions in the new Vault.
      * @param _profitMaxUnlockTime The time strategy profits will unlock over.
      * @param _releaseDelta The number of releases prior to the latest to use as a target. NOTE: Set to 0 for latest.
-     * @return vault address of the newly-deployed vault
+     * @return _vault address of the newly-deployed vault
      */
     function newEndorsedVault(
         address _asset,
@@ -303,7 +303,7 @@ contract Registry {
         address _roleManager,
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
-    ) public onlyGovernance returns (address vault) {
+    ) public onlyGovernance returns (address _vault) {
         // Get the target release based on the delta given.
         uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -319,7 +319,7 @@ contract Registry {
         require(factory != address(0), "Registry: unknown release");
 
         // Deploy New vault.
-        vault = IFactory(factory).deploy_new_vault(
+        _vault = IFactory(factory).deploy_new_vault(
             ERC20(_asset),
             _name,
             _symbol,
@@ -328,7 +328,7 @@ contract Registry {
         );
 
         // Register the vault with this Registry
-        _registerVault(vault, _asset, _releaseTarget, block.timestamp);
+        _registerVault(_vault, _asset, _releaseTarget, block.timestamp);
     }
 
     /**
