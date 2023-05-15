@@ -3,25 +3,8 @@ pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-interface IReleaseRegistry {
-    function numReleases() external view returns (uint256);
-
-    function factories(uint256) external view returns (address);
-}
-
-interface IFactory {
-    function api_version() external view returns (string memory);
-
-    function vault_blueprint() external view returns (address);
-
-    function deploy_new_vault(
-        ERC20 asset,
-        string calldata name,
-        string calldata symbol,
-        address roleManager,
-        uint256 profitMaxUnlockTime
-    ) external returns (address);
-}
+import {IFactory} from "../interfaces/IFactory.sol";
+import {ReleaseRegistry} from "./ReleaseRegistry.sol";
 
 interface IVault {
     function asset() external view returns (address);
@@ -182,7 +165,7 @@ contract Registry {
         address _asset,
         uint256 _versionDelta
     ) public view returns (uint256) {
-        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
             1 -
             _versionDelta;
         return _endorsedVaultsByVersion[_asset][version].length;
@@ -196,7 +179,7 @@ contract Registry {
         address _asset,
         uint256 _versionDelta
     ) public view returns (uint256) {
-        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
             1 -
             _versionDelta;
         return _endorsedStrategiesByVersion[_asset][version].length;
@@ -212,7 +195,7 @@ contract Registry {
         address _asset,
         uint256 _versionDelta
     ) public view returns (address[] memory) {
-        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
             1 -
             _versionDelta;
         return _endorsedVaultsByVersion[_asset][version];
@@ -228,7 +211,7 @@ contract Registry {
         address _asset,
         uint256 _versionDelta
     ) public view returns (address[] memory) {
-        uint256 version = IReleaseRegistry(releaseRegistry).numReleases() -
+        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
             1 -
             _versionDelta;
         return _endorsedStrategiesByVersion[_asset][version];
@@ -307,13 +290,13 @@ contract Registry {
         uint256 _releaseDelta
     ) public onlyGovernance returns (address _vault) {
         // Get the target release based on the delta given.
-        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+        uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
             .numReleases() -
             1 -
             _releaseDelta;
 
         // Get the factory address for that specific Api version.
-        address factory = IReleaseRegistry(releaseRegistry).factories(
+        address factory = ReleaseRegistry(releaseRegistry).factories(
             _releaseTarget
         );
 
@@ -351,14 +334,13 @@ contract Registry {
         uint256 _deploymentTimestamp
     ) public onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
-        uint256 releaseTarget = IReleaseRegistry(releaseRegistry)
-            .numReleases() -
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).numReleases() -
             1 -
             _releaseDelta; // dev: no releases
 
         // Get the API version for the target specified
         string memory apiVersion = IFactory(
-            IReleaseRegistry(releaseRegistry).factories(releaseTarget)
+            ReleaseRegistry(releaseRegistry).factories(releaseTarget)
         ).api_version();
 
         require(
@@ -431,14 +413,14 @@ contract Registry {
         uint256 _deploymentTimestamp
     ) public onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
-        uint256 _releaseTarget = IReleaseRegistry(releaseRegistry)
+        uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
             .numReleases() -
             1 -
             _releaseDelta; // dev: no releases
 
         // Get the API version for this release
         string memory apiVersion = IFactory(
-            IReleaseRegistry(releaseRegistry).factories(_releaseTarget)
+            ReleaseRegistry(releaseRegistry).factories(_releaseTarget)
         ).api_version();
 
         // Make sure the API versions match

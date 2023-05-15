@@ -32,6 +32,7 @@ contract RegistryFactory {
     ) external returns (address newRegistry) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
+
         assembly {
             // EIP-1167 bytecode
             let clone_code := mload(0x40)
