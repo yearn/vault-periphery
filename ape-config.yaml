@@ -1,4 +1,4 @@
-name: tokenized-strategy-ape-mix
+name: yearn-v3-vault-periphery
 
 plugins:
   - name: solidity
@@ -6,9 +6,9 @@ plugins:
   - name: etherscan
   - name: hardhat
   - name: infura
-  - name: alchemy
 
 default_ecosystem: ethereum
+
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
@@ -18,7 +18,7 @@ dependencies:
     branch: master
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    branch: test
+    ref: test
     contracts_folder: src
     exclude:
      - src/test/**/*
@@ -34,12 +34,5 @@ solidity:
     - "@periphery=periphery/master"
 
 ethereum:
-  default_network: mainnet-fork
-  mainnet_fork:
+  local:
     default_provider: hardhat
-
-hardhat:
-  fork:
-    ethereum:
-      mainnet:
-        upstream_provider: infura

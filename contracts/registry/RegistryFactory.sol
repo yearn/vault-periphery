@@ -1,38 +1,35 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+pragma solidity 0.8.18;
 
-import {CustomRegistry} from "./CustomRegistry.sol";
+import {Registry} from "./Registry.sol";
 
-contract CustomRegistryFactory {
-    event NewCustomRegistry(address indexed newCustomRegistry);
+contract RegistryFactory {
+    event NewRegistry(address indexed newRegistry);
 
     address public immutable original;
 
-    address public immutable registry;
+    address public immutable releaseRegistry;
 
-    constructor(string memory _name, address _registry) {
-        registry = _registry;
+    constructor(string memory _name, address _releaseRegistry) {
+        releaseRegistry = _releaseRegistry;
 
-        CustomRegistry _original = new CustomRegistry();
+        Registry _original = new Registry();
 
         // Initialize original
-        _original.initialize(_name, _registry);
-
-        // Set correct owner
-        _original.transferOwnership(msg.sender);
+        _original.initialize(msg.sender, _name, _releaseRegistry);
 
         original = address(_original);
 
-        emit NewCustomRegistry(original);
+        emit NewRegistry(original);
     }
 
     function name() external pure returns (string memory) {
         return "Custom Vault Registry Factory";
     }
 
-    function createCustomRegistry(
+    function createNewRegistry(
         string memory _name
-    ) external returns (address newCustomRegistry) {
+    ) external returns (address newRegistry) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
 
@@ -48,15 +45,12 @@ contract CustomRegistryFactory {
                 add(clone_code, 0x28),
                 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
             )
-            newCustomRegistry := create(0, clone_code, 0x37)
+            newRegistry := create(0, clone_code, 0x37)
         }
 
         // Initialize original
-        CustomRegistry(newCustomRegistry).initialize(_name, registry);
+        Registry(newRegistry).initialize(msg.sender, _name, releaseRegistry);
 
-        // Set correct owner
-        CustomRegistry(newCustomRegistry).transferOwnership(msg.sender);
-
-        emit NewCustomRegistry(newCustomRegistry);
+        emit NewRegistry(newRegistry);
     }
 }

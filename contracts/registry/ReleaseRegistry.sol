@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 interface IFactory {
     function api_version() external view returns (string memory);
 }
 
-contract ReleaseRegistry is Ownable {
+contract ReleaseRegistry is Ownable2Step {
     event NewRelease(
         uint256 indexed releaseId,
         address indexed factory,
@@ -17,13 +17,22 @@ contract ReleaseRegistry is Ownable {
     // The total number of releases that have been deployed
     uint256 public numReleases;
 
-    // Mapping of release targets starting at 0 to the address
+    // Mapping of release id starting at 0 to the address
     // of the corresponding factory for that release.
     mapping(uint256 => address) public factories;
 
     // Mapping of the API version for a specific release to the
     // place in the order it was released.
     mapping(string => uint256) public releaseTargets;
+
+    /**
+     * @notice Returns the latest factory.
+     * @dev Throws if no releases are registered yet.
+     * @return The address of the factory for the latest release.
+     */
+    function latestFactory() external view returns (address) {
+        return factories[numReleases - 1];
+    }
 
     /**
      * @notice Returns the api version of the latest release.
@@ -57,7 +66,7 @@ contract ReleaseRegistry is Ownable {
                 keccak256(
                     bytes(IFactory(factories[releaseId - 1]).api_version())
                 ) != keccak256(bytes(apiVersion)),
-                "VaultRegistry: same api version"
+                "ReleaseRegistry: same api version"
             );
         }
 
@@ -71,6 +80,6 @@ contract ReleaseRegistry is Ownable {
         numReleases = releaseId + 1;
 
         // Log the release for external listeners
-        emit NewRelease(releaseId, _factory, IFactory(_factory).api_version());
+        emit NewRelease(releaseId, _factory, apiVersion);
     }
 }
