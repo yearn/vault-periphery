@@ -33,9 +33,14 @@ contract Registry {
 
     event GovernanceUpdated(address indexed newGovernance);
 
+    // Struct stored for every endorsed vault or strategy for 
+    // off chain use to easily retreive info.
     struct Info {
-        address asset;
+        // The token thats being used.
+        address asset; 
+        // The release number corresponding to the release registries version.
         uint256 releaseVersion;
+        // Time when the vault was deployed for easier indexing.
         uint256 deploymentTimeStamp;
     }
 
@@ -56,7 +61,7 @@ contract Registry {
     // Array of all tokens used as the underlying.
     address[] public assets;
 
-    // Mapping to check it a specific `asset` has a vault.
+    // Mapping to check if a specific `asset` has a vault.
     mapping(address => bool) public assetIsUsed;
 
     // asset => array of all endorsed vaults.
@@ -80,6 +85,7 @@ contract Registry {
      * @notice Initializes the Custom registry.
      * @dev Should be called atomiclly by the factory after creation.
      *
+     * @param _governance Address to set as owner of the Registry.
      * @param _name The custom string for this custom registry to be called.
      * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
      */

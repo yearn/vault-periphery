@@ -27,9 +27,14 @@ contract RegistryFactory {
         return "Custom Vault Registry Factory";
     }
 
+    function createNewRegistry(string memory _name) external returns (address) {
+        return createNewRegistry(msg.sender, _name);
+    }
+
     function createNewRegistry(
+        address _governance,
         string memory _name
-    ) external returns (address newRegistry) {
+    ) public returns (address newRegistry) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
 
@@ -49,7 +54,7 @@ contract RegistryFactory {
         }
 
         // Initialize original
-        Registry(newRegistry).initialize(msg.sender, _name, releaseRegistry);
+        Registry(newRegistry).initialize(_governance, _name, releaseRegistry);
 
         emit NewRegistry(newRegistry);
     }
