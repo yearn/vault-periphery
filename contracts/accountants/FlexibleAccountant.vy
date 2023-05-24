@@ -74,6 +74,12 @@ def __init__(asset: address):
 @external
 def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256):
     """
+    @notice Called by a vault when a strategy is reporting to calculate fees.
+    @param strategy, The strategy that is reporting.
+    @param gain, The amount gained since last report if any.
+    @param loss, The amount lost since last report if any.
+    @return Total fees the vault should charge.
+    @return Total refunds the accountant is giving.
     """
     total_refunds: uint256 = 0
 
@@ -98,7 +104,6 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
     if gain > 0:
         total_fees += (gain * fee.performance_fee) / MAX_BPS
-        total_refunds = min(asset_balance, gain * refund_ratio / MAX_BPS)
     else:
         # Now taking loss from its own funds. In the future versions could be from different mecanisms
         total_refunds = min(asset_balance, loss * refund_ratio / MAX_BPS)

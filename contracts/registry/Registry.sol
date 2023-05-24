@@ -33,15 +33,17 @@ contract Registry {
 
     event GovernanceUpdated(address indexed newGovernance);
 
-    // Struct stored for every endorsed vault or strategy for 
+    // Struct stored for every endorsed vault or strategy for
     // off chain use to easily retreive info.
     struct Info {
         // The token thats being used.
-        address asset; 
+        address asset;
         // The release number corresponding to the release registries version.
         uint256 releaseVersion;
         // Time when the vault was deployed for easier indexing.
         uint256 deploymentTimeStamp;
+        // String so that mangement to tag a vault with any info for FE's.
+        string tag;
     }
 
     modifier onlyGovernance() {
@@ -389,7 +391,8 @@ contract Registry {
         info[_vault] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp
+            deploymentTimeStamp: _deploymentTimestamp,
+            tag: ""
         });
 
         if (!assetIsUsed[_asset]) {
@@ -444,7 +447,8 @@ contract Registry {
         info[_strategy] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp
+            deploymentTimeStamp: _deploymentTimestamp,
+            tag: ""
         });
 
         if (!assetIsUsed[_asset]) {
@@ -465,6 +469,22 @@ contract Registry {
      */
     function endorseStrategy(address _strategy) external {
         endorseStrategy(_strategy, 0, 0);
+    }
+
+    /**
+     * @notice Tag a vault with a specific string.
+     * @dev This is available to governance to tag any vault or strategy
+     * on chain if desired to arbitrarily classify any vaults.
+     *   i.e. Certain credit ratings ("AAA")
+     *
+     * @param _vault Address of the vault or strategy to tag.
+     * @param _tag The string to tag the vault or strategy with.
+     */
+    function tagVault(
+        address _vault,
+        string memory _tag
+    ) external onlyGovernance {
+        info[_vault].tag = _tag;
     }
 
     function transferGovernance(
