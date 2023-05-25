@@ -75,11 +75,6 @@ def __init__(asset: address):
 def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256):
     """
     @notice Called by a vault when a strategy is reporting to calculate fees.
-    @param strategy, The strategy that is reporting.
-    @param gain, The amount gained since last report if any.
-    @param loss, The amount lost since last report if any.
-    @return Total fees the vault should charge.
-    @return Total refunds the accountant is giving.
     """
     total_refunds: uint256 = 0
 

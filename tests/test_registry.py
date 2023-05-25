@@ -402,7 +402,52 @@ def test__endorse_strategy_wrong_api__reverts(
     registry.endorseStrategy(strategy, 0, 0, sender=daddy)
 
 
-def test_access(
+def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, strategy):
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    name = "New vaults"
+    symbol = "yvTest"
+
+    # Deploy a new vault offset of 1
+    tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event[0].vault)
+
+    # Make sure it is endorsed but not tagged.
+    assert registry.info(vault.address).asset == asset.address
+    assert registry.info(vault.address).tag == ""
+
+    tag = "Test Tag"
+
+    registry.tagVault(vault.address, tag, sender=daddy)
+
+    assert registry.info(vault.address).asset == asset.address
+    assert registry.info(vault.address).tag == tag
+
+    # Try to tag an undendorsed vault
+    with ape.reverts("!Endorsed"):
+        registry.tagVault(strategy.address, tag, sender=daddy)
+
+    # Endorse the strategy then tag it.
+    registry.endorseStrategy(strategy.address, sender=daddy)
+
+    assert registry.info(strategy.address).asset == asset.address
+    assert registry.info(strategy.address).tag == ""
+
+    tag = "Test Tag"
+
+    registry.tagVault(strategy.address, tag, sender=daddy)
+
+    assert registry.info(strategy.address).asset == asset.address
+    assert registry.info(strategy.address).tag == tag
+
+
+def test__access(
     registry, asset, release_registry, vault_factory, daddy, strategy, user
 ):
     add_new_release(
@@ -439,6 +484,9 @@ def test_access(
     # cant endorse strategy with default values
     with ape.reverts("!Authorized"):
         registry.endorseStrategy(strategy, sender=user)
+
+    with ape.reverts("!Authorized"):
+        registry.tagVault(strategy, "tag", sender=user)
 
     # cant transfer governance
     with ape.reverts("!Authorized"):

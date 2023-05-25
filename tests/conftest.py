@@ -107,6 +107,11 @@ def registry(registry_factory):
 
 
 @pytest.fixture(scope="session")
+def queue_manager(daddy):
+    yield daddy.deploy(project.QueueManager)
+
+
+@pytest.fixture(scope="session")
 def create_vault(project, daddy, vault_factory):
     def create_vault(
         asset,

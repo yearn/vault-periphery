@@ -475,7 +475,7 @@ contract Registry {
      * @notice Tag a vault with a specific string.
      * @dev This is available to governance to tag any vault or strategy
      * on chain if desired to arbitrarily classify any vaults.
-     *   i.e. Certain credit ratings ("AAA")
+     *   i.e. Certain credit ratings ("AAA") / Vault status ("Shutdown") etc.
      *
      * @param _vault Address of the vault or strategy to tag.
      * @param _tag The string to tag the vault or strategy with.
@@ -484,6 +484,7 @@ contract Registry {
         address _vault,
         string memory _tag
     ) external onlyGovernance {
+        require(info[_vault].asset != address(0), "!Endorsed");
         info[_vault].tag = _tag;
     }
 

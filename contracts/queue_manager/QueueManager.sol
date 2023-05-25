@@ -2,12 +2,15 @@
 
 pragma solidity 0.8.18;
 
+interface IVault {
+    function roles(address) external view returns (uint256);
+}
+
 contract QueueManager {
     address public governance;
 
     mapping(address => address[]) internal strategies;
     mapping(address => address[]) public queue;
-    mapping(address => bool) internal force;
 
     string public name;
 
@@ -26,10 +29,6 @@ contract QueueManager {
         address vault
     ) external view returns (address[] memory) {
         return queue[vault];
-    }
-
-    function should_override(address vault) external view returns (bool) {
-        return force[vault];
     }
 
     function new_strategy(address strategy) external {
@@ -59,14 +58,10 @@ contract QueueManager {
         }
     }
 
-    function setForce(address vault, bool _force) external {
-        require(msg.sender == governance);
-        force[vault] = _force;
-    }
-
-    function setQueue(address vault, address[] memory _queue) external {
-        require(msg.sender == governance);
+    function setQueue(address _vault, address[] memory _queue) external {
+        uint256 mask = 1 << 4;
+        require((IVault(_vault).roles(msg.sender) & mask) == mask, "!gov");
         require(_queue.length <= 10);
-        queue[vault] = _queue;
+        queue[_vault] = _queue;
     }
 }
