@@ -78,6 +78,7 @@ def vault_factory(project, daddy, vault_blueprint):
         project.dependencies["yearn-vaults"]["master"].VaultFactory,
         "Vault V3 Factory 0.0.1",
         vault_blueprint,
+        daddy.address,
     )
 
 
@@ -90,20 +91,24 @@ def release_registry(project, daddy):
 
 @pytest.fixture(scope="session")
 def new_registry(daddy, registry_factory):
-    yield project.Registry.at(
-        registry_factory.createNewRegistry("New test Registry", sender=daddy)
-    )
+    def new_registry(gov=daddy):
+        tx = registry_factory.createNewRegistry(gov, "New test Registry", sender=gov)
+        return project.Registry.at(
+            list(tx.decode_logs(registry_factory.NewRegistry))[0].newRegistry
+        )
+
+    yield new_registry
 
 
 @pytest.fixture(scope="session")
 def registry_factory(daddy, project, release_registry):
-    factory = daddy.deploy(project.RegistryFactory, "Test Registry", release_registry)
+    factory = daddy.deploy(project.RegistryFactory, release_registry)
     yield factory
 
 
 @pytest.fixture(scope="session")
-def registry(registry_factory):
-    yield project.Registry.at(registry_factory.original())
+def registry(new_registry, registry_factory, daddy):
+    return new_registry(daddy)
 
 
 @pytest.fixture(scope="session")
@@ -165,7 +170,7 @@ def vault(asset, create_vault):
 
 @pytest.fixture
 def create_strategy(project, management, asset):
-    def create_strategy(token=asset, apiVersion="3.1.0"):
+    def create_strategy(token=asset, apiVersion="3.0.1-beta"):
         strategy = management.deploy(project.MockStrategy, token.address, apiVersion)
 
         return strategy
@@ -175,7 +180,7 @@ def create_strategy(project, management, asset):
 
 @pytest.fixture(scope="function")
 def strategy(asset, create_strategy):
-    strategy = create_strategy(asset, "3.1.0")
+    strategy = create_strategy(asset)
     yield strategy
 
 

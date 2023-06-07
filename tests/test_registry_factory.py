@@ -5,17 +5,11 @@ import pytest
 
 
 def test__factory_set_up(registry_factory, release_registry, daddy):
-    assert registry_factory.original() != ZERO_ADDRESS
     assert registry_factory.releaseRegistry() == release_registry
-
-    original_registry = project.Registry.at(registry_factory.original())
-    # make sure the original registry was setup correctly
-    assert original_registry.governance() == daddy
-    assert original_registry.releaseRegistry() == release_registry
-    assert original_registry.numAssets() == 0
+    assert registry_factory.name() == "Custom Vault Registry Factory"
 
 
-def test__clone_registry(registry_factory, release_registry, management):
+def test__new_registry(registry_factory, release_registry, management):
     new_name = "new test registry"
 
     # create a new registry
@@ -29,13 +23,11 @@ def test__clone_registry(registry_factory, release_registry, management):
 
     assert len(event) == 1
     assert event[0].newRegistry == new_registry
+    assert event[0].governance == management
+    assert event[0].name == new_name
 
     # make sure it is set up correctly
     assert new_registry.governance() == management
     assert new_registry.releaseRegistry() == release_registry
     assert new_registry.name() == new_name
     assert new_registry.numAssets() == 0
-
-    # make sure we can't re initialize the registry
-    with ape.reverts("!initialized"):
-        new_registry.initialize(management, "testing", management, sender=management)

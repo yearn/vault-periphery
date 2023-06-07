@@ -33,10 +33,17 @@ contract Registry {
 
     event GovernanceUpdated(address indexed newGovernance);
 
+    // Struct stored for every endorsed vault or strategy for
+    // off chain use to easily retreive info.
     struct Info {
+        // The token thats being used.
         address asset;
+        // The release number corresponding to the release registries version.
         uint256 releaseVersion;
+        // Time when the vault was deployed for easier indexing.
         uint256 deploymentTimeStamp;
+        // String so that mangement to tag a vault with any info for FE's.
+        string tag;
     }
 
     modifier onlyGovernance() {
@@ -51,12 +58,12 @@ contract Registry {
     string public name;
 
     // Address used to get the specific versions from.
-    address public releaseRegistry;
+    address public immutable releaseRegistry;
 
     // Array of all tokens used as the underlying.
     address[] public assets;
 
-    // Mapping to check it a specific `asset` has a vault.
+    // Mapping to check if a specific `asset` has a vault.
     mapping(address => bool) public assetIsUsed;
 
     // asset => array of all endorsed vaults.
@@ -77,20 +84,15 @@ contract Registry {
     mapping(address => Info) public info;
 
     /**
-     * @notice Initializes the Custom registry.
-     * @dev Should be called atomiclly by the factory after creation.
-     *
+     * @param _governance Address to set as owner of the Registry.
      * @param _name The custom string for this custom registry to be called.
      * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
      */
-    function initialize(
+    constructor(
         address _governance,
         string memory _name,
         address _releaseRegistry
-    ) external {
-        // Can't initialize twice.
-        require(releaseRegistry == address(0), "!initialized");
-
+    ) {
         // Set governance
         governance = _governance;
 
@@ -383,7 +385,8 @@ contract Registry {
         info[_vault] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp
+            deploymentTimeStamp: _deploymentTimestamp,
+            tag: ""
         });
 
         if (!assetIsUsed[_asset]) {
@@ -438,7 +441,8 @@ contract Registry {
         info[_strategy] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp
+            deploymentTimeStamp: _deploymentTimestamp,
+            tag: ""
         });
 
         if (!assetIsUsed[_asset]) {
@@ -459,6 +463,23 @@ contract Registry {
      */
     function endorseStrategy(address _strategy) external {
         endorseStrategy(_strategy, 0, 0);
+    }
+
+    /**
+     * @notice Tag a vault with a specific string.
+     * @dev This is available to governance to tag any vault or strategy
+     * on chain if desired to arbitrarily classify any vaults.
+     *   i.e. Certain credit ratings ("AAA") / Vault status ("Shutdown") etc.
+     *
+     * @param _vault Address of the vault or strategy to tag.
+     * @param _tag The string to tag the vault or strategy with.
+     */
+    function tagVault(
+        address _vault,
+        string memory _tag
+    ) external onlyGovernance {
+        require(info[_vault].asset != address(0), "!Endorsed");
+        info[_vault].tag = _tag;
     }
 
     function transferGovernance(
