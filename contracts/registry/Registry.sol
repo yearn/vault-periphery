@@ -84,8 +84,6 @@ contract Registry {
     mapping(address => Info) public info;
 
     /**
-     * @notice Initializes the Custom registry.
-     *
      * @param _governance Address to set as owner of the Registry.
      * @param _name The custom string for this custom registry to be called.
      * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.

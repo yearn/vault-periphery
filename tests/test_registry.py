@@ -58,7 +58,7 @@ def test__deploy_new_vault(registry, asset, release_registry, vault_factory, dad
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
     assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
@@ -100,7 +100,7 @@ def test__endorse_deployed_vault(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
     assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
@@ -140,7 +140,7 @@ def test__endorse_deployed_vault__default_values(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
     assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
@@ -174,7 +174,7 @@ def test__endorse_deployed_strategy(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedStrategies(asset) == 1
     assert registry.numEndorsedStrategiesByVersion(asset, 0) == 1
     assert registry.getEndorsedStrategies(asset)[0] == strategy.address
@@ -207,7 +207,7 @@ def test__endorse_deployed_strategy__default_values(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedStrategies(asset) == 1
     assert registry.numEndorsedStrategiesByVersion(asset, 0) == 1
     assert registry.getEndorsedStrategies(asset)[0] == strategy.address
@@ -267,7 +267,7 @@ def test__deploy_vault_with_new_release(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
     assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
@@ -327,7 +327,7 @@ def test__deploy_vault_with_oldrelease(
 
     # Make sure it was endorsed correctly
     assert registry.numAssets() == 1
-    assert registry.assets(0) == asset.address
+    assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
     assert registry.numEndorsedVaultsByVersion(asset, 1) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
