@@ -58,7 +58,7 @@ contract Registry {
     string public name;
 
     // Address used to get the specific versions from.
-    address public releaseRegistry;
+    address public immutable releaseRegistry;
 
     // Array of all tokens used as the underlying.
     address[] public assets;
@@ -85,20 +85,16 @@ contract Registry {
 
     /**
      * @notice Initializes the Custom registry.
-     * @dev Should be called atomiclly by the factory after creation.
      *
      * @param _governance Address to set as owner of the Registry.
      * @param _name The custom string for this custom registry to be called.
      * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
      */
-    function initialize(
+    constructor(
         address _governance,
         string memory _name,
         address _releaseRegistry
-    ) external {
-        // Can't initialize twice.
-        require(releaseRegistry == address(0), "!initialized");
-
+    ) {
         // Set governance
         governance = _governance;
 
