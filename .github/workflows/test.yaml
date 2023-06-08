@@ -22,7 +22,7 @@ jobs:
       - name: install vyper
         run: pip install git+https://github.com/vyperlang/vyper
       - run: ape compile --force --size
-      - run: npm install hardhat@v2.13.0
+      - run: npm install hardhat
       
       - run: ape test
         timeout-minutes: 10
