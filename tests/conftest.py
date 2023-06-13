@@ -84,7 +84,7 @@ def vault_factory(project, daddy, vault_blueprint):
 
 @pytest.fixture(scope="session")
 def release_registry(project, daddy):
-    release_registry = daddy.deploy(project.ReleaseRegistry)
+    release_registry = daddy.deploy(project.ReleaseRegistry, daddy)
 
     yield release_registry
 

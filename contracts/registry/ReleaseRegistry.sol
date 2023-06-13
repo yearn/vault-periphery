@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-
 interface IFactory {
     function api_version() external view returns (string memory);
 }
 
-contract ReleaseRegistry is Ownable2Step {
+contract ReleaseRegistry {
     event NewRelease(
         uint256 indexed releaseId,
         address indexed factory,
         string apiVersion
     );
+
+    event GovernanceUpdated(address indexed newGovernance);
+
+    modifier onlyGovernance() {
+        require(msg.sender == governance, "!Authorized");
+        _;
+    }
+
+    // Address that can set new releases.
+    address public governance;
 
     // The total number of releases that have been deployed
     uint256 public numReleases;
@@ -24,6 +32,11 @@ contract ReleaseRegistry is Ownable2Step {
     // Mapping of the API version for a specific release to the
     // place in the order it was released.
     mapping(string => uint256) public releaseTargets;
+
+    constructor(address _governance) {
+        // Set governance
+        governance = _governance;
+    }
 
     /**
      * @notice Returns the latest factory.
@@ -48,13 +61,13 @@ contract ReleaseRegistry is Ownable2Step {
      * @dev Stores the factory address in `factories` and the release
      * target in `releaseTargests` with its associated API version.
      *
-     *   Throws if caller isn't `owner`.
+     *   Throws if caller isn't `governance`.
      *   Throws if the api version is the same as the previous release.
      *   Emits a `NewRelease` event.
      *
      * @param _factory The factory that will be used create new vaults.
      */
-    function newRelease(address _factory) external onlyOwner {
+    function newRelease(address _factory) external onlyGovernance {
         // Check if the release is different from the current one
         uint256 releaseId = numReleases;
 
@@ -81,5 +94,14 @@ contract ReleaseRegistry is Ownable2Step {
 
         // Log the release for external listeners
         emit NewRelease(releaseId, _factory, apiVersion);
+    }
+
+    function transferGovernance(
+        address _newGovernance
+    ) external onlyGovernance {
+        require(_newGovernance != address(0), "ZERO_ADDRESS");
+        governance = _newGovernance;
+
+        emit GovernanceUpdated(_newGovernance);
     }
 }

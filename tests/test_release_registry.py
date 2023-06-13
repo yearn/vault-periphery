@@ -5,7 +5,7 @@ import pytest
 
 
 def test__deployment(release_registry, daddy):
-    assert release_registry.owner() == daddy
+    assert release_registry.governance() == daddy
     assert release_registry.numReleases() == 0
     assert release_registry.factories(0) == ZERO_ADDRESS
     assert release_registry.releaseTargets("3.1.0") == 0
@@ -93,3 +93,20 @@ def test__add_same_factory(release_registry, daddy, vault_factory):
         release_registry.newRelease(vault_factory.address, sender=daddy)
 
     assert release_registry.numReleases() == 1
+
+
+def test__transfer_governance(release_registry, daddy, user):
+    assert release_registry.governance() == daddy
+
+    with ape.reverts("ZERO_ADDRESS"):
+        release_registry.transferGovernance(ZERO_ADDRESS, sender=daddy)
+
+    assert release_registry.governance() == daddy
+
+    tx = release_registry.transferGovernance(user, sender=daddy)
+
+    event = list(tx.decode_logs(release_registry.GovernanceUpdated))
+
+    assert len(event) == 1
+    assert event[0].newGovernance == user
+    assert release_registry.governance() == user
