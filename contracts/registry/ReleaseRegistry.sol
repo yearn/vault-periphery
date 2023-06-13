@@ -13,7 +13,7 @@ contract ReleaseRegistry {
     );
 
     event GovernanceUpdated(address indexed newGovernance);
-    
+
     modifier onlyGovernance() {
         require(msg.sender == governance, "!Authorized");
         _;
