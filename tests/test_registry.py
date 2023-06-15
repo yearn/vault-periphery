@@ -458,7 +458,7 @@ def test__access(
     symbol = "yvTest"
 
     # Cant deploy a vault through registry
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=user)
 
     # Deploy a new vault
@@ -470,41 +470,42 @@ def test__access(
     )
 
     # Cant endorse a vault
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.endorseVault(new_vault, 0, 0, sender=user)
 
     # cant endorse vault with default values
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.endorseVault(new_vault, sender=user)
 
     # cant endorse strategy
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.endorseStrategy(strategy, 0, 0, sender=user)
 
     # cant endorse strategy with default values
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.endorseStrategy(strategy, sender=user)
 
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.tagVault(strategy, "tag", sender=user)
 
     # cant transfer governance
-    with ape.reverts("!Authorized"):
+    with ape.reverts("!governance"):
         registry.transferGovernance(user, sender=user)
 
 
 def test__transfer_governance(registry, daddy, user):
     assert registry.governance() == daddy
 
-    with ape.reverts("ZERO_ADDRESS"):
+    with ape.reverts("ZERO ADDRESS"):
         registry.transferGovernance(ZERO_ADDRESS, sender=daddy)
 
     assert registry.governance() == daddy
 
     tx = registry.transferGovernance(user, sender=daddy)
 
-    event = list(tx.decode_logs(registry.GovernanceUpdated))
+    event = list(tx.decode_logs(registry.GovernanceTransferred))
 
     assert len(event) == 1
+    assert event[0].previousGovernance == daddy
     assert event[0].newGovernance == user
     assert registry.governance() == user

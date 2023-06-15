@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+import {Governance} from "@periphery/utils/Governance.sol";
 
 import {IFactory} from "../interfaces/IFactory.sol";
 import {ReleaseRegistry} from "./ReleaseRegistry.sol";
@@ -18,7 +20,7 @@ interface IStrategy {
     function apiVersion() external view returns (string memory);
 }
 
-contract Registry {
+contract Registry is Governance {
     event NewEndorsedVault(
         address indexed vault,
         address indexed asset,
@@ -30,8 +32,6 @@ contract Registry {
         address indexed asset,
         uint256 releaseVersion
     );
-
-    event GovernanceUpdated(address indexed newGovernance);
 
     // Struct stored for every endorsed vault or strategy for
     // off chain use to easily retreive info.
@@ -45,14 +45,6 @@ contract Registry {
         // String so that mangement to tag a vault with any info for FE's.
         string tag;
     }
-
-    modifier onlyGovernance() {
-        require(msg.sender == governance, "!Authorized");
-        _;
-    }
-
-    // Owner of this Registry
-    address public governance;
 
     // Custom name for this Registry.
     string public name;
@@ -92,13 +84,9 @@ contract Registry {
         address _governance,
         string memory _name,
         address _releaseRegistry
-    ) {
-        // Set governance
-        governance = _governance;
-
+    ) Governance(_governance) {
         // Set name.
         name = _name;
-
         // Set releaseRegistry.
         releaseRegistry = _releaseRegistry;
     }
@@ -480,14 +468,5 @@ contract Registry {
     ) external onlyGovernance {
         require(info[_vault].asset != address(0), "!Endorsed");
         info[_vault].tag = _tag;
-    }
-
-    function transferGovernance(
-        address _newGovernance
-    ) external onlyGovernance {
-        require(_newGovernance != address(0), "ZERO_ADDRESS");
-        governance = _newGovernance;
-
-        emit GovernanceUpdated(_newGovernance);
     }
 }
