@@ -1,26 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.18;
 
+import {Governance} from "@periphery/utils/Governance.sol";
+
 interface IFactory {
     function api_version() external view returns (string memory);
 }
 
-contract ReleaseRegistry {
+contract ReleaseRegistry is Governance {
     event NewRelease(
         uint256 indexed releaseId,
         address indexed factory,
         string apiVersion
     );
-
-    event GovernanceUpdated(address indexed newGovernance);
-
-    modifier onlyGovernance() {
-        require(msg.sender == governance, "!Authorized");
-        _;
-    }
-
-    // Address that can set new releases.
-    address public governance;
 
     // The total number of releases that have been deployed
     uint256 public numReleases;
@@ -33,10 +25,7 @@ contract ReleaseRegistry {
     // place in the order it was released.
     mapping(string => uint256) public releaseTargets;
 
-    constructor(address _governance) {
-        // Set governance
-        governance = _governance;
-    }
+    constructor(address _governance) Governance(_governance) {}
 
     /**
      * @notice Returns the latest factory.
@@ -94,14 +83,5 @@ contract ReleaseRegistry {
 
         // Log the release for external listeners
         emit NewRelease(releaseId, _factory, apiVersion);
-    }
-
-    function transferGovernance(
-        address _newGovernance
-    ) external onlyGovernance {
-        require(_newGovernance != address(0), "ZERO_ADDRESS");
-        governance = _newGovernance;
-
-        emit GovernanceUpdated(_newGovernance);
     }
 }

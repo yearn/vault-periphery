@@ -98,15 +98,16 @@ def test__add_same_factory(release_registry, daddy, vault_factory):
 def test__transfer_governance(release_registry, daddy, user):
     assert release_registry.governance() == daddy
 
-    with ape.reverts("ZERO_ADDRESS"):
+    with ape.reverts("ZERO ADDRESS"):
         release_registry.transferGovernance(ZERO_ADDRESS, sender=daddy)
 
     assert release_registry.governance() == daddy
 
     tx = release_registry.transferGovernance(user, sender=daddy)
 
-    event = list(tx.decode_logs(release_registry.GovernanceUpdated))
+    event = list(tx.decode_logs(release_registry.GovernanceTransferred))
 
     assert len(event) == 1
+    assert event[0].previousGovernance == daddy
     assert event[0].newGovernance == user
     assert release_registry.governance() == user
