@@ -60,12 +60,12 @@ def test_access(release_registry, daddy, user, vault_factory):
 
     # only daddy should be able to set a new release
     with ape.reverts():
-        release_registry.newRelease(vault_factory, sender=user)
+        release_registry.newRelease(vault_factory.address, sender=user)
 
     assert release_registry.numReleases() == 0
     assert release_registry.factories(0) == ZERO_ADDRESS
 
-    release_registry.newRelease(vault_factory, sender=daddy)
+    release_registry.newRelease(vault_factory.address, sender=daddy)
 
     assert release_registry.numReleases() == 1
     assert release_registry.factories(0) == vault_factory.address

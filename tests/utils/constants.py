@@ -33,3 +33,8 @@ class StrategyChangeType(IntFlag):
 class RoleStatusChange(IntFlag):
     OPENED = 1
     CLOSED = 2
+
+
+class ChangeType(IntFlag):
+    ADDED = 1
+    REMOVED = 2
