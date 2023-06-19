@@ -261,6 +261,31 @@ def test_distribute(accountant, daddy, user, vault, asset, deposit_into_vault, a
     assert vault.balanceOf(daddy.address) == amount
 
 
+def test_withdraw_underlying(
+    accountant, daddy, user, vault, asset, deposit_into_vault, amount
+):
+    deposit_into_vault(vault, amount)
+
+    assert vault.balanceOf(user) == amount
+    assert vault.balanceOf(accountant.address) == 0
+    assert asset.balanceOf(accountant.address) == 0
+
+    vault.transfer(accountant.address, amount, sender=user)
+
+    assert vault.balanceOf(user) == 0
+    assert vault.balanceOf(accountant.address) == amount
+    assert asset.balanceOf(accountant.address) == 0
+
+    with ape.reverts("not fee manager"):
+        accountant.withdraw_underlying(vault.address, amount, sender=user)
+
+    tx = accountant.withdraw_underlying(vault.address, amount, sender=daddy)
+
+    assert vault.balanceOf(user) == 0
+    assert vault.balanceOf(accountant.address) == 0
+    assert asset.balanceOf(accountant.address) == amount
+
+
 def test_report_profit(
     accountant,
     daddy,

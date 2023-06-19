@@ -12,6 +12,7 @@ struct StrategyParams:
 interface IVault:
     def asset() -> address: view
     def strategies(strategy: address) -> StrategyParams: view
+    def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
 
 # EVENTS #
 event VaultChanged:
@@ -263,17 +264,38 @@ def remove_custom_config(strategy: address):
     # Emit relevant event.
     log UpdateCustomFeeConfig(strategy, self.fees[strategy])
 
-# Should be able to send to a different address.
-# Add a withdraw function to pull funds from vault and keep in underlying
+
+@external
+def withdraw_underlying(vault: address, amount: uint256) -> uint256:
+    assert msg.sender == self.fee_manager, "not fee manager"
+    return IVault(vault).redeem(amount, self, self)
 
 @external
 def distribute(token: address):
     assert msg.sender == self.fee_manager, "not fee manager"
 
     rewards: uint256 = ERC20(token).balanceOf(self)
-    ERC20(token).transfer(msg.sender, rewards)
+    self._erc20_safe_transfer(token, msg.sender, rewards)
 
     log DistributeRewards(token, rewards)
+
+
+@internal
+def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    # HACK: Used to handle non-compliant tokens like USDT
+    response: Bytes[32] = raw_call(
+        token,
+        concat(
+            method_id("transfer(address,uint256)"),
+            convert(receiver, bytes32),
+            convert(amount, bytes32),
+        ),
+        max_outsize=32,
+    )
+    if len(response) > 0:
+        assert convert(response, bool), "Transfer failed!"
+
 
 @external
 def set_future_fee_manager(future_fee_manager: address):
