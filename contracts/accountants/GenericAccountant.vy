@@ -22,33 +22,17 @@ event UpdateDefaultFeeConfig:
     default_fee_config: Fee
 
 event SetFutureFeeManager:
-    fee_manager: address
+    future_fee_manager: address
 
 event NewFeeManager:
     fee_manager: address
 
-event StrategyChanged:
+event UpdateCustomFeeConfig:
     strategy: address
-    change: ChangeType
-
-event UpdatePerformanceFee:
-    strategy: address
-    performance_fee: uint16
-
-event UpdateManagementFee:
-    strategy: address
-    management_fee: uint16
-
-event UpdateRefundRatio:
-    strategy: address
-    refund_ratio: uint16
-
-event UpdateMaxFee:
-    strategy: address
-    max_fee: uint16
+    custom_config: Fee
 
 event DistributeRewards:
-    vault: address
+    token: address
     rewards: uint256
 
 ### ENUMS ###
@@ -122,9 +106,10 @@ def __init__(
 def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256):
     """ 
     """
+    # Make sure this is a valid vault.
     assert self.vaults[msg.sender], "!authorized"
-    
-    # management_fee is charged in both profit and loss scenarios
+
+    # Retrieve the strategies params from the vault.
     strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
     # Expected behavior is to use the default config.
     fee: Fee = self.default_config
@@ -233,18 +218,34 @@ def update_default_config(
 
     log UpdateDefaultFeeConfig(self.default_config)
 
-# Should be able to send to a different address.
 @external
-def distribute(vault: address):
+def set_custom_config(
+    strategy: address,
+    custom_management: uint16, 
+    custom_performance: uint16, 
+    custom_refund: uint16, 
+    custom_max: uint16
+):
     assert msg.sender == self.fee_manager, "not fee manager"
+    assert custom_management <= self._management_fee_threshold(), "exceeds management fee threshold"
+    assert custom_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
 
-    rewards: uint256 = ERC20(vault).balanceOf(self)
-    ERC20(vault).transfer(msg.sender, rewards)
+    # If this is the first custom fee set for this strategy.
+    if not self.custom[strategy]:
+        # Update the custom flag.
+        self.custom[strategy] = True
 
-    log DistributeRewards(vault, rewards)
+    self.fees[strategy] = Fee({
+        management_fee: custom_management,
+        performance_fee: custom_performance,
+        refund_ratio: custom_refund,
+        max_fee: custom_max
+    })
+
+    log UpdateCustomFeeConfig(strategy, self.fees[strategy])
 
 @external
-def remove_custom_fees(strategy: address):
+def remove_custom_config(strategy: address):
     assert msg.sender == self.fee_manager, "not fee manager"
     assert self.custom[strategy], "No custom fees set"
 
@@ -260,77 +261,19 @@ def remove_custom_fees(strategy: address):
     })
 
     # Emit relevant event.
-    log StrategyChanged(strategy, ChangeType.REMOVED)
+    log UpdateCustomFeeConfig(strategy, self.fees[strategy])
+
+# Should be able to send to a different address.
+# Add a withdraw function to pull funds from vault and keep in underlying
 
 @external
-def set_performance_fee(strategy: address, performance_fee: uint16):
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert performance_fee <= self._performance_fee_threshold(), "exceeds performance fee threshold"
-
-    # If this is the first custom fee set for this strategy.
-    if not self.custom[strategy]:
-        # Update the custom flag.
-        self.custom[strategy] = True
-
-        # Emit the relevant event.
-        log StrategyChanged(strategy, ChangeType.ADDED)
-
-    self.fees[strategy].performance_fee = performance_fee
-
-    log UpdatePerformanceFee(strategy, performance_fee)
-
-
-@external
-def set_management_fee(strategy: address, management_fee: uint16):
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert management_fee <= self._management_fee_threshold(), "exceeds management fee threshold"
-
-    # If this is the first custom fee set for this strategy.
-    if not self.custom[strategy]:
-        # Update the custom flag.
-        self.custom[strategy] = True
-
-        # Emit the relevant event.
-        log StrategyChanged(strategy, ChangeType.ADDED)
-
-    self.fees[strategy].management_fee = management_fee
-
-    log UpdateManagementFee(strategy, management_fee)
-
-
-@external
-def set_refund_ratio(strategy: address, refund_ratio: uint16):
+def distribute(token: address):
     assert msg.sender == self.fee_manager, "not fee manager"
 
-    # If this is the first custom fee set for this strategy.
-    if not self.custom[strategy]:
-        # Update the custom flag.
-        self.custom[strategy] = True
+    rewards: uint256 = ERC20(token).balanceOf(self)
+    ERC20(token).transfer(msg.sender, rewards)
 
-        # Emit the relevant event.
-        log StrategyChanged(strategy, ChangeType.ADDED)
-
-    self.fees[strategy].refund_ratio = refund_ratio
-
-    log UpdateRefundRatio(strategy, refund_ratio)
-
-
-@external
-def set_max_fee(strategy: address, max_fee: uint16):
-    assert msg.sender == self.fee_manager, "not fee manager"
-
-    # If this is the first custom fee set for this strategy.
-    if not self.custom[strategy]:
-        # Update the custom flag.
-        self.custom[strategy] = True
-
-        # Emit the relevant event.
-        log StrategyChanged(strategy, ChangeType.ADDED)
-
-    self.fees[strategy].max_fee = max_fee
-
-    log UpdateMaxFee(strategy, max_fee)
-
+    log DistributeRewards(token, rewards)
 
 @external
 def set_future_fee_manager(future_fee_manager: address):
@@ -343,11 +286,11 @@ def set_future_fee_manager(future_fee_manager: address):
 
 @external
 def accept_fee_manager():
-    assert msg.sender == self.future_fee_manager, "not fee manager"
+    assert msg.sender == self.future_fee_manager, "not future fee manager"
     self.fee_manager = self.future_fee_manager
     self.future_fee_manager = empty(address)
 
-    log NewFeeManager(self.fee_manager)
+    log NewFeeManager(msg.sender)
 
 
 @view
