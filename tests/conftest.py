@@ -21,6 +21,11 @@ def management(accounts):
 
 
 @pytest.fixture(scope="session")
+def fee_recipient(accounts):
+    return accounts[3]
+
+
+@pytest.fixture(scope="session")
 def user(accounts):
     return accounts[9]
 
@@ -219,9 +224,10 @@ def provide_strategy_with_debt():
 
 
 @pytest.fixture(scope="session")
-def deploy_accountant(project, daddy):
+def deploy_accountant(project, daddy, fee_recipient):
     def deploy_accountant(
         manager=daddy,
+        fee_recipient=fee_recipient,
         management_fee=100,
         performance_fee=1_000,
         refund_ratio=0,
@@ -230,6 +236,7 @@ def deploy_accountant(project, daddy):
         accountant = daddy.deploy(
             project.GenericAccountant,
             manager,
+            fee_recipient,
             management_fee,
             performance_fee,
             refund_ratio,

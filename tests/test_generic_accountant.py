@@ -3,9 +3,10 @@ from ape import chain
 from utils.constants import ChangeType, ZERO_ADDRESS, MAX_BPS, MAX_INT
 
 
-def test_setup(daddy, vault, strategy, accountant):
+def test_setup(daddy, vault, strategy, accountant, fee_recipient):
     assert accountant.fee_manager() == daddy
     assert accountant.future_fee_manager() == ZERO_ADDRESS
+    assert accountant.fee_recipient() == fee_recipient
     assert accountant.default_config().management_fee == 100
     assert accountant.default_config().performance_fee == 1_000
     assert accountant.default_config().refund_ratio == 0
@@ -232,18 +233,46 @@ def test_set_fee_manager(accountant, daddy, user):
     assert accountant.future_fee_manager() == ZERO_ADDRESS
 
 
-def test_distribute(accountant, daddy, user, vault, asset, deposit_into_vault, amount):
+def test_set_fee_recipient(accountant, daddy, user, fee_recipient):
+    assert accountant.fee_manager() == daddy
+    assert accountant.fee_recipient() == fee_recipient
+
+    with ape.reverts("not fee manager"):
+        accountant.set_fee_recipient(user, sender=user)
+
+    with ape.reverts("not fee manager"):
+        accountant.set_fee_recipient(user, sender=fee_recipient)
+
+    with ape.reverts("ZERO ADDRESS"):
+        accountant.set_fee_recipient(ZERO_ADDRESS, sender=daddy)
+
+    tx = accountant.set_fee_recipient(user, sender=daddy)
+
+    event = list(tx.decode_logs(accountant.UpdateFeeRecipient))
+
+    assert len(event) == 1
+    assert event[0].old_fee_recipient == fee_recipient.address
+    assert event[0].new_fee_recipient == user.address
+
+    assert accountant.fee_recipient() == user
+
+
+def test_distribute(
+    accountant, daddy, user, vault, fee_recipient, deposit_into_vault, amount
+):
     deposit_into_vault(vault, amount)
 
     assert vault.balanceOf(user) == amount
     assert vault.balanceOf(accountant.address) == 0
     assert vault.balanceOf(daddy.address) == 0
+    assert vault.balanceOf(fee_recipient.address) == 0
 
     vault.transfer(accountant.address, amount, sender=user)
 
     assert vault.balanceOf(user) == 0
     assert vault.balanceOf(accountant.address) == amount
     assert vault.balanceOf(daddy.address) == 0
+    assert vault.balanceOf(fee_recipient.address) == 0
 
     with ape.reverts("not fee manager"):
         accountant.distribute(vault.address, sender=user)
@@ -258,7 +287,8 @@ def test_distribute(accountant, daddy, user, vault, asset, deposit_into_vault, a
 
     assert vault.balanceOf(user) == 0
     assert vault.balanceOf(accountant.address) == 0
-    assert vault.balanceOf(daddy.address) == amount
+    assert vault.balanceOf(daddy.address) == 0
+    assert vault.balanceOf(fee_recipient.address) == amount
 
 
 def test_withdraw_underlying(
