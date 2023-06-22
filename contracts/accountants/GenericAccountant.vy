@@ -447,7 +447,7 @@ def set_fee_recipient(new_fee_recipient: address):
 @external
 def performance_fee_threshold() -> uint16:
     """
-    @notice External function to get the max a pefromance fee can be.
+    @notice External function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
     """
     return self._performance_fee_threshold()
