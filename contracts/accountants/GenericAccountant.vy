@@ -457,7 +457,7 @@ def performance_fee_threshold() -> uint16:
 @internal
 def _performance_fee_threshold() -> uint16:
     """
-    @notice Internal function to get the max a pefromance fee can be.
+    @notice Internal function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
     """
     return convert(MAX_BPS / 2, uint16)
