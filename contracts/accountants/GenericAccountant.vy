@@ -126,7 +126,7 @@ def __init__(
     default_max: uint16
 ):
     """
-    @notice Initialilze the accountant and default fee config.
+    @notice Initialize the accountant and default fee config.
     @param fee_manager Address to be in charge of this accountant.
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
