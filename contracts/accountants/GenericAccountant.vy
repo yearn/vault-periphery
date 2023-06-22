@@ -405,7 +405,7 @@ def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 @external
 def set_future_fee_manager(future_fee_manager: address):
     """
-    @notice Step 1 of 2 to sset a new fee_manager.
+    @notice Step 1 of 2 to set a new fee_manager.
     @dev The address is set to future_fee_manager and will need to
         call accept_fee_manager in order to update the actual fee_manager.
     @param future_fee_manager Addrses to set to future_fee_manager.
