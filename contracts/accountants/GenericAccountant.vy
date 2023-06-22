@@ -53,6 +53,7 @@ event UpdateFeeRecipient:
     new_fee_recipient: address
 
 event UpdateCustomFeeConfig:
+    vault: address
     strategy: address
     custom_config: Fee
 
@@ -81,6 +82,8 @@ struct Fee:
     # Max percent of the reported gain that the accountant can take.
     # A max_fee of 0 will mean non is enforced.
     max_fee: uint16
+    # Bool set for custom fee configs
+    custom: bool
 
 
 ### CONSTANTS ###
@@ -110,11 +113,8 @@ fee_recipient: public(address)
 vaults: public(HashMap[address, bool])
 # Default config to use unless a custom one is set.
 default_config: public(Fee)
-
-# Mapping of strategy to bool if it has custom fees.
-custom: public(HashMap[address, bool])
-# Mapping strategy => custom Fee config
-fees: public(HashMap[address, Fee])
+# Mapping vault => strategy => custom Fee config
+fees: public(HashMap[address, HashMap[address, Fee]])
 
 @external
 def __init__(
@@ -147,7 +147,8 @@ def __init__(
         management_fee: default_management,
         performance_fee: default_performance,
         refund_ratio: default_refund,
-        max_fee: default_max
+        max_fee: default_max,
+        custom: False
     })
 
     log UpdateDefaultFeeConfig(self.default_config)
@@ -168,20 +169,21 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     # Make sure this is a valid vault.
     assert self.vaults[msg.sender], "!authorized"
 
-    # Retrieve the strategies params from the vault.
-    strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
-    # Expected behavior is to use the default config.
-    fee: Fee = self.default_config
+    # Load the custom config to check the `custom` flag.
+    # This should just be one slot.
+    fee: Fee = self.fees[msg.sender][strategy]
 
-    # Use custom fees if applicable.
-    if self.custom[strategy]:
-        fee = self.fees[strategy]
+    # If not use the default.
+    if not fee.custom:
+        fee = self.default_config
 
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
 
     # Charge management fees no matter gain or loss.
     if fee.management_fee > 0:
+        # Retrieve the strategies params from the vault.
+        strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
         # Time since last harvest.
         duration: uint256 = block.timestamp - strategy_params.last_report
         # management_fee is an annual amount, so charge based on the time passed.
@@ -285,7 +287,8 @@ def update_default_config(
         management_fee: default_management,
         performance_fee: default_performance,
         refund_ratio: default_refund,
-        max_fee: default_max
+        max_fee: default_max,
+        custom: False
     })
 
     log UpdateDefaultFeeConfig(self.default_config)
@@ -293,6 +296,7 @@ def update_default_config(
 
 @external
 def set_custom_config(
+    vault: address,
     strategy: address,
     custom_management: uint16, 
     custom_performance: uint16, 
@@ -301,7 +305,9 @@ def set_custom_config(
 ):
     """
     @notice Used to set a custom fee amounts for a specific strategy.
+        In a specific vault.
     @dev Setting this will cause the default config to be overridden.
+    @param vault The vault the strategy is hooked up to.
     @param strategy The strategy to customize.
     @param custom_management Custom annual management fee to charge.
     @param custom_performance Custom performance fee to charge.
@@ -309,47 +315,42 @@ def set_custom_config(
     @param custom_max Custom max fee to allow as a perfent of gain.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
+    assert self.vaults[vault], "vault not added"
     assert custom_management <= self._management_fee_threshold(), "exceeds management fee threshold"
     assert custom_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
 
-    # If this is the first custom fee set for this strategy.
-    if not self.custom[strategy]:
-        # Update the custom flag.
-        self.custom[strategy] = True
-
     # Set this strategies custom config.
-    self.fees[strategy] = Fee({
+    self.fees[vault][strategy] = Fee({
         management_fee: custom_management,
         performance_fee: custom_performance,
         refund_ratio: custom_refund,
-        max_fee: custom_max
+        max_fee: custom_max,
+        custom: True
     })
 
-    log UpdateCustomFeeConfig(strategy, self.fees[strategy])
+    log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
 
 
 @external
-def remove_custom_config(strategy: address):
+def remove_custom_config(vault: address, strategy: address):
     """
     @notice Removes a previously set custom config for a strategy.
     @param strategy The strategy to remove custom setting for.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
-    assert self.custom[strategy], "No custom fees set"
-
-    # Set custom bool flag back to false.
-    self.custom[strategy] = False
+    assert self.fees[vault][strategy].custom, "No custom fees set"
 
     # Set all the strategies custom fees to 0.
-    self.fees[strategy] = Fee({
+    self.fees[vault][strategy] = Fee({
         management_fee: 0,
         performance_fee: 0,
         refund_ratio: 0,
-        max_fee: 0
+        max_fee: 0,
+        custom: False
     })
 
     # Emit relevant event.
-    log UpdateCustomFeeConfig(strategy, self.fees[strategy])
+    log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
 
 
 @external
@@ -460,7 +461,7 @@ def _performance_fee_threshold() -> uint16:
     @notice Internal function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
     """
-    return convert(MAX_BPS / 2, uint16)
+    return 5_000
 
 
 @view
