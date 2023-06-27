@@ -69,13 +69,13 @@ enum ChangeType:
 
 ### STRUCTS ###
 
-# Struct that holds all nedded amounts to charge fees
+# Struct that holds all needed amounts to charge fees
 # and issue refunds. All amounts are expressed in Basis points.
 # i.e. 10_000 == 100%.
 struct Fee:
     # Annual management fee to charge on strategy debt.
     management_fee: uint16
-    # Peformance fee to charge on reported gain.
+    # Performance fee to charge on reported gain.
     performance_fee: uint16
     # Ratio of reported loss to attempt to refund.
     refund_ratio: uint16
@@ -131,7 +131,7 @@ def __init__(
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max Default max fee to allow as a perfent of gain.
+    @param default_max Default max fee to allow as a percent of gain.
     """
     assert fee_manager != empty(address), "ZERO ADDRESS"
     assert fee_recipient != empty(address), "ZERO ADDRESS"
@@ -199,7 +199,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     if gain > 0:
         total_fees += (gain * convert(fee.performance_fee, uint256)) / MAX_BPS
     else:
-        # Means we have a loss.
+        # Means we should have a loss.
         if fee.refund_ratio > 0:
             # Cache the underlying asset the vault uses.
             asset: address = IVault(msg.sender).asset()
@@ -240,7 +240,7 @@ def add_vault(vault: address):
     """
     @notice Add a new vault for this accountant to charge fees for.
     @dev This is not used to set any of the fees for the specific 
-    vault or strategy. Each fee will be set seperatly. 
+    vault or strategy. Each fee will be set separately. 
     @param vault The address of a vault to allow to use this accountant.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
@@ -277,7 +277,7 @@ def update_default_config(
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max Default max fee to allow as a perfent of gain.
+    @param default_max Default max fee to allow as a percent of gain.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
@@ -312,7 +312,7 @@ def set_custom_config(
     @param custom_management Custom annual management fee to charge.
     @param custom_performance Custom performance fee to charge.
     @param custom_refund Custom refund ratio to give back on losses.
-    @param custom_max Custom max fee to allow as a perfent of gain.
+    @param custom_max Custom max fee to allow as a percent of gain.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert self.vaults[vault], "vault not added"
@@ -409,7 +409,7 @@ def set_future_fee_manager(future_fee_manager: address):
     @notice Step 1 of 2 to set a new fee_manager.
     @dev The address is set to future_fee_manager and will need to
         call accept_fee_manager in order to update the actual fee_manager.
-    @param future_fee_manager Addrses to set to future_fee_manager.
+    @param future_fee_manager Address to set to future_fee_manager.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert future_fee_manager != empty(address), "ZERO ADDRESS"
@@ -433,7 +433,7 @@ def accept_fee_manager():
 @external
 def set_fee_recipient(new_fee_recipient: address):
     """
-    @notice Set a new address to recieve distributed rewards.
+    @notice Set a new address to receive distributed rewards.
     @param new_fee_recipient Address to receive distributed fees.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
