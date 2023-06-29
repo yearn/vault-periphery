@@ -4,6 +4,7 @@ from utils.constants import MAX_INT, WEEK, ROLES
 from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
 import os
+import time
 
 # we default to local node
 w3 = Web3(HTTPProvider(os.getenv("CHAIN_PROVIDER", "http://127.0.0.1:8545")))
@@ -17,6 +18,11 @@ def daddy(accounts):
 @pytest.fixture(scope="session")
 def management(accounts):
     yield accounts[2]
+
+
+@pytest.fixture(scope="session")
+def fee_recipient(accounts):
+    return accounts[3]
 
 
 @pytest.fixture(scope="session")
@@ -74,12 +80,13 @@ def vault_blueprint(project, daddy):
 
 @pytest.fixture(scope="session")
 def vault_factory(project, daddy, vault_blueprint):
-    return daddy.deploy(
+    vault_factory = daddy.deploy(
         project.dependencies["yearn-vaults"]["master"].VaultFactory,
-        "Vault V3 Factory 0.0.1",
+        "Vault V3 Factory 3.0.1-beta",
         vault_blueprint,
         daddy.address,
     )
+    return vault_factory
 
 
 @pytest.fixture(scope="session")
@@ -118,9 +125,11 @@ def create_vault(project, daddy, vault_factory):
         governance=daddy,
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
-        vault_name="Test Vault",
+        vault_name=None,
         vault_symbol="VV3",
     ):
+        vault_suffix = str(int(time.time()))[-4:]
+        vault_name = f"Vault V3 {vault_suffix}"
 
         tx = vault_factory.deploy_new_vault(
             asset,
@@ -162,13 +171,13 @@ def create_vault(project, daddy, vault_factory):
     yield create_vault
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def vault(asset, create_vault):
     vault = create_vault(asset)
     yield vault
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def create_strategy(project, management, asset):
     def create_strategy(token=asset, apiVersion="3.0.1-beta"):
         strategy = management.deploy(project.MockStrategy, token.address, apiVersion)
@@ -178,7 +187,7 @@ def create_strategy(project, management, asset):
     yield create_strategy
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def strategy(asset, create_strategy):
     strategy = create_strategy(asset)
     yield strategy
@@ -212,3 +221,54 @@ def provide_strategy_with_debt():
         vault.update_debt(strategy.address, target_debt, sender=account)
 
     return provide_strategy_with_debt
+
+
+@pytest.fixture(scope="session")
+def deploy_accountant(project, daddy, fee_recipient):
+    def deploy_accountant(
+        manager=daddy,
+        fee_recipient=fee_recipient,
+        management_fee=100,
+        performance_fee=1_000,
+        refund_ratio=0,
+        max_fee=0,
+    ):
+        accountant = daddy.deploy(
+            project.GenericAccountant,
+            manager,
+            fee_recipient,
+            management_fee,
+            performance_fee,
+            refund_ratio,
+            max_fee,
+        )
+
+        return accountant
+
+    yield deploy_accountant
+
+
+@pytest.fixture(scope="session")
+def accountant(deploy_accountant):
+    accountant = deploy_accountant()
+
+    yield accountant
+
+
+@pytest.fixture(scope="session")
+def set_fees_for_strategy():
+    def set_fees_for_strategy(
+        daddy,
+        strategy,
+        accountant,
+        management_fee,
+        performance_fee,
+        refund_ratio=0,
+        max_fee=0,
+    ):
+        accountant.set_management_fee(strategy.address, management_fee, sender=daddy)
+        accountant.set_performance_fee(strategy.address, performance_fee, sender=daddy)
+        accountant.set_refund_ratio(strategy.address, refund_ratio, sender=daddy)
+        accountant.set_max_fee(strategy.address, max_fee, sender=daddy)
+
+    return set_fees_for_strategy

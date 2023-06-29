@@ -5,8 +5,7 @@ WEEK = 7 * DAY
 YEAR = 31_556_952  # same value used in vault
 MAX_INT = 2**256 - 1
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-MAX_BPS = 1_000_000_000_000
-MAX_BPS_ACCOUNTANT = 10_000
+MAX_BPS = 10_000
 
 
 class ROLES(IntFlag):
@@ -33,3 +32,8 @@ class StrategyChangeType(IntFlag):
 class RoleStatusChange(IntFlag):
     OPENED = 1
     CLOSED = 2
+
+
+class ChangeType(IntFlag):
+    ADDED = 1
+    REMOVED = 2
