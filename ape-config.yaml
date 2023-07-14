@@ -30,7 +30,7 @@ dependencies:
 solidity:
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.8.2"
-    - "@yearn-vaults=yearn-vaults/master"
+    - "@yearn-vaults=yearn-vaults/v3.0.0"
     - "@tokenized-strategy=tokenized-strategy/v3.0.0"
     - "@periphery=periphery/master"
 
