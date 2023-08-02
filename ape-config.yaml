@@ -15,23 +15,23 @@ dependencies:
     version: 4.8.2
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
-    ref: master
+    ref: v3.0.0
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    ref: 3.0.1-beta
+    ref: v3.0.0
     contracts_folder: src
     exclude:
      - src/test/**/*
   - name: periphery
-    github: schlagonia/tokenized-strategy-periphery
+    github: yearn/tokenized-strategy-periphery
     ref: master
     contracts_folder: src
 
 solidity:
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.8.2"
-    - "@yearn-vaults=yearn-vaults/master"
-    - "@tokenized-strategy=tokenized-strategy/3.0.1-beta"
+    - "@yearn-vaults=yearn-vaults/v3.0.0"
+    - "@tokenized-strategy=tokenized-strategy/v3.0.0"
     - "@periphery=periphery/master"
 
 ethereum:
