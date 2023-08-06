@@ -82,6 +82,10 @@ struct Fee:
     # Max percent of the reported gain that the accountant can take.
     # A max_fee of 0 will mean non is enforced.
     max_fee: uint16
+    # Max acceptable gain for a strategy.
+    max_gain: uint16
+    # The max acceptable loss for a strategy.
+    max_loss: uint16
     # Bool set for custom fee configs
     custom: bool
 
@@ -123,7 +127,9 @@ def __init__(
     default_management: uint16, 
     default_performance: uint16, 
     default_refund: uint16, 
-    default_max: uint16
+    default_max_fee: uint16,
+    default_max_gain: uint16,
+    default_max_loss: uint16
 ):
     """
     @notice Initialize the accountant and default fee config.
@@ -131,12 +137,17 @@ def __init__(
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max Default max fee to allow as a percent of gain.
+    @param default_max_fee Default max fee to allow as a percent of gain.
+    @param default_max_gain Default max percent gain a strategy can report.
+    @param default_max_loss Default max percent loss a strategy can report.
     """
     assert fee_manager != empty(address), "ZERO ADDRESS"
     assert fee_recipient != empty(address), "ZERO ADDRESS"
     assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
     assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert convert(default_max_fee, uint256) <= MAX_BPS, "too high"
+    assert convert(default_max_gain, uint256) <= MAX_BPS, "too high"
+    assert convert(default_max_loss, uint256) <= MAX_BPS, "too high"
 
     # Set initial addresses
     self.fee_manager = fee_manager
@@ -147,7 +158,9 @@ def __init__(
         management_fee: default_management,
         performance_fee: default_performance,
         refund_ratio: default_refund,
-        max_fee: default_max,
+        max_fee: default_max_fee,
+        max_gain: default_max_gain,
+        max_loss: default_max_loss,
         custom: False
     })
 
@@ -180,10 +193,11 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
 
+    # Retrieve the strategies params from the vault.
+    strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
+
     # Charge management fees no matter gain or loss.
     if fee.management_fee > 0:
-        # Retrieve the strategies params from the vault.
-        strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
         # Time since last harvest.
         duration: uint256 = block.timestamp - strategy_params.last_report
         # management_fee is an annual amount, so charge based on the time passed.
@@ -197,8 +211,13 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
     # Only charge performance fees if there is a gain.
     if gain > 0:
+        assert gain <= strategy_params.current_debt * convert(fee.max_gain, uint256) / MAX_BPS, "too much gain"
         total_fees += (gain * convert(fee.performance_fee, uint256)) / MAX_BPS
+
     else:
+        if fee.max_loss < 10_000:    
+            assert loss <= strategy_params.current_debt * convert(fee.max_loss, uint256) / MAX_BPS, "too much loss"
+
         # Means we should have a loss.
         if fee.refund_ratio > 0:
             # Cache the underlying asset the vault uses.
@@ -220,19 +239,9 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
 @internal
 def erc20_safe_approve(token: address, spender: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
-    # HACK: Used to handle non-compliant tokens like USDT
-    response: Bytes[32] = raw_call(
-        token,
-        concat(
-            method_id("approve(address,uint256)"),
-            convert(spender, bytes32),
-            convert(amount, bytes32),
-        ),
-        max_outsize=32,
-    )
-    if len(response) > 0:
-        assert convert(response, bool), "approval failed!"
+    # Used only to approve tokens that are not the type managed by this Vault.
+    # Used to handle non-compliant tokens like USDT
+    assert ERC20(token).approve(spender, amount, default_return_value=True), "approval failed"
 
 
 @external
@@ -270,24 +279,33 @@ def update_default_config(
     default_management: uint16, 
     default_performance: uint16, 
     default_refund: uint16, 
-    default_max: uint16
+    default_max_fee: uint16,
+    default_max_gain: uint16,
+    default_max_loss: uint16
 ):
     """
     @notice Update the default config used for all strategies.
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max Default max fee to allow as a percent of gain.
+    @param default_max_fee Default max fee to allow as a percent of gain.
+    @param default_max_gain Default max percent gain a strategy can report.
+    @param default_max_loss Default max percent loss a strategy can report.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
     assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert convert(default_max_fee, uint256) <= MAX_BPS, "too high"
+    assert convert(default_max_gain, uint256) <= MAX_BPS, "too high"
+    assert convert(default_max_loss, uint256) <= MAX_BPS, "too high"
 
     self.default_config = Fee({
         management_fee: default_management,
         performance_fee: default_performance,
         refund_ratio: default_refund,
-        max_fee: default_max,
+        max_fee: default_max_fee,
+        max_gain: default_max_gain,
+        max_loss: default_max_loss,
         custom: False
     })
 
@@ -301,7 +319,9 @@ def set_custom_config(
     custom_management: uint16, 
     custom_performance: uint16, 
     custom_refund: uint16, 
-    custom_max: uint16
+    custom_max_fee: uint16,
+    custom_max_gain: uint16,
+    custom_max_loss: uint16
 ):
     """
     @notice Used to set a custom fee amounts for a specific strategy.
@@ -312,19 +332,26 @@ def set_custom_config(
     @param custom_management Custom annual management fee to charge.
     @param custom_performance Custom performance fee to charge.
     @param custom_refund Custom refund ratio to give back on losses.
-    @param custom_max Custom max fee to allow as a percent of gain.
+    @param custom_max_fee Custom max fee to allow as a percent of gain.
+    @param custom_max_gain Default max percent gain a strategy can report.
+    @param custom_max_loss Default max percent loss a strategy can report.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert self.vaults[vault], "vault not added"
     assert custom_management <= self._management_fee_threshold(), "exceeds management fee threshold"
     assert custom_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert convert(custom_max_fee, uint256) <= MAX_BPS, "too high"
+    assert convert(custom_max_gain, uint256) <= MAX_BPS, "too high"
+    assert convert(custom_max_loss, uint256) <= MAX_BPS, "too high"
 
     # Set this strategies custom config.
     self.fees[vault][strategy] = Fee({
         management_fee: custom_management,
         performance_fee: custom_performance,
         refund_ratio: custom_refund,
-        max_fee: custom_max,
+        max_fee: custom_max_fee,
+        max_gain: custom_max_gain,
+        max_loss: custom_max_loss,
         custom: True
     })
 
@@ -346,6 +373,8 @@ def remove_custom_config(vault: address, strategy: address):
         performance_fee: 0,
         refund_ratio: 0,
         max_fee: 0,
+        max_gain: 0,
+        max_loss: 0,
         custom: False
     })
 
@@ -389,18 +418,7 @@ def distribute(token: address) -> uint256:
 @internal
 def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
-    # HACK: Used to handle non-compliant tokens like USDT
-    response: Bytes[32] = raw_call(
-        token,
-        concat(
-            method_id("transfer(address,uint256)"),
-            convert(receiver, bytes32),
-            convert(amount, bytes32),
-        ),
-        max_outsize=32,
-    )
-    if len(response) > 0:
-        assert convert(response, bool), "Transfer failed!"
+    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
 
 
 @external

@@ -232,6 +232,8 @@ def deploy_accountant(project, daddy, fee_recipient):
         performance_fee=1_000,
         refund_ratio=0,
         max_fee=0,
+        max_gain=10_000,
+        max_loss=0,
     ):
         accountant = daddy.deploy(
             project.GenericAccountant,
@@ -241,6 +243,8 @@ def deploy_accountant(project, daddy, fee_recipient):
             performance_fee,
             refund_ratio,
             max_fee,
+            max_gain,
+            max_loss,
         )
 
         return accountant
