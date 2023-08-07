@@ -224,8 +224,33 @@ def provide_strategy_with_debt():
 
 
 @pytest.fixture(scope="session")
-def deploy_accountant(project, daddy, fee_recipient):
-    def deploy_accountant(
+def deploy_generic_accountant(project, daddy, fee_recipient):
+    def deploy_generic_accountant(
+        manager=daddy,
+        fee_recipient=fee_recipient,
+        management_fee=100,
+        performance_fee=1_000,
+        refund_ratio=0,
+        max_fee=0,
+    ):
+        accountant = daddy.deploy(
+            project.GenericAccountant,
+            manager,
+            fee_recipient,
+            management_fee,
+            performance_fee,
+            refund_ratio,
+            max_fee,
+        )
+
+        return accountant
+
+    yield deploy_generic_accountant
+
+
+@pytest.fixture(scope="session")
+def deploy_healthcheck_accountant(project, daddy, fee_recipient):
+    def deploy_healthcheck_accountant(
         manager=daddy,
         fee_recipient=fee_recipient,
         management_fee=100,
@@ -236,7 +261,7 @@ def deploy_accountant(project, daddy, fee_recipient):
         max_loss=0,
     ):
         accountant = daddy.deploy(
-            project.GenericAccountant,
+            project.HealthCheckAccountant,
             manager,
             fee_recipient,
             management_fee,
@@ -249,14 +274,21 @@ def deploy_accountant(project, daddy, fee_recipient):
 
         return accountant
 
-    yield deploy_accountant
+    yield deploy_healthcheck_accountant
 
 
 @pytest.fixture(scope="session")
-def accountant(deploy_accountant):
-    accountant = deploy_accountant()
+def generic_accountant(deploy_generic_accountant):
+    generic_accountant = deploy_generic_accountant()
 
-    yield accountant
+    yield generic_accountant
+
+
+@pytest.fixture(scope="session")
+def healthcheck_accountant(deploy_healthcheck_accountant):
+    healthcheck_accountant = deploy_healthcheck_accountant()
+
+    yield healthcheck_accountant
 
 
 @pytest.fixture(scope="session")
