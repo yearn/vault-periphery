@@ -1,7 +1,7 @@
 # @version 0.3.7
 
 """
-@title Healtcheck Accountant
+@title HealtCheck Accountant
 @license GNU AGPLv3
 @author yearn.finance
 @notice
