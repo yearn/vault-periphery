@@ -44,13 +44,13 @@ def test__set_release_registry(address_provider, daddy, user, release_registry):
     id = AddressIds.RELEASE_REGISTRY
     address = release_registry.address
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_release_registry() == ZERO_ADDRESS
 
     with ape.reverts("!governance"):
         address_provider.set_release_registry(address, sender=user)
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_release_registry() == ZERO_ADDRESS
 
     tx = address_provider.set_release_registry(address, sender=daddy)
@@ -58,11 +58,11 @@ def test__set_release_registry(address_provider, daddy, user, release_registry):
     logs = list(tx.decode_logs(address_provider.UpdatedAddress))
 
     assert len(logs) == 1
-    # assert logs[0].address_id == id
+    assert logs[0].address_id == id
     assert logs[0].old_address == ZERO_ADDRESS
     assert logs[0].new_address == address
 
-    # assert address_provider.get_address(id) == address
+    assert address_provider.get_address(id) == address
     assert address_provider.get_release_registry() == address
 
 
@@ -70,13 +70,13 @@ def test__set_common_report_trigger(address_provider, daddy, user):
     id = AddressIds.COMMON_REPORT_TRIGGER
     address = user
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_common_report_trigger() == ZERO_ADDRESS
 
     with ape.reverts("!governance"):
         address_provider.set_common_report_trigger(address, sender=user)
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_common_report_trigger() == ZERO_ADDRESS
 
     tx = address_provider.set_common_report_trigger(address, sender=daddy)
@@ -84,11 +84,11 @@ def test__set_common_report_trigger(address_provider, daddy, user):
     logs = list(tx.decode_logs(address_provider.UpdatedAddress))
 
     assert len(logs) == 1
-    # assert logs[0].address_id == id
+    assert logs[0].address_id == id
     assert logs[0].old_address == ZERO_ADDRESS
     assert logs[0].new_address == address
 
-    # assert address_provider.get_address(id) == address
+    assert address_provider.get_address(id) == address
     assert address_provider.get_common_report_trigger() == address
 
 
@@ -96,13 +96,13 @@ def test__set_apr_oracle(address_provider, daddy, user):
     id = AddressIds.APR_ORACLE
     address = user
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_apr_oracle() == ZERO_ADDRESS
 
     with ape.reverts("!governance"):
         address_provider.set_apr_oracle(address, sender=user)
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_apr_oracle() == ZERO_ADDRESS
 
     tx = address_provider.set_apr_oracle(address, sender=daddy)
@@ -110,11 +110,11 @@ def test__set_apr_oracle(address_provider, daddy, user):
     logs = list(tx.decode_logs(address_provider.UpdatedAddress))
 
     assert len(logs) == 1
-    # assert logs[0].address_id == id
+    assert logs[0].address_id == id
     assert logs[0].old_address == ZERO_ADDRESS
     assert logs[0].new_address == address
 
-    # assert address_provider.get_address(id) == address
+    assert address_provider.get_address(id) == address
     assert address_provider.get_apr_oracle() == address
 
 
@@ -122,13 +122,13 @@ def test__set_registry_factory(address_provider, daddy, user, registry_factory):
     id = AddressIds.REGISTRY_FACTORY
     address = registry_factory.address
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_registry_factory() == ZERO_ADDRESS
 
     with ape.reverts("!governance"):
         address_provider.set_registry_factory(address, sender=user)
 
-    # assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_address(id) == ZERO_ADDRESS
     assert address_provider.get_registry_factory() == ZERO_ADDRESS
 
     tx = address_provider.set_registry_factory(address, sender=daddy)
@@ -136,11 +136,11 @@ def test__set_registry_factory(address_provider, daddy, user, registry_factory):
     logs = list(tx.decode_logs(address_provider.UpdatedAddress))
 
     assert len(logs) == 1
-    # assert logs[0].address_id == id
+    assert logs[0].address_id == id
     assert logs[0].old_address == ZERO_ADDRESS
     assert logs[0].new_address == address
 
-    # assert address_provider.get_address(id) == address
+    assert address_provider.get_address(id) == address
     assert address_provider.get_registry_factory() == address
 
 

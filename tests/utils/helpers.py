@@ -1,6 +1,6 @@
 from hexbytes import HexBytes
-import hashlib
+from sha3 import keccak_256
 
 
 def to_bytes32(string):
-    return HexBytes(hashlib.sha3_256((string).encode("utf-8")).digest())
+    return HexBytes(keccak_256((string).encode("utf-8")).hexdigest())
