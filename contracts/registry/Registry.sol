@@ -33,6 +33,18 @@ contract Registry is Governance {
         uint256 releaseVersion
     );
 
+    event RemovedVault(
+        address indexed vault,
+        address indexed asset,
+        uint256 releaseVersion
+    );
+
+    event RemovedStrategy(
+        address indexed strategy,
+        address indexed asset,
+        uint256 releaseVersion
+    );
+
     // Struct stored for every endorsed vault or strategy for
     // off chain use to easily retreive info.
     struct Info {
@@ -468,5 +480,93 @@ contract Registry is Governance {
     ) external onlyGovernance {
         require(info[_vault].asset != address(0), "!Endorsed");
         info[_vault].tag = _tag;
+    }
+
+    function removeVault(address _vault) external onlyGovernance {
+        require(info[_vault].asset != address(0), "!endorsed");
+        address asset = IVault(_vault).asset();
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IVault(_vault).api_version()
+        );
+
+        _endorsedVaults[asset] = _removeItem(_vault, _endorsedVaults[asset]);
+        _endorsedVaults[asset].pop();
+        _endorsedVaultsByVersion[asset][releaseTarget] = _removeItem(
+            _vault,
+            _endorsedVaultsByVersion[asset][releaseTarget]
+        );
+        _endorsedVaultsByVersion[asset][releaseTarget].pop();
+
+        if (
+            _endorsedVaults[asset].length == 0 &&
+            _endorsedStrategies[asset].length == 0
+        ) {
+            assets = _removeItem(asset, assets);
+            assets.pop();
+            assetIsUsed[asset] = false;
+        }
+
+        info[_vault] = Info({
+            asset: address(0),
+            releaseVersion: 0,
+            deploymentTimeStamp: 0,
+            tag: ""
+        });
+
+        emit RemovedVault(_vault, asset, releaseTarget);
+    }
+
+    function removeStrategy(address _strategy) external onlyGovernance {
+        require(info[_strategy].asset != address(0), "!endorsed");
+        address asset = IStrategy(_strategy).asset();
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IStrategy(_strategy).apiVersion()
+        );
+
+        _endorsedStrategies[asset] = _removeItem(_strategy, _endorsedStrategies[asset]);
+        _endorsedStrategies[asset].pop();
+        _endorsedStrategiesByVersion[asset][releaseTarget] = _removeItem(
+            _strategy,
+            _endorsedStrategiesByVersion[asset][releaseTarget]
+        );
+        _endorsedStrategiesByVersion[asset][releaseTarget].pop();
+
+        if (
+            _endorsedVaults[asset].length == 0 &&
+            _endorsedStrategies[asset].length == 0
+        ) {
+            assets = _removeItem(asset, assets);
+            assets.pop();
+            assetIsUsed[asset] = false;
+        }
+
+        info[_strategy] = Info({
+            asset: address(0),
+            releaseVersion: 0,
+            deploymentTimeStamp: 0,
+            tag: ""
+        });
+
+        emit RemovedStrategy(_strategy, asset, releaseTarget);
+    }
+
+    function _removeItem(
+        address _item,
+        address[] memory _array
+    ) internal pure returns (address[] memory) {
+        uint256 length = _array.length;
+
+        for (uint256 i; i < length; ++i) {
+            // If we found the item.
+            if (_array[i] == _item) {
+                // Check if it is the last item in the array.
+                if (i + 1 != length) {
+                    _array[i] = _array[length - 1];
+                }
+                return _array;
+            }
+        }
+
+        require(false, "Item Not Found");
     }
 }
