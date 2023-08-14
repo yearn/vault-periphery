@@ -523,7 +523,10 @@ contract Registry is Governance {
             IStrategy(_strategy).apiVersion()
         );
 
-        _endorsedStrategies[asset] = _removeItem(_strategy, _endorsedStrategies[asset]);
+        _endorsedStrategies[asset] = _removeItem(
+            _strategy,
+            _endorsedStrategies[asset]
+        );
         _endorsedStrategies[asset].pop();
         _endorsedStrategiesByVersion[asset][releaseTarget] = _removeItem(
             _strategy,

@@ -99,7 +99,7 @@ def release_registry(project, daddy):
 @pytest.fixture(scope="session")
 def new_registry(daddy, registry_factory):
     def new_registry(gov=daddy):
-        tx = registry_factory.createNewRegistry(gov, "New test Registry", sender=gov)
+        tx = registry_factory.createNewRegistry("New test Registry", gov, sender=gov)
         return project.Registry.at(
             list(tx.decode_logs(registry_factory.NewRegistry))[0].newRegistry
         )
