@@ -482,30 +482,50 @@ contract Registry is Governance {
         info[_vault].tag = _tag;
     }
 
+    /**
+     * @notice Unendorse a vault.
+     * @dev This should be done with care. It has the potential to loop
+     * through three seperate dynamic arrays that will be loaded and set
+     * to strage at O(n) runtime.
+     *
+     * @param _vault The address of the vault to un-endorse.
+     */
     function removeVault(address _vault) external onlyGovernance {
         require(info[_vault].asset != address(0), "!endorsed");
+
+        // Get the asset the vault is using.
         address asset = IVault(_vault).asset();
+        // Get the relase version for this specific vault.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
             IVault(_vault).api_version()
         );
 
+        // Set the endorsed Vaults array with `_vault` as the last item.
         _endorsedVaults[asset] = _removeItem(_vault, _endorsedVaults[asset]);
+        // Remove the last item from the array.
         _endorsedVaults[asset].pop();
+
+        // Set the endorsed by version array so `_vault` is the last item.
         _endorsedVaultsByVersion[asset][releaseTarget] = _removeItem(
             _vault,
             _endorsedVaultsByVersion[asset][releaseTarget]
         );
+        // Remove the last item from the array.
         _endorsedVaultsByVersion[asset][releaseTarget].pop();
 
+        // If that was the only vault using that asset.
         if (
             _endorsedVaults[asset].length == 0 &&
             _endorsedStrategies[asset].length == 0
         ) {
+            // Remove the asset from the array.
             assets = _removeItem(asset, assets);
             assets.pop();
+            // And set the bool back to false.
             assetIsUsed[asset] = false;
         }
 
+        // Reset the info struct.
         info[_vault] = Info({
             asset: address(0),
             releaseVersion: 0,
@@ -513,36 +533,57 @@ contract Registry is Governance {
             tag: ""
         });
 
+        // Emit the event.
         emit RemovedVault(_vault, asset, releaseTarget);
     }
 
+    /**
+     * @notice Unendorse a strategy.
+     * @dev This should be done with care. It has the potential to loop
+     * through three seperate dynamic arrays that will be loaded and set
+     * to strage at O(n) runtime.
+     *
+     * @param _strategy The address of the strategy to un-endorse.
+     */
     function removeStrategy(address _strategy) external onlyGovernance {
         require(info[_strategy].asset != address(0), "!endorsed");
+
+        // Get the asset that the strategy uses.
         address asset = IStrategy(_strategy).asset();
+        // Get the release version that the strategy uses.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
             IStrategy(_strategy).apiVersion()
         );
 
+        // Set the endorsed strategies array with `_strategy` as the last item.
         _endorsedStrategies[asset] = _removeItem(
             _strategy,
             _endorsedStrategies[asset]
         );
+        // Remove the last item of the array.
         _endorsedStrategies[asset].pop();
+
+        // Set the endorsed by version array with `_strategy` as the last item.
         _endorsedStrategiesByVersion[asset][releaseTarget] = _removeItem(
             _strategy,
             _endorsedStrategiesByVersion[asset][releaseTarget]
         );
+        // Remove the final item off the array.
         _endorsedStrategiesByVersion[asset][releaseTarget].pop();
 
+        // If that was the only vault using that asset.
         if (
             _endorsedVaults[asset].length == 0 &&
             _endorsedStrategies[asset].length == 0
         ) {
+            // Remove the asset from the array.
             assets = _removeItem(asset, assets);
             assets.pop();
+            // And set the bool back to false.
             assetIsUsed[asset] = false;
         }
 
+        // Reset the info struct.
         info[_strategy] = Info({
             asset: address(0),
             releaseVersion: 0,
@@ -550,9 +591,21 @@ contract Registry is Governance {
             tag: ""
         });
 
+        // Emit corresponding event.
         emit RemovedStrategy(_strategy, asset, releaseTarget);
     }
 
+    /**
+     * @dev Internal function used to rearrange an array so that `_item`
+     * is at the very end so it can be 'popped' of the array.
+     *
+     * NOTE: This will revert if the item is not found so we don't pop
+     * an item off that we don't want to.
+     *
+     * @param _item The address we want to remove.
+     * @param _array The dynamic array we are searching through.
+     * @return . New array with `_item` at the end.
+     */
     function _removeItem(
         address _item,
         address[] memory _array
@@ -564,8 +617,10 @@ contract Registry is Governance {
             if (_array[i] == _item) {
                 // Check if it is the last item in the array.
                 if (i + 1 != length) {
+                    // If so replace the items index with the last item.
                     _array[i] = _array[length - 1];
                 }
+                // Return now since we are done.
                 return _array;
             }
         }
