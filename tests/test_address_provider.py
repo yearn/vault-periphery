@@ -10,6 +10,7 @@ def test_address_provider_setup(deploy_address_provider, daddy):
     assert address_provider.name() == "Yearn V3 Address Provider"
     assert address_provider.governance() == daddy
     assert address_provider.pending_governance() == ZERO_ADDRESS
+    assert address_provider.get_router() == ZERO_ADDRESS
     assert address_provider.get_release_registry() == ZERO_ADDRESS
     assert address_provider.get_common_report_trigger() == ZERO_ADDRESS
     assert address_provider.get_apr_oracle() == ZERO_ADDRESS
@@ -38,6 +39,32 @@ def test__set_address(address_provider, daddy, user):
     assert logs[0].new_address == address
 
     assert address_provider.get_address(id) == address
+
+
+def test__set_router(address_provider, daddy, user):
+    id = AddressIds.ROUTER
+    address = user.address
+
+    assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_router() == ZERO_ADDRESS
+
+    with ape.reverts("!governance"):
+        address_provider.set_router(address, sender=user)
+
+    assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_router() == ZERO_ADDRESS
+
+    tx = address_provider.set_router(address, sender=daddy)
+
+    logs = list(tx.decode_logs(address_provider.UpdatedAddress))
+
+    assert len(logs) == 1
+    assert logs[0].address_id == id
+    assert logs[0].old_address == ZERO_ADDRESS
+    assert logs[0].new_address == address
+
+    assert address_provider.get_address(id) == address
+    assert address_provider.get_router() == address
 
 
 def test__set_release_registry(address_provider, daddy, user, release_registry):

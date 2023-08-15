@@ -27,10 +27,11 @@ event NewPendingGovernance:
 
 #### CONSTANTS ####
 
+ROUTER: constant(bytes32) = keccak256("ROUTER")
 RELEASE_REGISTRY: constant(bytes32) = keccak256("RELEASE REGISTRY")
+REGISTRY_FACTORY: constant(bytes32) = keccak256("REGISTRY FACTORY")
 COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("COMMON REPORT TRIGGER")
 APR_ORACLE: constant(bytes32) = keccak256("APR ORACLE")
-REGISTRY_FACTORY: constant(bytes32) = keccak256("REGISTRY FACTORY")
 
 name: public(constant(String[28])) = "Yearn V3 Address Provider"
 
@@ -74,12 +75,30 @@ def _get_address(address_id: bytes32) -> address:
 
 @view
 @external
+def get_router() -> address:
+    """
+    @notice Get the current Yearn 4626 Router.
+    @return Current Yearn 4626 Router
+    """
+    return self._get_address(ROUTER)
+
+@view
+@external
 def get_release_registry() -> address:
     """
     @notice Get the current Release Registry.
     @return Current Release Registry address
     """
     return self._get_address(RELEASE_REGISTRY)
+
+@view
+@external
+def get_registry_factory() -> address:
+    """
+    @ Get the current Registry Factory.
+    @return Current Registry Factory address.
+    """
+    return self._get_address(REGISTRY_FACTORY)
 
 @view
 @external
@@ -98,15 +117,6 @@ def get_apr_oracle() -> address:
     @return Current APR Oracel address.
     """
     return self._get_address(APR_ORACLE)
-
-@view
-@external
-def get_registry_factory() -> address:
-    """
-    @ Get the current Registry Factory.
-    @return Current Registry Factory address.
-    """
-    return self._get_address(REGISTRY_FACTORY)
 
 ########## SETTERS ##########
 
@@ -135,6 +145,16 @@ def _set_address(address_id: bytes32, new_address: address):
     log UpdatedAddress(address_id, old_address, new_address)
 
 @external
+def set_router(new_address: address):
+    """
+    @notice Sets a new address for the Yearn 4626 Router.
+    @dev Must be called by the governance.
+    @param new_address The new Router.
+    """
+    assert msg.sender == self.governance, "!governance"
+    self._set_address(ROUTER, new_address)
+
+@external
 def set_release_registry(new_address: address):
     """
     @notice Sets a new address for the Release Registry.
@@ -143,6 +163,16 @@ def set_release_registry(new_address: address):
     """
     assert msg.sender == self.governance, "!governance"
     self._set_address(RELEASE_REGISTRY, new_address)
+
+@external
+def set_registry_factory(new_address: address):
+    """
+    @notice Sets a new address for the Release Factory.
+    @dev Must be called by the governance.
+    @param new_address The new Release Factory.
+    """
+    assert msg.sender == self.governance, "!governance"
+    self._set_address(REGISTRY_FACTORY, new_address)
 
 @external
 def set_common_report_trigger(new_address: address):
@@ -163,16 +193,6 @@ def set_apr_oracle(new_address: address):
     """
     assert msg.sender == self.governance, "!governance"
     self._set_address(APR_ORACLE, new_address)
-
-@external
-def set_registry_factory(new_address: address):
-    """
-    @notice Sets a new address for the Release Factory.
-    @dev Must be called by the governance.
-    @param new_address The new Release Factory.
-    """
-    assert msg.sender == self.governance, "!governance"
-    self._set_address(REGISTRY_FACTORY, new_address)
 
 ########## GOVERNANCE ##########
 
