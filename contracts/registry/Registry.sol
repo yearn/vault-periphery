@@ -76,14 +76,6 @@ contract Registry is Governance {
     // asset => array of all endorsed strategies.
     mapping(address => address[]) internal _endorsedStrategies;
 
-    // asset => release number => array of endorsed vaults
-    mapping(address => mapping(uint256 => address[]))
-        internal _endorsedVaultsByVersion;
-
-    // asset => release number => array of endorsed strategies
-    mapping(address => mapping(uint256 => address[]))
-        internal _endorsedStrategiesByVersion;
-
     // vault/strategy address => Info stuct.
     mapping(address => Info) public info;
 
@@ -157,66 +149,6 @@ contract Registry is Governance {
         address _asset
     ) external view returns (address[] memory) {
         return _endorsedStrategies[_asset];
-    }
-
-    /**
-     * @notice Get the number of endorsed vaults for an asset of a specific API version.
-     * @return The amount of endorsed vaults.
-     */
-    function numEndorsedVaultsByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (uint256) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedVaultsByVersion[_asset][version].length;
-    }
-
-    /**
-     * @notice Get the number of endorsed strategies for an asset of a specific API version.
-     * @return The amount of endorsed strategies.
-     */
-    function numEndorsedStrategiesByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (uint256) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedStrategiesByVersion[_asset][version].length;
-    }
-
-    /**
-     * @notice Get the array of vaults endorsed for an `_asset` of a specific API.
-     * @param _asset The underlying token used by the vaults.
-     * @param _versionDelta The difference from the most recent API version.
-     * @return The endorsed vaults.
-     */
-    function getEndorsedVaultsByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (address[] memory) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedVaultsByVersion[_asset][version];
-    }
-
-    /**
-     * @notice Get the array of strategies endorsed for an `_asset` of a specific API.
-     * @param _asset The underlying token used by the strategies.
-     * @param _versionDelta The difference from the most recent API version.
-     * @return The endorsed strategies.
-     */
-    function getEndorsedStrategiesByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (address[] memory) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedStrategiesByVersion[_asset][version];
     }
 
     /**
@@ -377,9 +309,8 @@ contract Registry is Governance {
         uint256 _releaseTarget,
         uint256 _deploymentTimestamp
     ) internal {
-        // Add to the endorsed vaults arrays.
+        // Add to the endorsed vaults array.
         _endorsedVaults[_asset].push(_vault);
-        _endorsedVaultsByVersion[_asset][_releaseTarget].push(_vault);
 
         // Set the Info struct for this vault
         info[_vault] = Info({
@@ -436,7 +367,6 @@ contract Registry is Governance {
         address _asset = IStrategy(_strategy).asset();
 
         _endorsedStrategies[_asset].push(_strategy);
-        _endorsedStrategiesByVersion[_asset][_releaseTarget].push(_strategy);
 
         info[_strategy] = Info({
             asset: _asset,
@@ -485,7 +415,7 @@ contract Registry is Governance {
     /**
      * @notice Unendorse a vault.
      * @dev This should be done with care. It has the potential to loop
-     * through three seperate dynamic arrays that will be loaded and set
+     * through two seperate dynamic arrays that will be loaded and set
      * to strage at O(n) runtime.
      *
      * @param _vault The address of the vault to un-endorse.
@@ -504,14 +434,6 @@ contract Registry is Governance {
         _endorsedVaults[asset] = _removeItem(_vault, _endorsedVaults[asset]);
         // Remove the last item from the array.
         _endorsedVaults[asset].pop();
-
-        // Set the endorsed by version array so `_vault` is the last item.
-        _endorsedVaultsByVersion[asset][releaseTarget] = _removeItem(
-            _vault,
-            _endorsedVaultsByVersion[asset][releaseTarget]
-        );
-        // Remove the last item from the array.
-        _endorsedVaultsByVersion[asset][releaseTarget].pop();
 
         // If that was the only vault using that asset.
         if (
@@ -540,7 +462,7 @@ contract Registry is Governance {
     /**
      * @notice Unendorse a strategy.
      * @dev This should be done with care. It has the potential to loop
-     * through three seperate dynamic arrays that will be loaded and set
+     * through two seperate dynamic arrays that will be loaded and set
      * to strage at O(n) runtime.
      *
      * @param _strategy The address of the strategy to un-endorse.
@@ -562,14 +484,6 @@ contract Registry is Governance {
         );
         // Remove the last item of the array.
         _endorsedStrategies[asset].pop();
-
-        // Set the endorsed by version array with `_strategy` as the last item.
-        _endorsedStrategiesByVersion[asset][releaseTarget] = _removeItem(
-            _strategy,
-            _endorsedStrategiesByVersion[asset][releaseTarget]
-        );
-        // Remove the final item off the array.
-        _endorsedStrategiesByVersion[asset][releaseTarget].pop();
 
         // If that was the only vault using that asset.
         if (
