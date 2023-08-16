@@ -460,6 +460,46 @@ contract Registry is Governance {
     }
 
     /**
+     * @notice Remove a `_vault` at a specific `_index`.
+     * @dev Can be used as a more efficent way to remove a vault
+     * to not have to iterate over the full array.
+     *
+     * NOTE: This will not remove the asset from the `assets` array
+     * if it is no longer in use and will have to be done manually.
+     *
+     * @param _vault Address of the vault to remove.
+     * @param _index Index in the `endorsedVaults` array `_vault` sits at.
+     */
+    function removeVault(
+        address _vault,
+        uint256 _index
+    ) external onlyGovernance {
+        require(info[_vault].asset != address(0), "!endorsed");
+
+        // Get the asset the vault is using.
+        address asset = IVault(_vault).asset();
+        // Get the relase version for this specific vault.
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IVault(_vault).api_version()
+        );
+
+        address[] memory _vaults = _endorsedVaults[asset];
+        require(_vaults[_index] == _vault, "wrong index");
+
+        // Set the last index to the spot we are removing.
+        _vaults[_index] = _vaults[_vaults.length - 1];
+
+        // Set to storage.
+        _endorsedVaults[asset] = _vaults;
+
+        // Pop the last item off the array.
+        _endorsedVaults[asset].pop();
+
+        // Emit the event.
+        emit RemovedVault(_vault, asset, releaseTarget);
+    }
+
+    /**
      * @notice Unendorse a strategy.
      * @dev This should be done with care. It has the potential to loop
      * through two seperate dynamic arrays that will be loaded and set
@@ -507,6 +547,70 @@ contract Registry is Governance {
 
         // Emit corresponding event.
         emit RemovedStrategy(_strategy, asset, releaseTarget);
+    }
+
+    /**
+     * @notice Remove a `_strategy` at a specific `_index`.
+     * @dev Can be used as a more efficent way to remove a strategy
+     * to not have to iterate over the full array.
+     *
+     * NOTE: This will not remove the asset from the `assets` array
+     * if it is no longer in use and will have to be done manually.
+     *
+     * @param _strategy Address of the strategy to remove.
+     * @param _index Index in the `endorsedStrategies` array `_strategy` sits at.
+     */
+    function removeStrategy(
+        address _strategy,
+        uint256 _index
+    ) external onlyGovernance {
+        require(info[_strategy].asset != address(0), "!endorsed");
+
+        // Get the asset the vault is using.
+        address asset = IStrategy(_strategy).asset();
+        // Get the relase version for this specific vault.
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IStrategy(_strategy).apiVersion()
+        );
+
+        address[] memory _strategies = _endorsedStrategies[asset];
+        require(_strategies[_index] == _strategy, "wrong index");
+
+        // Set the last index to the spot we are removing.
+        _strategies[_index] = _strategies[_strategies.length - 1];
+
+        // Set to storage.
+        _endorsedStrategies[asset] = _strategies;
+
+        // Pop the last item off the array.
+        _endorsedStrategies[asset].pop();
+
+        // Emit the event.
+        emit RemovedVault(_strategy, asset, releaseTarget);
+    }
+
+    function removeAsset(
+        address _asset,
+        uint256 _index
+    ) external onlyGovernance {
+        require(assetIsUsed[_asset], "!in use");
+        require(
+            _endorsedVaults[_asset].length == 0 &&
+                _endorsedStrategies[_asset].length == 0,
+            "still in use"
+        );
+
+        address[] memory _assets = assets;
+        require(_assets[_index] == _asset, "wrong asset");
+
+        // Replace `_asset` with the last index.
+        _assets[_index] = _assets[_assets.length - 1];
+
+        // Set to storage.
+        assets = _assets;
+
+        // Pop last item off the array.
+        assets.pop();
     }
 
     /**
