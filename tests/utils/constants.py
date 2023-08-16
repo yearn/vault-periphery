@@ -1,4 +1,5 @@
 from enum import IntFlag
+from utils.helpers import to_bytes32
 
 DAY = 86400
 WEEK = 7 * DAY
@@ -37,3 +38,11 @@ class RoleStatusChange(IntFlag):
 class ChangeType(IntFlag):
     ADDED = 1
     REMOVED = 2
+
+
+class AddressIds:
+    ROUTER = to_bytes32("ROUTER")
+    RELEASE_REGISTRY = to_bytes32("RELEASE REGISTRY")
+    REGISTRY_FACTORY = to_bytes32("REGISTRY FACTORY")
+    COMMON_REPORT_TRIGGER = to_bytes32("COMMON REPORT TRIGGER")
+    APR_ORACLE = to_bytes32("APR ORACLE")

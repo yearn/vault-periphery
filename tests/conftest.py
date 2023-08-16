@@ -272,3 +272,20 @@ def set_fees_for_strategy():
         accountant.set_max_fee(strategy.address, max_fee, sender=daddy)
 
     return set_fees_for_strategy
+
+
+@pytest.fixture(scope="session")
+def deploy_address_provider(project, daddy):
+    def deploy_address_provider(gov=daddy):
+        address_provider = gov.deploy(project.AddressProvider, gov)
+
+        return address_provider
+
+    yield deploy_address_provider
+
+
+@pytest.fixture(scope="session")
+def address_provider(deploy_address_provider):
+    address_provider = deploy_address_provider()
+
+    yield address_provider

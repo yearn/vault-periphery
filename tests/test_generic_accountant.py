@@ -3,7 +3,9 @@ from ape import chain
 from utils.constants import ChangeType, ZERO_ADDRESS, MAX_BPS, MAX_INT
 
 
-def test_setup(daddy, vault, strategy, accountant, fee_recipient):
+def test_setup(daddy, vault, strategy, deploy_accountant, fee_recipient):
+    accountant = deploy_accountant()
+
     assert accountant.fee_manager() == daddy
     assert accountant.future_fee_manager() == ZERO_ADDRESS
     assert accountant.fee_recipient() == fee_recipient
