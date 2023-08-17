@@ -97,9 +97,9 @@ contract GenericDebtAllocator is Governance {
                 // Return true and the calldata.
                 return (
                     true,
-                    abi.encodeWithSelector(
-                        _vault.update_debt.selector,
-                        abi.encode(_strategy, params.current_debt + toAdd)
+                    abi.encodeCall(
+                        _vault.update_debt,
+                        (_strategy, params.current_debt + toAdd)
                     )
                 );
             }
@@ -117,9 +117,9 @@ contract GenericDebtAllocator is Governance {
                 // If so return true and the calldata.
                 return (
                     true,
-                    abi.encodeWithSelector(
-                        _vault.update_debt.selector,
-                        abi.encode(_strategy, params.current_debt - toPull)
+                    abi.encodeCall(
+                        _vault.update_debt,
+                        (_strategy, params.current_debt - toPull)
                     )
                 );
             }
