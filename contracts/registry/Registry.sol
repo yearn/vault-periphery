@@ -413,55 +413,8 @@ contract Registry is Governance {
     }
 
     /**
-     * @notice Unendorse a vault.
-     * @dev This should be done with care. It has the potential to loop
-     * through two seperate dynamic arrays that will be loaded and set
-     * to strage at O(n) runtime.
-     *
-     * @param _vault The address of the vault to un-endorse.
-     */
-    function removeVault(address _vault) external onlyGovernance {
-        require(info[_vault].asset != address(0), "!endorsed");
-
-        // Get the asset the vault is using.
-        address asset = IVault(_vault).asset();
-        // Get the relase version for this specific vault.
-        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
-            IVault(_vault).api_version()
-        );
-
-        // Set the endorsed Vaults array with `_vault` as the last item.
-        _endorsedVaults[asset] = _removeItem(_vault, _endorsedVaults[asset]);
-        // Remove the last item from the array.
-        _endorsedVaults[asset].pop();
-
-        // If that was the only vault using that asset.
-        if (
-            _endorsedVaults[asset].length == 0 &&
-            _endorsedStrategies[asset].length == 0
-        ) {
-            // Remove the asset from the array.
-            assets = _removeItem(asset, assets);
-            assets.pop();
-            // And set the bool back to false.
-            assetIsUsed[asset] = false;
-        }
-
-        // Reset the info struct.
-        info[_vault] = Info({
-            asset: address(0),
-            releaseVersion: 0,
-            deploymentTimeStamp: 0,
-            tag: ""
-        });
-
-        // Emit the event.
-        emit RemovedVault(_vault, asset, releaseTarget);
-    }
-
-    /**
      * @notice Remove a `_vault` at a specific `_index`.
-     * @dev Can be used as a more efficent way to remove a vault
+     * @dev Can be used as an efficent way to remove a vault
      * to not have to iterate over the full array.
      *
      * NOTE: This will not remove the asset from the `assets` array
@@ -495,63 +448,21 @@ contract Registry is Governance {
         // Pop the last item off the array.
         _endorsedVaults[asset].pop();
 
-        // Emit the event.
-        emit RemovedVault(_vault, asset, releaseTarget);
-    }
-
-    /**
-     * @notice Unendorse a strategy.
-     * @dev This should be done with care. It has the potential to loop
-     * through two seperate dynamic arrays that will be loaded and set
-     * to strage at O(n) runtime.
-     *
-     * @param _strategy The address of the strategy to un-endorse.
-     */
-    function removeStrategy(address _strategy) external onlyGovernance {
-        require(info[_strategy].asset != address(0), "!endorsed");
-
-        // Get the asset that the strategy uses.
-        address asset = IStrategy(_strategy).asset();
-        // Get the release version that the strategy uses.
-        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
-            IStrategy(_strategy).apiVersion()
-        );
-
-        // Set the endorsed strategies array with `_strategy` as the last item.
-        _endorsedStrategies[asset] = _removeItem(
-            _strategy,
-            _endorsedStrategies[asset]
-        );
-        // Remove the last item of the array.
-        _endorsedStrategies[asset].pop();
-
-        // If that was the only vault using that asset.
-        if (
-            _endorsedVaults[asset].length == 0 &&
-            _endorsedStrategies[asset].length == 0
-        ) {
-            // Remove the asset from the array.
-            assets = _removeItem(asset, assets);
-            assets.pop();
-            // And set the bool back to false.
-            assetIsUsed[asset] = false;
-        }
-
-        // Reset the info struct.
-        info[_strategy] = Info({
+        // Reset the info config.
+        info[_vault] = Info({
             asset: address(0),
             releaseVersion: 0,
             deploymentTimeStamp: 0,
             tag: ""
         });
 
-        // Emit corresponding event.
-        emit RemovedStrategy(_strategy, asset, releaseTarget);
+        // Emit the event.
+        emit RemovedVault(_vault, asset, releaseTarget);
     }
 
     /**
      * @notice Remove a `_strategy` at a specific `_index`.
-     * @dev Can be used as a more efficent way to remove a strategy
+     * @dev Can be used as a efficent way to remove a strategy
      * to not have to iterate over the full array.
      *
      * NOTE: This will not remove the asset from the `assets` array
@@ -585,10 +496,26 @@ contract Registry is Governance {
         // Pop the last item off the array.
         _endorsedStrategies[asset].pop();
 
+        // Reset the info config.
+        info[_strategy] = Info({
+            asset: address(0),
+            releaseVersion: 0,
+            deploymentTimeStamp: 0,
+            tag: ""
+        });
+
         // Emit the event.
-        emit RemovedVault(_strategy, asset, releaseTarget);
+        emit RemovedStrategy(_strategy, asset, releaseTarget);
     }
 
+    /**
+     * @notice Removes a specific `_asset` at `_index` from `assets`.
+     * @dev Can be used if an asset is no longer in use after a vault or
+     * strategy has also been removed.
+     *
+     * @param _asset The asset to remove from the array.
+     * @param _index The index it sits at.
+     */
     function removeAsset(
         address _asset,
         uint256 _index
@@ -611,38 +538,8 @@ contract Registry is Governance {
 
         // Pop last item off the array.
         assets.pop();
-    }
 
-    /**
-     * @dev Internal function used to rearrange an array so that `_item`
-     * is at the very end so it can be 'popped' of the array.
-     *
-     * NOTE: This will revert if the item is not found so we don't pop
-     * an item off that we don't want to.
-     *
-     * @param _item The address we want to remove.
-     * @param _array The dynamic array we are searching through.
-     * @return . New array with `_item` at the end.
-     */
-    function _removeItem(
-        address _item,
-        address[] memory _array
-    ) internal pure returns (address[] memory) {
-        uint256 length = _array.length;
-
-        for (uint256 i; i < length; ++i) {
-            // If we found the item.
-            if (_array[i] == _item) {
-                // Check if it is the last item in the array.
-                if (i + 1 != length) {
-                    // If so replace the items index with the last item.
-                    _array[i] = _array[length - 1];
-                }
-                // Return now since we are done.
-                return _array;
-            }
-        }
-
-        require(false, "Item Not Found");
+        // No longer used.
+        assetIsUsed[_asset] = false;
     }
 }
