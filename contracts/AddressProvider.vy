@@ -5,12 +5,7 @@
 @license GNU AGPLv3
 @author yearn.finance
 @notice
-    Address provider for the general Yearn V3 contracts.
-
-    Easily retrieve the most recent version of all periphery
-    Yearn V3 contracts.
-
-    Based on the Aave Pool Address Provider.
+    Address provider for the periphery Yearn V3 contracts.
 """
 #### EVENTS ####
 
@@ -19,11 +14,11 @@ event UpdatedAddress:
     old_address: indexed(address)
     new_address: indexed(address)
 
-event UpdateGovernance:
-    governance: indexed(address)
-
 event NewPendingGovernance:
     pending_governance: indexed(address)
+
+event UpdateGovernance:
+    governance: indexed(address)
 
 #### CONSTANTS ####
 
