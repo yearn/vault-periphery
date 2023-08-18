@@ -15,6 +15,8 @@ contract GenericDebtAllocator is Governance {
 
     event SetMinimumChange(address indexed strategy, uint256 minimumChange);
 
+    event SetMaxAcceptableBaseFee(uint256 maxAcceptableBaseFee);
+
     // Struct for each strategies info.
     struct Config {
         uint256 targetRatio;
@@ -33,6 +35,10 @@ contract GenericDebtAllocator is Governance {
     // Can't be more than 10_000.
     uint256 public debtRatio;
 
+    // Max the chains base fee can be during debt update.
+    // Will default to max uint256 and need to be set to be used.
+    uint256 public maxAcceptableBaseFee;
+
     constructor(address _vault, address _governance) Governance(_governance) {
         inizialize(_vault, _governance);
     }
@@ -47,6 +53,8 @@ contract GenericDebtAllocator is Governance {
         require(address(vault) == address(0), "!initialized");
         vault = _vault;
         governance = _governance;
+        // Default max base fee to uint256 max
+        maxAcceptableBaseFee = type(uint256).max;
     }
 
     /**
@@ -63,6 +71,11 @@ contract GenericDebtAllocator is Governance {
     function shouldUpdateDebt(
         address _strategy
     ) external view returns (bool, bytes memory) {
+        // Check the base fee isn't to high.
+        if (block.basefee > maxAcceptableBaseFee) {
+            return (false, bytes("Base Fee"));
+        }
+
         // Cache the vault variable.
         IVault _vault = IVault(vault);
         // Retrieve the strategy specifc parameters.
@@ -179,5 +192,20 @@ contract GenericDebtAllocator is Governance {
         configs[_strategy].minimumChange = _minimumChange;
 
         emit SetMinimumChange(_strategy, _minimumChange);
+    }
+
+    /**
+     * @notice Set the max acceptable base fee.
+     * @dev This defaults to max uint256 and will need to
+     * be set for it to be used.
+     *
+     * @param _maxAcceptableBaseFee The new max base fee.
+     */
+    function setMaxAcceptableBaseFee(
+        uint256 _maxAcceptableBaseFee
+    ) external onlyGovernance {
+        maxAcceptableBaseFee = _maxAcceptableBaseFee;
+
+        emit SetMaxAcceptableBaseFee(_maxAcceptableBaseFee);
     }
 }
