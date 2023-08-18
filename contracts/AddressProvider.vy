@@ -26,6 +26,7 @@ ROUTER: constant(bytes32) = keccak256("ROUTER")
 RELEASE_REGISTRY: constant(bytes32) = keccak256("RELEASE REGISTRY")
 REGISTRY_FACTORY: constant(bytes32) = keccak256("REGISTRY FACTORY")
 COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("COMMON REPORT TRIGGER")
+BASE_FEE_PROVIDER: constant(bytes32) = keccak256("BASE FEE PROVIDER")
 APR_ORACLE: constant(bytes32) = keccak256("APR ORACLE")
 
 name: public(constant(String[28])) = "Yearn V3 Address Provider"
@@ -106,6 +107,15 @@ def get_common_report_trigger() -> address:
 
 @view
 @external
+def get_base_fee_provider() -> address:
+    """
+    @ Get the current Base Fee Provider.
+    @return Current Base Fee Provider address.
+    """
+    return self._get_address(BASE_FEE_PROVIDER)
+
+@view
+@external
 def get_apr_oracle() -> address:
     """
     @ Get the current APR Oracle.
@@ -178,6 +188,16 @@ def set_common_report_trigger(new_address: address):
     """
     assert msg.sender == self.governance, "!governance"
     self._set_address(COMMON_REPORT_TRIGGER, new_address)
+
+@external
+def set_base_fee_provider(new_address: address):
+    """
+    @notice Sets a new address for the Base Fee Provider.
+    @dev Must be called by the governance.
+    @param new_address The new Base Fee Provider.
+    """
+    assert msg.sender == self.governance, "!governance"
+    self._set_address(BASE_FEE_PROVIDER, new_address)
 
 @external
 def set_apr_oracle(new_address: address):
