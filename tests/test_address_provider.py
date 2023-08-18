@@ -145,6 +145,32 @@ def test__set_apr_oracle(address_provider, daddy, user):
     assert address_provider.get_apr_oracle() == address
 
 
+def test__set_base_fee_provider(address_provider, daddy, user):
+    id = AddressIds.BASE_FEE_PROVIDER
+    address = user
+
+    assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_base_fee_provider() == ZERO_ADDRESS
+
+    with ape.reverts("!governance"):
+        address_provider.set_base_fee_provider(address, sender=user)
+
+    assert address_provider.get_address(id) == ZERO_ADDRESS
+    assert address_provider.get_base_fee_provider() == ZERO_ADDRESS
+
+    tx = address_provider.set_base_fee_provider(address, sender=daddy)
+
+    logs = list(tx.decode_logs(address_provider.UpdatedAddress))
+
+    assert len(logs) == 1
+    assert logs[0].address_id == id
+    assert logs[0].old_address == ZERO_ADDRESS
+    assert logs[0].new_address == address
+
+    assert address_provider.get_address(id) == address
+    assert address_provider.get_base_fee_provider() == address
+
+
 def test__set_registry_factory(address_provider, daddy, user, registry_factory):
     id = AddressIds.REGISTRY_FACTORY
     address = registry_factory.address
