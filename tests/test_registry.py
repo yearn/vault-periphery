@@ -67,7 +67,7 @@ def test__deploy_new_vault(registry, asset, release_registry, vault_factory, dad
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault(
@@ -107,7 +107,7 @@ def test__endorse_deployed_vault(
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault__default_values(
@@ -145,7 +145,7 @@ def test__endorse_deployed_vault__default_values(
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == 0
+    assert registry.info(new_vault.address).deploymentTimestamp == 0
 
 
 def test__endorse_deployed_strategy(
@@ -177,7 +177,7 @@ def test__endorse_deployed_strategy(
     assert all_strategies[0][0] == strategy.address
     assert registry.info(strategy.address).asset == asset.address
     assert registry.info(strategy.address).releaseVersion == 0
-    assert registry.info(strategy.address).deploymentTimeStamp == block
+    assert registry.info(strategy.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_strategy__default_values(
@@ -208,7 +208,7 @@ def test__endorse_deployed_strategy__default_values(
     assert all_strategies[0][0] == strategy.address
     assert registry.info(strategy.address).asset == asset.address
     assert registry.info(strategy.address).releaseVersion == 0
-    assert registry.info(strategy.address).deploymentTimeStamp == 0
+    assert registry.info(strategy.address).deploymentTimestamp == 0
 
 
 def test__deploy_vault_with_new_release(
@@ -266,7 +266,7 @@ def test__deploy_vault_with_new_release(
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 1
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__deploy_vault_with_old_release(
@@ -324,7 +324,7 @@ def test__deploy_vault_with_old_release(
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault_wrong_api__reverts(
@@ -472,7 +472,7 @@ def test__remove_vault(registry, asset, release_registry, vault_factory, daddy):
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
     # Remove the vault
     tx = registry.removeVault(new_vault, 0, sender=daddy)
@@ -494,7 +494,7 @@ def test__remove_vault(registry, asset, release_registry, vault_factory, daddy):
     assert all_vaults[0] == []
     assert registry.info(new_vault.address).asset == ZERO_ADDRESS
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == 0
+    assert registry.info(new_vault.address).deploymentTimestamp == 0
     assert registry.info(new_vault.address).tag == ""
 
 
@@ -621,7 +621,7 @@ def test__remove_strategy(
     assert all_strategies[0] == []
     assert registry.info(strategy.address).asset == ZERO_ADDRESS
     assert registry.info(strategy.address).releaseVersion == 0
-    assert registry.info(strategy.address).deploymentTimeStamp == 0
+    assert registry.info(strategy.address).deploymentTimestamp == 0
     assert registry.info(strategy.address).tag == ""
 
 

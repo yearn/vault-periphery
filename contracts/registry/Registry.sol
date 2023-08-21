@@ -53,7 +53,7 @@ contract Registry is Governance {
         // The release number corresponding to the release registries version.
         uint256 releaseVersion;
         // Time when the vault was deployed for easier indexing.
-        uint256 deploymentTimeStamp;
+        uint256 deploymentTimestamp;
         // String so that mangement to tag a vault with any info for FE's.
         string tag;
     }
@@ -316,7 +316,7 @@ contract Registry is Governance {
         info[_vault] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp,
+            deploymentTimestamp: _deploymentTimestamp,
             tag: ""
         });
 
@@ -371,7 +371,7 @@ contract Registry is Governance {
         info[_strategy] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp,
+            deploymentTimestamp: _deploymentTimestamp,
             tag: ""
         });
 
@@ -449,12 +449,7 @@ contract Registry is Governance {
         _endorsedVaults[asset].pop();
 
         // Reset the info config.
-        info[_vault] = Info({
-            asset: address(0),
-            releaseVersion: 0,
-            deploymentTimeStamp: 0,
-            tag: ""
-        });
+        delete info[_vault];
 
         // Emit the event.
         emit RemovedVault(_vault, asset, releaseTarget);
@@ -497,12 +492,7 @@ contract Registry is Governance {
         _endorsedStrategies[asset].pop();
 
         // Reset the info config.
-        info[_strategy] = Info({
-            asset: address(0),
-            releaseVersion: 0,
-            deploymentTimeStamp: 0,
-            tag: ""
-        });
+        delete info[_strategy];
 
         // Emit the event.
         emit RemovedStrategy(_strategy, asset, releaseTarget);
