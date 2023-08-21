@@ -40,16 +40,16 @@ contract GenericDebtAllocator is Governance {
     uint256 public maxAcceptableBaseFee;
 
     constructor(address _vault, address _governance) Governance(_governance) {
-        inizialize(_vault, _governance);
+        initialize(_vault, _governance);
     }
 
     /**
      * @notice Initializes the debt allocator.
-     * @dev Should be called atomiclly after cloning.
+     * @dev Should be called atomically after cloning.
      * @param _vault Address of the vault this allocates debt for.
-     * @param _governance Address to govern this contracts.
+     * @param _governance Address to govern this contract.
      */
-    function inizialize(address _vault, address _governance) public {
+    function initialize(address _vault, address _governance) public {
         require(address(vault) == address(0), "!initialized");
         vault = _vault;
         governance = _governance;
@@ -58,20 +58,20 @@ contract GenericDebtAllocator is Governance {
     }
 
     /**
-     * @notice Check if a strategies debt should be updated.
+     * @notice Check if a strategy's debt should be updated.
      * @dev This should be called by a keeper to decide if a strategies
      * debt should be updated and if so by how much.
      *
      * This cannot be used to withdraw down to 0 debt.
      *
      * @param _strategy Address of the strategy to check.
-     * @return . bool repersenting if the debt should be updated.
-     * @return . calldata that includes what the debt should be updated to.
+     * @return . Bool representing if the debt should be updated.
+     * @return . Calldata if `true` or reason if `false`.
      */
     function shouldUpdateDebt(
         address _strategy
     ) external view returns (bool, bytes memory) {
-        // Check the base fee isn't to high.
+        // Check the base fee isn't too high.
         if (block.basefee > maxAcceptableBaseFee) {
             return (false, bytes("Base Fee"));
         }
@@ -86,7 +86,7 @@ contract GenericDebtAllocator is Governance {
         // Get the strategy specific debt config.
         Config memory config = configs[_strategy];
         // Make sure we have a target debt.
-        require(config.targetRatio != 0, "!target");
+        require(config.targetRatio != 0, "no targetRatio");
 
         // Get the target debt for the strategy based on vault assets.
         uint256 targetDebt = Math.min(
@@ -125,7 +125,7 @@ contract GenericDebtAllocator is Governance {
                 IVault(_strategy).maxWithdraw(address(_vault))
             );
 
-            // Check if its over the threshold.
+            // Check if it's over the threshold.
             if (toPull > config.minimumChange) {
                 // If so return true and the calldata.
                 return (
@@ -144,7 +144,7 @@ contract GenericDebtAllocator is Governance {
     /**
      * @notice Sets a new target debt ratio for a strategy.
      * @dev A `minimumChange` for that strategy must be set first.
-     * This is to prevent debt to be updated to frequently.
+     * This is to prevent debt from being updated too frequently.
      *
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
@@ -164,7 +164,7 @@ contract GenericDebtAllocator is Governance {
             _targetRatio;
 
         // Make sure it is under 100% allocated
-        require(newDebtRatio <= MAX_BPS, "!max");
+        require(newDebtRatio <= MAX_BPS, "ratio too high");
 
         // Write to storage.
         configs[_strategy].targetRatio = _targetRatio;
@@ -198,6 +198,8 @@ contract GenericDebtAllocator is Governance {
      * @notice Set the max acceptable base fee.
      * @dev This defaults to max uint256 and will need to
      * be set for it to be used.
+     *
+     * Is denominated in gwei. So 50gwei would be set as 50e9.
      *
      * @param _maxAcceptableBaseFee The new max base fee.
      */

@@ -41,7 +41,7 @@ contract GenericDebtAllocatorFactory {
             newAllocator := create(0, clone_code, 0x37)
         }
 
-        GenericDebtAllocator(newAllocator).inizialize(_vault, _governance);
+        GenericDebtAllocator(newAllocator).initialize(_vault, _governance);
 
         emit NewDebtAllocator(newAllocator, _vault);
     }
