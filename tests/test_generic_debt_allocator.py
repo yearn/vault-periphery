@@ -64,7 +64,7 @@ def test_set_minimum(generic_debt_allocator, daddy, vault, strategy, user):
 
     generic_debt_allocator.setMinimumChange(strategy, minimum, sender=daddy)
 
-    with ape.reverts("!max"):
+    with ape.reverts("ratio too high"):
         generic_debt_allocator.setTargetDebtRatio(strategy, int(10_001), sender=daddy)
 
     tx = generic_debt_allocator.setTargetDebtRatio(strategy, target, sender=daddy)
@@ -88,7 +88,7 @@ def test_should_update_debt(
 
     vault.add_strategy(strategy.address, sender=daddy)
 
-    with ape.reverts("!target"):
+    with ape.reverts("no targetRatio"):
         generic_debt_allocator.shouldUpdateDebt(strategy.address)
 
     minimum = int(1)
@@ -100,14 +100,14 @@ def test_should_update_debt(
     # Vault has no assets so should be false.
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("No Change Needed").encode("utf-8")
+    assert bytes == ("Below Min").encode("utf-8")
 
     deposit_into_vault(vault, amount)
 
     # No max debt has been set so should be false.
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("No Change Needed").encode("utf-8")
+    assert bytes == ("Below Min").encode("utf-8")
 
     vault.update_max_debt_for_strategy(strategy, MAX_INT, sender=daddy)
 
@@ -123,7 +123,7 @@ def test_should_update_debt(
     # Should now be false again once allocated
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("No Change Needed").encode("utf-8")
+    assert bytes == ("Below Min").encode("utf-8")
 
     # Update the ratio to make true
     generic_debt_allocator.setTargetDebtRatio(strategy, int(target + 1), sender=daddy)
@@ -139,7 +139,7 @@ def test_should_update_debt(
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("No Change Needed").encode("utf-8")
+    assert bytes == ("Below Min").encode("utf-8")
 
     # Reset it.
     vault.update_max_debt_for_strategy(strategy, MAX_INT, sender=daddy)
@@ -155,7 +155,7 @@ def test_should_update_debt(
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("").encode("utf-8")
+    assert bytes == ("No Idle").encode("utf-8")
 
     vault.set_minimum_total_idle(0, sender=daddy)
 
@@ -164,7 +164,7 @@ def test_should_update_debt(
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
-    assert bytes == ("").encode("utf-8")
+    assert bytes == ("Below Min").encode("utf-8")
 
     # Lower the target and minimum
     generic_debt_allocator.setMinimumChange(strategy, int(1), sender=daddy)

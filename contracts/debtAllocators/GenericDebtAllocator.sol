@@ -97,12 +97,18 @@ contract GenericDebtAllocator is Governance {
 
         // If we need to add more.
         if (targetDebt > params.current_debt) {
-            // We can't add more than the current idle.
+            uint256 currentIdle = _vault.totalIdle();
+            uint256 minIdle = _vault.minimum_total_idle();
+
+            // We can't add more than the available idle.
+            if (minIdle >= currentIdle) {
+                return (false, bytes("No Idle"));
+            }
+
             uint256 toAdd = Math.min(
                 targetDebt - params.current_debt,
-                // This may underflow if idle is less than the min.
-                // Thats okay since it should return false anyway.
-                _vault.totalIdle() - _vault.minimum_total_idle()
+                // Can't take more than is available.
+                currentIdle - minIdle
             );
 
             // If the amount to add is over our threshold.
@@ -136,9 +142,10 @@ contract GenericDebtAllocator is Governance {
                     )
                 );
             }
-        } else {
-            return (false, bytes("No Change Needed"));
         }
+
+        // Either no change or below our minimumChange.
+        return (false, bytes("Below Min"));
     }
 
     /**
