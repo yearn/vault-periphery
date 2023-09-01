@@ -436,14 +436,12 @@ contract Registry is Governance {
             IVault(_vault).api_version()
         );
 
-        address[] memory _vaults = _endorsedVaults[asset];
-        require(_vaults[_index] == _vault, "wrong index");
+        require(_endorsedVaults[asset][_index] == _vault, "wrong index");
 
         // Set the last index to the spot we are removing.
-        _vaults[_index] = _vaults[_vaults.length - 1];
-
-        // Set to storage.
-        _endorsedVaults[asset] = _vaults;
+        _endorsedVaults[asset][_index] = _endorsedVaults[asset][
+            _endorsedVaults[asset].length - 1
+        ];
 
         // Pop the last item off the array.
         _endorsedVaults[asset].pop();
@@ -479,14 +477,12 @@ contract Registry is Governance {
             IStrategy(_strategy).apiVersion()
         );
 
-        address[] memory _strategies = _endorsedStrategies[asset];
-        require(_strategies[_index] == _strategy, "wrong index");
+        require(_endorsedStrategies[asset][_index] == _strategy, "wrong index");
 
         // Set the last index to the spot we are removing.
-        _strategies[_index] = _strategies[_strategies.length - 1];
-
-        // Set to storage.
-        _endorsedStrategies[asset] = _strategies;
+        _endorsedStrategies[asset][_index] = _endorsedStrategies[asset][
+            _endorsedStrategies[asset].length - 1
+        ];
 
         // Pop the last item off the array.
         _endorsedStrategies[asset].pop();
@@ -517,14 +513,10 @@ contract Registry is Governance {
             "still in use"
         );
 
-        address[] memory _assets = assets;
-        require(_assets[_index] == _asset, "wrong asset");
+        require(assets[_index] == _asset, "wrong asset");
 
         // Replace `_asset` with the last index.
-        _assets[_index] = _assets[_assets.length - 1];
-
-        // Set to storage.
-        assets = _assets;
+        assets[_index] = assets[assets.length - 1];
 
         // Pop last item off the array.
         assets.pop();
