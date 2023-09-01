@@ -3,9 +3,17 @@ pragma solidity 0.8.18;
 
 import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
 
+/**
+ * @title YearnV3 Generic Debt Allocator Factory
+ * @author yearn.finance
+ * @notice
+ *  Factory for anyone to easily deploy their own generic
+ *  debt allocator for a Yearn V3 Vault.
+ */
 contract GenericDebtAllocatorFactory {
     event NewDebtAllocator(address indexed allocator, address indexed vault);
 
+    // Original allocator to use for cloning.
     address public immutable original;
 
     constructor(address _vault, address _governance) {
@@ -14,12 +22,25 @@ contract GenericDebtAllocatorFactory {
         emit NewDebtAllocator(original, _vault);
     }
 
+    /**
+     * @notice Clones a new debt allocator.
+     * @dev defaults to msg.sender as the governance role.
+     *
+     * @param _vault The vault for the allocator to be hooked to.
+     * @return Address of the new generic debt allocator
+     */
     function newGenericDebtAllocator(
         address _vault
     ) external returns (address) {
         return newGenericDebtAllocator(_vault, msg.sender);
     }
 
+    /**
+     * @notice Clones a new debt allocator.
+     * @param _vault The vault for the allocator to be hooked to.
+     * @param _governance Address to serve as governance.
+     * @return newAllocator Address of the new generic debt allocator
+     */
     function newGenericDebtAllocator(
         address _vault,
         address _governance

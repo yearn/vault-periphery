@@ -6,6 +6,23 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 import {IVault} from "../interfaces/IVault.sol";
 
+/**
+ * @title YearnV3 Generic Debt Allocator
+ * @author yearn.finance
+ * @notice
+ *  This Generic Debt Allocator is meant to be used alongside
+ *  a Yearn V3 vault to provide the needed triggers for a keeper
+ *  to perform automative debt updates for the vaults strategies.
+ *
+ *  Each allocator contract will serve one Vault and each strategy
+ *  that should be managed by this allocator will need to be added
+ *  manually by setting a `minimumChange` and a `targetRatio`.
+ *
+ *  The allocator aims to allocate debt between the strategies
+ *  based on their set target ratios. Which are denominated in basis
+ *  points and repersnet the percent of total assets that specific
+ *  strategy should hold.
+ */
 contract GenericDebtAllocator is Governance {
     event SetTargetDebtRatio(
         address indexed strategy,
@@ -19,7 +36,10 @@ contract GenericDebtAllocator is Governance {
 
     // Struct for each strategies info.
     struct Config {
+        // The percent in Basis Points the strategy should have.
         uint256 targetRatio;
+        // The minimum amount denominated in asset that will
+        // need to be moved to trigger a debt update.
         uint256 minimumChange;
     }
 
@@ -108,7 +128,10 @@ contract GenericDebtAllocator is Governance {
             uint256 toAdd = Math.min(
                 targetDebt - params.current_debt,
                 // Can't take more than is available.
-                currentIdle - minIdle
+                Math.min(
+                    currentIdle - minIdle,
+                    IVault(_strategy).maxDeposit(vault)
+                )
             );
 
             // If the amount to add is over our threshold.
