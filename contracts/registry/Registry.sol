@@ -33,6 +33,18 @@ contract Registry is Governance {
         uint256 releaseVersion
     );
 
+    event RemovedVault(
+        address indexed vault,
+        address indexed asset,
+        uint256 releaseVersion
+    );
+
+    event RemovedStrategy(
+        address indexed strategy,
+        address indexed asset,
+        uint256 releaseVersion
+    );
+
     // Struct stored for every endorsed vault or strategy for
     // off chain use to easily retreive info.
     struct Info {
@@ -41,7 +53,7 @@ contract Registry is Governance {
         // The release number corresponding to the release registries version.
         uint256 releaseVersion;
         // Time when the vault was deployed for easier indexing.
-        uint256 deploymentTimeStamp;
+        uint256 deploymentTimestamp;
         // String so that mangement to tag a vault with any info for FE's.
         string tag;
     }
@@ -63,14 +75,6 @@ contract Registry is Governance {
 
     // asset => array of all endorsed strategies.
     mapping(address => address[]) internal _endorsedStrategies;
-
-    // asset => release number => array of endorsed vaults
-    mapping(address => mapping(uint256 => address[]))
-        internal _endorsedVaultsByVersion;
-
-    // asset => release number => array of endorsed strategies
-    mapping(address => mapping(uint256 => address[]))
-        internal _endorsedStrategiesByVersion;
 
     // vault/strategy address => Info stuct.
     mapping(address => Info) public info;
@@ -145,66 +149,6 @@ contract Registry is Governance {
         address _asset
     ) external view returns (address[] memory) {
         return _endorsedStrategies[_asset];
-    }
-
-    /**
-     * @notice Get the number of endorsed vaults for an asset of a specific API version.
-     * @return The amount of endorsed vaults.
-     */
-    function numEndorsedVaultsByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (uint256) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedVaultsByVersion[_asset][version].length;
-    }
-
-    /**
-     * @notice Get the number of endorsed strategies for an asset of a specific API version.
-     * @return The amount of endorsed strategies.
-     */
-    function numEndorsedStrategiesByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (uint256) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedStrategiesByVersion[_asset][version].length;
-    }
-
-    /**
-     * @notice Get the array of vaults endorsed for an `_asset` of a specific API.
-     * @param _asset The underlying token used by the vaults.
-     * @param _versionDelta The difference from the most recent API version.
-     * @return The endorsed vaults.
-     */
-    function getEndorsedVaultsByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (address[] memory) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedVaultsByVersion[_asset][version];
-    }
-
-    /**
-     * @notice Get the array of strategies endorsed for an `_asset` of a specific API.
-     * @param _asset The underlying token used by the strategies.
-     * @param _versionDelta The difference from the most recent API version.
-     * @return The endorsed strategies.
-     */
-    function getEndorsedStrategiesByVersion(
-        address _asset,
-        uint256 _versionDelta
-    ) public view returns (address[] memory) {
-        uint256 version = ReleaseRegistry(releaseRegistry).numReleases() -
-            1 -
-            _versionDelta;
-        return _endorsedStrategiesByVersion[_asset][version];
     }
 
     /**
@@ -365,15 +309,14 @@ contract Registry is Governance {
         uint256 _releaseTarget,
         uint256 _deploymentTimestamp
     ) internal {
-        // Add to the endorsed vaults arrays.
+        // Add to the endorsed vaults array.
         _endorsedVaults[_asset].push(_vault);
-        _endorsedVaultsByVersion[_asset][_releaseTarget].push(_vault);
 
         // Set the Info struct for this vault
         info[_vault] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp,
+            deploymentTimestamp: _deploymentTimestamp,
             tag: ""
         });
 
@@ -424,12 +367,11 @@ contract Registry is Governance {
         address _asset = IStrategy(_strategy).asset();
 
         _endorsedStrategies[_asset].push(_strategy);
-        _endorsedStrategiesByVersion[_asset][_releaseTarget].push(_strategy);
 
         info[_strategy] = Info({
             asset: _asset,
             releaseVersion: _releaseTarget,
-            deploymentTimeStamp: _deploymentTimestamp,
+            deploymentTimestamp: _deploymentTimestamp,
             tag: ""
         });
 
@@ -468,5 +410,118 @@ contract Registry is Governance {
     ) external onlyGovernance {
         require(info[_vault].asset != address(0), "!Endorsed");
         info[_vault].tag = _tag;
+    }
+
+    /**
+     * @notice Remove a `_vault` at a specific `_index`.
+     * @dev Can be used as an efficent way to remove a vault
+     * to not have to iterate over the full array.
+     *
+     * NOTE: This will not remove the asset from the `assets` array
+     * if it is no longer in use and will have to be done manually.
+     *
+     * @param _vault Address of the vault to remove.
+     * @param _index Index in the `endorsedVaults` array `_vault` sits at.
+     */
+    function removeVault(
+        address _vault,
+        uint256 _index
+    ) external onlyGovernance {
+        require(info[_vault].asset != address(0), "!endorsed");
+
+        // Get the asset the vault is using.
+        address asset = IVault(_vault).asset();
+        // Get the relase version for this specific vault.
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IVault(_vault).api_version()
+        );
+
+        require(_endorsedVaults[asset][_index] == _vault, "wrong index");
+
+        // Set the last index to the spot we are removing.
+        _endorsedVaults[asset][_index] = _endorsedVaults[asset][
+            _endorsedVaults[asset].length - 1
+        ];
+
+        // Pop the last item off the array.
+        _endorsedVaults[asset].pop();
+
+        // Reset the info config.
+        delete info[_vault];
+
+        // Emit the event.
+        emit RemovedVault(_vault, asset, releaseTarget);
+    }
+
+    /**
+     * @notice Remove a `_strategy` at a specific `_index`.
+     * @dev Can be used as a efficent way to remove a strategy
+     * to not have to iterate over the full array.
+     *
+     * NOTE: This will not remove the asset from the `assets` array
+     * if it is no longer in use and will have to be done manually.
+     *
+     * @param _strategy Address of the strategy to remove.
+     * @param _index Index in the `endorsedStrategies` array `_strategy` sits at.
+     */
+    function removeStrategy(
+        address _strategy,
+        uint256 _index
+    ) external onlyGovernance {
+        require(info[_strategy].asset != address(0), "!endorsed");
+
+        // Get the asset the vault is using.
+        address asset = IStrategy(_strategy).asset();
+        // Get the relase version for this specific vault.
+        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
+            IStrategy(_strategy).apiVersion()
+        );
+
+        require(_endorsedStrategies[asset][_index] == _strategy, "wrong index");
+
+        // Set the last index to the spot we are removing.
+        _endorsedStrategies[asset][_index] = _endorsedStrategies[asset][
+            _endorsedStrategies[asset].length - 1
+        ];
+
+        // Pop the last item off the array.
+        _endorsedStrategies[asset].pop();
+
+        // Reset the info config.
+        delete info[_strategy];
+
+        // Emit the event.
+        emit RemovedStrategy(_strategy, asset, releaseTarget);
+    }
+
+    /**
+     * @notice Removes a specific `_asset` at `_index` from `assets`.
+     * @dev Can be used if an asset is no longer in use after a vault or
+     * strategy has also been removed.
+     *
+     * @param _asset The asset to remove from the array.
+     * @param _index The index it sits at.
+     */
+    function removeAsset(
+        address _asset,
+        uint256 _index
+    ) external onlyGovernance {
+        require(assetIsUsed[_asset], "!in use");
+        require(
+            _endorsedVaults[_asset].length == 0 &&
+                _endorsedStrategies[_asset].length == 0,
+            "still in use"
+        );
+
+        require(assets[_index] == _asset, "wrong asset");
+
+        // Replace `_asset` with the last index.
+        assets[_index] = assets[assets.length - 1];
+
+        // Pop last item off the array.
+        assets.pop();
+
+        // No longer used.
+        assetIsUsed[_asset] = false;
     }
 }

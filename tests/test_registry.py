@@ -60,16 +60,14 @@ def test__deploy_new_vault(registry, asset, release_registry, vault_factory, dad
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
-    assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
-    assert registry.getEndorsedVaultsByVersion(asset, 0)[0] == new_vault.address
     all_vaults = registry.getAllEndorsedVaults()
     assert len(all_vaults) == 1
     assert len(all_vaults[0]) == 1
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault(
@@ -102,16 +100,14 @@ def test__endorse_deployed_vault(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
-    assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
-    assert registry.getEndorsedVaultsByVersion(asset, 0)[0] == new_vault.address
     all_vaults = registry.getAllEndorsedVaults()
     assert len(all_vaults) == 1
     assert len(all_vaults[0]) == 1
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault__default_values(
@@ -142,16 +138,14 @@ def test__endorse_deployed_vault__default_values(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
-    assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
-    assert registry.getEndorsedVaultsByVersion(asset, 0)[0] == new_vault.address
     all_vaults = registry.getAllEndorsedVaults()
     assert len(all_vaults) == 1
     assert len(all_vaults[0]) == 1
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == 0
+    assert registry.info(new_vault.address).deploymentTimestamp == 0
 
 
 def test__endorse_deployed_strategy(
@@ -176,16 +170,14 @@ def test__endorse_deployed_strategy(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedStrategies(asset) == 1
-    assert registry.numEndorsedStrategiesByVersion(asset, 0) == 1
     assert registry.getEndorsedStrategies(asset)[0] == strategy.address
-    assert registry.getEndorsedStrategiesByVersion(asset, 0)[0] == strategy.address
     all_strategies = registry.getAllEndorsedStrategies()
     assert len(all_strategies) == 1
     assert len(all_strategies[0]) == 1
     assert all_strategies[0][0] == strategy.address
     assert registry.info(strategy.address).asset == asset.address
     assert registry.info(strategy.address).releaseVersion == 0
-    assert registry.info(strategy.address).deploymentTimeStamp == block
+    assert registry.info(strategy.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_strategy__default_values(
@@ -209,16 +201,14 @@ def test__endorse_deployed_strategy__default_values(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedStrategies(asset) == 1
-    assert registry.numEndorsedStrategiesByVersion(asset, 0) == 1
     assert registry.getEndorsedStrategies(asset)[0] == strategy.address
-    assert registry.getEndorsedStrategiesByVersion(asset, 0)[0] == strategy.address
     all_strategies = registry.getAllEndorsedStrategies()
     assert len(all_strategies) == 1
     assert len(all_strategies[0]) == 1
     assert all_strategies[0][0] == strategy.address
     assert registry.info(strategy.address).asset == asset.address
     assert registry.info(strategy.address).releaseVersion == 0
-    assert registry.info(strategy.address).deploymentTimeStamp == 0
+    assert registry.info(strategy.address).deploymentTimestamp == 0
 
 
 def test__deploy_vault_with_new_release(
@@ -269,19 +259,17 @@ def test__deploy_vault_with_new_release(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
-    assert registry.numEndorsedVaultsByVersion(asset, 0) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
-    assert registry.getEndorsedVaultsByVersion(asset, 0)[0] == new_vault.address
     all_vaults = registry.getAllEndorsedVaults()
     assert len(all_vaults) == 1
     assert len(all_vaults[0]) == 1
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 1
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
-def test__deploy_vault_with_oldrelease(
+def test__deploy_vault_with_old_release(
     registry, asset, release_registry, vault_factory, daddy
 ):
     # Set the factory as the first release
@@ -329,16 +317,14 @@ def test__deploy_vault_with_oldrelease(
     assert registry.numAssets() == 1
     assert registry.getAssets()[0] == asset.address
     assert registry.numEndorsedVaults(asset) == 1
-    assert registry.numEndorsedVaultsByVersion(asset, 1) == 1
     assert registry.getEndorsedVaults(asset)[0] == new_vault.address
-    assert registry.getEndorsedVaultsByVersion(asset, 1)[0] == new_vault.address
     all_vaults = registry.getAllEndorsedVaults()
     assert len(all_vaults) == 1
     assert len(all_vaults[0]) == 1
     assert all_vaults[0][0] == new_vault.address
     assert registry.info(new_vault.address).asset == asset.address
     assert registry.info(new_vault.address).releaseVersion == 0
-    assert registry.info(new_vault.address).deploymentTimeStamp == block
+    assert registry.info(new_vault.address).deploymentTimestamp == block
 
 
 def test__endorse_deployed_vault_wrong_api__reverts(
@@ -429,7 +415,7 @@ def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, str
     assert registry.info(vault.address).asset == asset.address
     assert registry.info(vault.address).tag == tag
 
-    # Try to tag an undendorsed vault
+    # Try to tag an un endorsed vault
     with ape.reverts("!Endorsed"):
         registry.tagVault(strategy.address, tag, sender=daddy)
 
@@ -445,6 +431,294 @@ def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, str
 
     assert registry.info(strategy.address).asset == asset.address
     assert registry.info(strategy.address).tag == tag
+
+
+def test__remove_vault(registry, asset, release_registry, vault_factory, daddy):
+    # Add the factory as the first release
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    name = "New vaults"
+    symbol = "yvTest"
+
+    # Deploy a new vault
+    tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
+
+    # address = tx.return_value
+    # new_vault = project.dependencies["yearn-vaults"]["v3.0.0"].VaultV3.at(address)
+    block = tx.timestamp
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.0"].VaultV3.at(
+        event[0].vault
+    )
+
+    assert len(event) == 1
+    assert event[0].asset == asset.address
+    assert event[0].vault == new_vault
+    assert event[0].releaseVersion == 0
+
+    # Make sure it was endorsed correctly
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getEndorsedVaults(asset)[0] == new_vault.address
+    all_vaults = registry.getAllEndorsedVaults()
+    assert len(all_vaults) == 1
+    assert len(all_vaults[0]) == 1
+    assert all_vaults[0][0] == new_vault.address
+    assert registry.info(new_vault.address).asset == asset.address
+    assert registry.info(new_vault.address).releaseVersion == 0
+    assert registry.info(new_vault.address).deploymentTimestamp == block
+
+    # Remove the vault
+    tx = registry.removeVault(new_vault, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.RemovedVault))
+
+    assert len(event) == 1
+    assert event[0].vault == new_vault.address
+    assert event[0].asset == asset.address
+    assert event[0].releaseVersion == 0
+
+    # Make sure it was removed
+    assert registry.numAssets() == 1
+    assert registry.getAssets() == [asset.address]
+    assert registry.numEndorsedVaults(asset) == 0
+    assert registry.getEndorsedVaults(asset) == []
+    all_vaults = registry.getAllEndorsedVaults()
+    assert len(all_vaults) == 1
+    assert all_vaults[0] == []
+    assert registry.info(new_vault.address).asset == ZERO_ADDRESS
+    assert registry.info(new_vault.address).releaseVersion == 0
+    assert registry.info(new_vault.address).deploymentTimestamp == 0
+    assert registry.info(new_vault.address).tag == ""
+
+
+def test__remove_vault__two_vaults(
+    registry, asset, release_registry, vault_factory, daddy
+):
+    # Add the factory as the first release
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    name = "New vaults"
+    symbol = "yvTest"
+
+    # Deploy a new vault
+    tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.0"].VaultV3.at(
+        event[0].vault
+    )
+
+    tx = registry.newEndorsedVault(
+        asset, "second Vault", "sec", daddy, WEEK, 0, sender=daddy
+    )
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))
+    second_vault = project.dependencies["yearn-vaults"]["v3.0.0"].VaultV3.at(
+        event[0].vault
+    )
+
+    # Make sure they are endorsed correctly
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedVaults(asset) == 2
+    assert registry.getEndorsedVaults(asset) == [
+        new_vault.address,
+        second_vault.address,
+    ]
+    all_vaults = registry.getAllEndorsedVaults()
+    assert len(all_vaults) == 1
+    assert len(all_vaults[0]) == 2
+    assert all_vaults[0] == [new_vault.address, second_vault.address]
+    assert registry.info(new_vault.address).asset == asset.address
+    assert registry.info(new_vault.address).releaseVersion == 0
+    assert registry.info(second_vault.address).asset == asset.address
+    assert registry.info(second_vault.address).releaseVersion == 0
+
+    # Remove the first vault
+    tx = registry.removeVault(new_vault, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.RemovedVault))
+
+    assert len(event) == 1
+    assert event[0].vault == new_vault.address
+    assert event[0].asset == asset.address
+    assert event[0].releaseVersion == 0
+
+    # Make sure the second is still endorsed
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getEndorsedVaults(asset)[0] == second_vault.address
+    all_vaults = registry.getAllEndorsedVaults()
+    assert len(all_vaults) == 1
+    assert len(all_vaults[0]) == 1
+    assert all_vaults[0][0] == second_vault.address
+    assert registry.info(new_vault.address).asset == ZERO_ADDRESS
+    assert registry.info(new_vault.address).releaseVersion == 0
+    assert registry.info(new_vault.address).tag == ""
+    assert registry.info(second_vault.address).asset == asset.address
+    assert registry.info(second_vault.address).releaseVersion == 0
+
+
+def test__remove_strategy(
+    registry, asset, release_registry, vault_factory, strategy, daddy
+):
+    # Add the factory as the first release
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    tx = registry.endorseStrategy(strategy, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedStrategy))
+    assert len(event) == 1
+    assert event[0].asset == asset.address
+    assert event[0].strategy == strategy
+    assert event[0].releaseVersion == 0
+
+    # Make sure it was endorsed correctly
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedStrategies(asset) == 1
+    assert registry.getEndorsedStrategies(asset)[0] == strategy.address
+    all_strategies = registry.getAllEndorsedStrategies()
+    assert len(all_strategies) == 1
+    assert len(all_strategies[0]) == 1
+    assert all_strategies[0][0] == strategy.address
+    assert registry.info(strategy.address).asset == asset.address
+    assert registry.info(strategy.address).releaseVersion == 0
+
+    # Remove the strategy
+    tx = registry.removeStrategy(strategy, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.RemovedStrategy))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].asset == asset.address
+    assert event[0].releaseVersion == 0
+
+    # Make sure it was removed
+    assert registry.numAssets() == 1
+    assert registry.getAssets() == [asset.address]
+    assert registry.numEndorsedStrategies(asset) == 0
+    assert registry.getEndorsedStrategies(asset) == []
+    all_strategies = registry.getAllEndorsedStrategies()
+    assert len(all_strategies) == 1
+    assert all_strategies[0] == []
+    assert registry.info(strategy.address).asset == ZERO_ADDRESS
+    assert registry.info(strategy.address).releaseVersion == 0
+    assert registry.info(strategy.address).deploymentTimestamp == 0
+    assert registry.info(strategy.address).tag == ""
+
+
+def test__remove_strategy__two_strategies(
+    registry, asset, release_registry, vault_factory, strategy, create_strategy, daddy
+):
+    # Add the factory as the first release
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    registry.endorseStrategy(strategy, sender=daddy)
+
+    second_strategy = create_strategy()
+    registry.endorseStrategy(second_strategy, sender=daddy)
+
+    # Make sure they are endorsed correctly
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedStrategies(asset) == 2
+    assert registry.getEndorsedStrategies(asset) == [
+        strategy.address,
+        second_strategy.address,
+    ]
+    all_strategies = registry.getAllEndorsedStrategies()
+    assert len(all_strategies) == 1
+    assert len(all_strategies[0]) == 2
+    assert all_strategies[0] == [strategy.address, second_strategy.address]
+    assert registry.info(strategy.address).asset == asset.address
+    assert registry.info(strategy.address).releaseVersion == 0
+    assert registry.info(second_strategy.address).asset == asset.address
+    assert registry.info(second_strategy.address).releaseVersion == 0
+
+    # Remove the first strategy
+    tx = registry.removeStrategy(strategy, 0, sender=daddy)
+
+    event = list(tx.decode_logs(registry.RemovedStrategy))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].asset == asset.address
+    assert event[0].releaseVersion == 0
+
+    # Make sure the second is still endorsed
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedStrategies(asset) == 1
+    assert registry.getEndorsedStrategies(asset)[0] == second_strategy.address
+    all_strategies = registry.getAllEndorsedStrategies()
+    assert len(all_strategies) == 1
+    assert len(all_strategies[0]) == 1
+    assert all_strategies[0][0] == second_strategy.address
+    assert registry.info(strategy.address).asset == ZERO_ADDRESS
+    assert registry.info(strategy.address).releaseVersion == 0
+    assert registry.info(strategy.address).tag == ""
+    assert registry.info(second_strategy.address).asset == asset.address
+    assert registry.info(second_strategy.address).releaseVersion == 0
+
+
+def test__remove_asset(
+    registry, asset, release_registry, vault_factory, strategy, create_strategy, daddy
+):
+    # Add the factory as the first release
+    add_new_release(
+        release_registry=release_registry, factory=vault_factory, owner=daddy
+    )
+
+    assert release_registry.numReleases() == 1
+
+    registry.endorseStrategy(strategy, sender=daddy)
+
+    # Make sure it was endorsed correctly
+    assert registry.numAssets() == 1
+    assert registry.getAssets()[0] == asset.address
+    assert registry.numEndorsedStrategies(asset) == 1
+    assert registry.getEndorsedStrategies(asset)[0] == strategy.address
+    all_strategies = registry.getAllEndorsedStrategies()
+    assert len(all_strategies) == 1
+    assert len(all_strategies[0]) == 1
+    assert all_strategies[0][0] == strategy.address
+    assert registry.info(strategy.address).asset == asset.address
+    assert registry.info(strategy.address).releaseVersion == 0
+
+    # Should not be able to remove the asset
+    with ape.reverts("still in use"):
+        registry.removeAsset(asset.address, 0, sender=daddy)
+
+    # Remove the strategy
+    registry.removeStrategy(strategy.address, 0, sender=daddy)
+
+    registry.removeAsset(asset.address, 0, sender=daddy)
+
+    assert registry.numAssets() == 0
+    assert registry.getAssets() == []
+    assert registry.assetIsUsed(asset.address) == False
 
 
 def test__access(
@@ -487,6 +761,15 @@ def test__access(
 
     with ape.reverts("!governance"):
         registry.tagVault(strategy, "tag", sender=user)
+
+    with ape.reverts("!governance"):
+        registry.removeVault(new_vault.address, 0, sender=user)
+
+    with ape.reverts("!governance"):
+        registry.removeStrategy(strategy.address, 0, sender=user)
+
+    with ape.reverts("!governance"):
+        registry.removeAsset(asset.address, 0, sender=user)
 
     # cant transfer governance
     with ape.reverts("!governance"):

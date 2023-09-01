@@ -21,12 +21,12 @@ contract RegistryFactory {
     }
 
     function createNewRegistry(string memory _name) external returns (address) {
-        return createNewRegistry(msg.sender, _name);
+        return createNewRegistry(_name, msg.sender);
     }
 
     function createNewRegistry(
-        address _governance,
-        string memory _name
+        string memory _name,
+        address _governance
     ) public returns (address) {
         Registry newRegistry = new Registry(
             _governance,
