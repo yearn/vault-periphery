@@ -289,3 +289,35 @@ def address_provider(deploy_address_provider):
     address_provider = deploy_address_provider()
 
     yield address_provider
+
+
+@pytest.fixture(scope="session")
+def deploy_generic_debt_allocator_factory(project, vault, daddy):
+    def deploy_generic_debt_allocator_factory(initial_vault=vault, gov=daddy):
+        generic_debt_allocator_factory = gov.deploy(
+            project.GenericDebtAllocatorFactory, initial_vault, gov
+        )
+
+        return generic_debt_allocator_factory
+
+    yield deploy_generic_debt_allocator_factory
+
+
+@pytest.fixture(scope="session")
+def generic_debt_allocator_factory(deploy_generic_debt_allocator_factory):
+    generic_debt_allocator_factory = deploy_generic_debt_allocator_factory()
+
+    yield generic_debt_allocator_factory
+
+
+@pytest.fixture(scope="session")
+def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy):
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(
+        vault, daddy, sender=daddy
+    )
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+
+    generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    yield generic_debt_allocator

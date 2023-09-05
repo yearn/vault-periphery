@@ -7,12 +7,21 @@ interface IFactory {
     function api_version() external view returns (string memory);
 }
 
+/**
+ * @title YearnV3 Release Registry
+ * @author yearn.finance
+ * @notice
+ *  Used by Yearn Governance to track on chain all
+ *  releases of the V3 vaults by API Version.
+ */
 contract ReleaseRegistry is Governance {
     event NewRelease(
         uint256 indexed releaseId,
         address indexed factory,
         string apiVersion
     );
+
+    string public constant name = "Yearn V3 Release Registry";
 
     // The total number of releases that have been deployed
     uint256 public numReleases;
