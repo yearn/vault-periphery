@@ -31,34 +31,37 @@ struct StrategyParams:
 interface IVault:
     def asset() -> address: view
     def strategies(strategy: address) -> StrategyParams: view
-    def withdraw(amount: uint256, receiver: address, owner: address) -> uint256: nonpayable
+    def withdraw(amount: uint256, receiver: address, owner: address, max_loss: uint256) -> uint256: nonpayable
 
 ### EVENTS ###
 
 event VaultChanged:
-    vault: address
+    vault: indexed(address)
     change: ChangeType
 
 event UpdateDefaultFeeConfig:
     default_fee_config: Fee
 
 event SetFutureFeeManager:
-    future_fee_manager: address
+    future_fee_manager: indexed(address)
 
 event NewFeeManager:
-    fee_manager: address
+    fee_manager: indexed(address)
 
 event UpdateFeeRecipient:
-    old_fee_recipient: address
-    new_fee_recipient: address
+    old_fee_recipient: indexed(address)
+    new_fee_recipient: indexed(address)
 
 event UpdateCustomFeeConfig:
-    vault: address
-    strategy: address
+    vault: indexed(address)
+    strategy: indexed(address)
     custom_config: Fee
 
+event UpdateMaxLoss:
+    max_loss: uint256
+
 event DistributeRewards:
-    token: address
+    token: indexed(address)
     rewards: uint256
 
 ### ENUMS ###
@@ -99,6 +102,9 @@ MAX_BPS: constant(uint256) = 10_000
 #       365.2425 * 86400 = 31556952.0
 SECS_PER_YEAR: constant(uint256) = 31_556_952  # 365.2425 days
 
+PERFORMANCE_FEE_THRESHOLD: constant(uint16) = 5_000
+
+MANAGEMENT_FEE_THRESHOLD: constant(uint16) = 200
 
 ### STORAGE ###
 
@@ -108,6 +114,8 @@ fee_manager: public(address)
 future_fee_manager: public(address)
 # Address to distribute the accumulated fees to.
 fee_recipient: public(address)
+# Max loss variable to use on withdraws.
+max_loss: public(uint256)
 
 # Mapping of vaults that this serves as an accountant for.
 vaults: public(HashMap[address, bool])
@@ -135,8 +143,8 @@ def __init__(
     """
     assert fee_manager != empty(address), "ZERO ADDRESS"
     assert fee_recipient != empty(address), "ZERO ADDRESS"
-    assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     # Set initial addresses
     self.fee_manager = fee_manager
@@ -170,7 +178,6 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     assert self.vaults[msg.sender], "!authorized"
 
     # Load the custom config to check the `custom` flag.
-    # This should just be one slot.
     fee: Fee = self.fees[msg.sender][strategy]
 
     # If not use the default.
@@ -224,6 +231,11 @@ def erc20_safe_approve(token: address, spender: address, amount: uint256):
     # Used to handle non-compliant tokens like USDT
     assert ERC20(token).approve(spender, amount, default_return_value=True), "approval failed"
 
+@internal
+def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
+
 
 @external
 def add_vault(vault: address):
@@ -270,8 +282,8 @@ def update_default_config(
     @param default_max_fee Default max fee to allow as a percent of gain.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
-    assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     self.default_config = Fee({
         management_fee: default_management,
@@ -306,8 +318,8 @@ def set_custom_config(
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert self.vaults[vault], "vault not added"
-    assert custom_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert custom_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert custom_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert custom_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     # Set this strategies custom config.
     self.fees[vault][strategy] = Fee({
@@ -342,6 +354,18 @@ def remove_custom_config(vault: address, strategy: address):
     # Emit relevant event.
     log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
 
+@external
+def set_max_loss(max_loss: uint256):
+    """
+    @notice Set the max loss parameter to be used on withdraws.
+    @param max_loss Amount in basis points.
+    """
+    assert msg.sender == self.fee_manager, "not fee manager"
+    assert max_loss <= MAX_BPS, "higher than 100%"
+
+    self.max_loss = max_loss
+
+    log UpdateMaxLoss(max_loss)
 
 @external
 def withdraw_underlying(vault: address, amount: uint256):
@@ -355,7 +379,7 @@ def withdraw_underlying(vault: address, amount: uint256):
     @param amount The amount in the underlying to withdraw.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
-    IVault(vault).withdraw(amount, self, self)
+    IVault(vault).withdraw(amount, self, self, self.max_loss)
 
 
 @external
@@ -374,13 +398,6 @@ def distribute(token: address) -> uint256:
 
     log DistributeRewards(token, rewards)
     return rewards
-
-
-@internal
-def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
-    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
-
 
 
 @external
@@ -431,17 +448,7 @@ def performance_fee_threshold() -> uint16:
     @notice External function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
     """
-    return self._performance_fee_threshold()
-
-
-@view
-@internal
-def _performance_fee_threshold() -> uint16:
-    """
-    @notice Internal function to get the max a performance fee can be.
-    @return Max performance fee the accountant can charge.
-    """
-    return 5_000
+    return PERFORMANCE_FEE_THRESHOLD
 
 
 @view
@@ -451,14 +458,4 @@ def management_fee_threshold() -> uint16:
     @notice External function to get the max a management fee can be.
     @return Max management fee the accountant can charge.
     """
-    return self._management_fee_threshold()
-
-
-@view
-@internal
-def _management_fee_threshold() -> uint16:
-    """
-    @notice Internal function to get the max a management fee can be.
-    @return Max management fee the accountant can charge.
-    """
-    return 200
+    return MANAGEMENT_FEE_THRESHOLD
