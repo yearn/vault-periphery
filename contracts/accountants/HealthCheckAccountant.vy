@@ -57,6 +57,10 @@ event UpdateCustomFeeConfig:
     strategy: address
     custom_config: Fee
 
+event RemovedCustomFeeConfig:
+    vault: indexed(address)
+    strategy: indexed(address)
+
 event DistributeRewards:
     token: address
     rewards: uint256
@@ -86,9 +90,6 @@ struct Fee:
     max_gain: uint16
     # The max acceptable loss for a strategy.
     max_loss: uint16
-    # Bool set for custom fee configs
-    custom: bool
-
 
 ### CONSTANTS ###
 
@@ -103,6 +104,9 @@ MAX_BPS: constant(uint256) = 10_000
 #       365.2425 * 86400 = 31556952.0
 SECS_PER_YEAR: constant(uint256) = 31_556_952  # 365.2425 days
 
+PERFORMANCE_FEE_THRESHOLD: constant(uint16) = 5_000
+
+MANAGEMENT_FEE_THRESHOLD: constant(uint16) = 200
 
 ### STORAGE ###
 
@@ -119,6 +123,8 @@ vaults: public(HashMap[address, bool])
 default_config: public(Fee)
 # Mapping vault => strategy => custom Fee config
 fees: public(HashMap[address, HashMap[address, Fee]])
+# Mapping vault => strategy => flag to use a custom config.
+custom: public(HashMap[address, HashMap[address, bool]])
 
 @external
 def __init__(
@@ -143,8 +149,8 @@ def __init__(
     """
     assert fee_manager != empty(address), "ZERO ADDRESS"
     assert fee_recipient != empty(address), "ZERO ADDRESS"
-    assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
     assert convert(default_max_fee, uint256) <= MAX_BPS, "too high"
     assert convert(default_max_gain, uint256) <= MAX_BPS, "too high"
     assert convert(default_max_loss, uint256) <= MAX_BPS, "too high"
@@ -160,8 +166,7 @@ def __init__(
         refund_ratio: default_refund,
         max_fee: default_max_fee,
         max_gain: default_max_gain,
-        max_loss: default_max_loss,
-        custom: False
+        max_loss: default_max_loss
     })
 
     log UpdateDefaultFeeConfig(self.default_config)
@@ -182,12 +187,14 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     # Make sure this is a valid vault.
     assert self.vaults[msg.sender], "!authorized"
 
-    # Load the custom config to check the `custom` flag.
-    # This should just be one slot.
-    fee: Fee = self.fees[msg.sender][strategy]
+    # Declare the config to use
+    fee: Fee = empty(Fee)
 
-    # If not use the default.
-    if not fee.custom:
+    # Check if it there is a custom config to use.
+    if self.custom[msg.sender][strategy]:
+        fee = self.fees[msg.sender][strategy]
+    else:
+        # Otherwise use the default.
         fee = self.default_config
 
     total_fees: uint256 = 0
@@ -243,6 +250,10 @@ def erc20_safe_approve(token: address, spender: address, amount: uint256):
     # Used to handle non-compliant tokens like USDT
     assert ERC20(token).approve(spender, amount, default_return_value=True), "approval failed"
 
+@internal
+def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
 
 @external
 def add_vault(vault: address):
@@ -293,8 +304,8 @@ def update_default_config(
     @param default_max_loss Default max percent loss a strategy can report.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
-    assert default_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert default_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
     assert convert(default_max_fee, uint256) <= MAX_BPS, "too high"
     assert convert(default_max_gain, uint256) <= MAX_BPS, "too high"
     assert convert(default_max_loss, uint256) <= MAX_BPS, "too high"
@@ -305,8 +316,7 @@ def update_default_config(
         refund_ratio: default_refund,
         max_fee: default_max_fee,
         max_gain: default_max_gain,
-        max_loss: default_max_loss,
-        custom: False
+        max_loss: default_max_loss
     })
 
     log UpdateDefaultFeeConfig(self.default_config)
@@ -338,8 +348,8 @@ def set_custom_config(
     """
     assert msg.sender == self.fee_manager, "not fee manager"
     assert self.vaults[vault], "vault not added"
-    assert custom_management <= self._management_fee_threshold(), "exceeds management fee threshold"
-    assert custom_performance <= self._performance_fee_threshold(), "exceeds performance fee threshold"
+    assert custom_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
+    assert custom_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
     assert convert(custom_max_fee, uint256) <= MAX_BPS, "too high"
     assert convert(custom_max_gain, uint256) <= MAX_BPS, "too high"
     assert convert(custom_max_loss, uint256) <= MAX_BPS, "too high"
@@ -351,9 +361,11 @@ def set_custom_config(
         refund_ratio: custom_refund,
         max_fee: custom_max_fee,
         max_gain: custom_max_gain,
-        max_loss: custom_max_loss,
-        custom: True
+        max_loss: custom_max_loss
     })
+
+    # Set custom flag.
+    self.custom[vault][strategy] = True
 
     log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
 
@@ -365,7 +377,7 @@ def remove_custom_config(vault: address, strategy: address):
     @param strategy The strategy to remove custom setting for.
     """
     assert msg.sender == self.fee_manager, "not fee manager"
-    assert self.fees[vault][strategy].custom, "No custom fees set"
+    assert self.custom[vault][strategy], "No custom fees set"
 
     # Set all the strategies custom fees to 0.
     self.fees[vault][strategy] = Fee({
@@ -374,12 +386,14 @@ def remove_custom_config(vault: address, strategy: address):
         refund_ratio: 0,
         max_fee: 0,
         max_gain: 0,
-        max_loss: 0,
-        custom: False
+        max_loss: 0
     })
 
+    # Set custom flag.
+    self.custom[vault][strategy] = False
+
     # Emit relevant event.
-    log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
+    log RemovedCustomFeeConfig(vault, strategy)
 
 
 @external
@@ -413,13 +427,6 @@ def distribute(token: address) -> uint256:
 
     log DistributeRewards(token, rewards)
     return rewards
-
-
-@internal
-def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
-    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
-
 
 @external
 def set_future_fee_manager(future_fee_manager: address):
@@ -469,17 +476,7 @@ def performance_fee_threshold() -> uint16:
     @notice External function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
     """
-    return self._performance_fee_threshold()
-
-
-@view
-@internal
-def _performance_fee_threshold() -> uint16:
-    """
-    @notice Internal function to get the max a performance fee can be.
-    @return Max performance fee the accountant can charge.
-    """
-    return 5_000
+    return PERFORMANCE_FEE_THRESHOLD
 
 
 @view
@@ -489,14 +486,4 @@ def management_fee_threshold() -> uint16:
     @notice External function to get the max a management fee can be.
     @return Max management fee the accountant can charge.
     """
-    return self._management_fee_threshold()
-
-
-@view
-@internal
-def _management_fee_threshold() -> uint16:
-    """
-    @notice Internal function to get the max a management fee can be.
-    @return Max management fee the accountant can charge.
-    """
-    return 200
+    return MANAGEMENT_FEE_THRESHOLD

@@ -14,16 +14,14 @@ def test_setup(daddy, vault, strategy, healthcheck_accountant, fee_recipient):
     assert accountant.default_config().max_fee == 0
     assert accountant.default_config().max_gain == 10_000
     assert accountant.default_config().max_loss == 0
-    assert accountant.default_config().custom == False
     assert accountant.vaults(vault.address) == False
-    assert accountant.fees(vault.address, strategy.address).custom == False
+    assert accountant.custom(vault.address, strategy.address) == False
     assert accountant.fees(vault.address, strategy.address).management_fee == 0
     assert accountant.fees(vault.address, strategy.address).performance_fee == 0
     assert accountant.fees(vault.address, strategy.address).refund_ratio == 0
     assert accountant.fees(vault.address, strategy.address).max_fee == 0
     assert accountant.fees(vault.address, strategy.address).max_gain == 0
     assert accountant.fees(vault.address, strategy.address).max_loss == 0
-    assert accountant.fees(vault.address, strategy.address).custom == False
 
 
 def test_add_vault(
@@ -184,7 +182,6 @@ def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     assert config[3] == new_max_fee
     assert config[4] == new_max_gain
     assert config[5] == new_max_loss
-    assert config[6] == False
 
     assert accountant.default_config().management_fee == new_management
     assert accountant.default_config().performance_fee == new_performance
@@ -192,14 +189,13 @@ def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     assert accountant.default_config().max_fee == new_max_fee
     assert accountant.default_config().max_gain == new_max_gain
     assert accountant.default_config().max_loss == new_max_loss
-    assert accountant.default_config().custom == False
 
 
 def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
     accountant = healthcheck_accountant
     accountant.add_vault(vault.address, sender=daddy)
 
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0)
 
     new_management = 20
     new_performance = 2_000
@@ -233,7 +229,6 @@ def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
     assert config[3] == new_max_fee
     assert config[4] == new_max_gain
     assert config[5] == new_max_loss
-    assert config[6] == True
 
     assert (
         accountant.fees(vault.address, strategy.address) != accountant.default_config()
@@ -245,7 +240,6 @@ def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
-        True,
     )
 
 
@@ -253,7 +247,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
     accountant = healthcheck_accountant
     accountant.add_vault(vault.address, sender=daddy)
 
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0)
 
     with ape.reverts("No custom fees set"):
         accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
@@ -277,7 +271,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
         sender=daddy,
     )
 
-    assert accountant.fees(vault.address, strategy.address).custom == True
+    assert accountant.custom(vault.address, strategy.address) == True
     assert (
         accountant.fees(vault.address, strategy.address) != accountant.default_config()
     )
@@ -288,27 +282,17 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
-        True,
     )
 
     tx = accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateCustomFeeConfig))
+    event = list(tx.decode_logs(accountant.RemovedCustomFeeConfig))
 
     assert event[0].strategy == strategy.address
     assert event[0].vault == vault.address
     assert len(event) == 1
 
-    config = list(event[0].custom_config)
-    assert config[0] == 0
-    assert config[1] == 0
-    assert config[2] == 0
-    assert config[3] == 0
-    assert config[4] == 0
-    assert config[5] == 0
-    assert config[6] == False
-
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0)
 
 
 def test_set_fee_manager(healthcheck_accountant, daddy, user):
@@ -481,7 +465,7 @@ def test_report_profit(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -527,7 +511,7 @@ def test_report_no_profit(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -575,7 +559,7 @@ def test_report_max_fee(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -630,7 +614,7 @@ def test_report_refund(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -687,7 +671,7 @@ def test_report_refund_not_enough_asset(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -739,7 +723,7 @@ def test_report_profit__custom_config(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -786,7 +770,7 @@ def test_report_no_profit__custom_config(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Managmeent fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -835,7 +819,7 @@ def test_report_max_fee__custom_config(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -977,7 +961,7 @@ def test_report_refund__custom_config(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS
@@ -1041,7 +1025,7 @@ def test_report_refund_not_enough_asset__custom_config(
 
     fees, refunds = tx.return_value
 
-    # Managment fees
+    # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
     expected_performance_fees = gain * config[1] // MAX_BPS

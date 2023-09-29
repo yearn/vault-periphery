@@ -13,7 +13,7 @@ def test_setup(daddy, vault, strategy, generic_accountant, fee_recipient):
     assert accountant.default_config().refund_ratio == 0
     assert accountant.default_config().max_fee == 0
     assert accountant.vaults(vault.address) == False
-    assert accountant.fees(vault.address, strategy.address).custom == False
+    assert accountant.custom(vault.address, strategy.address) == False
     assert accountant.fees(vault.address, strategy.address).management_fee == 0
     assert accountant.fees(vault.address, strategy.address).performance_fee == 0
     assert accountant.fees(vault.address, strategy.address).refund_ratio == 0
@@ -116,7 +116,7 @@ def test_set_custom_config(daddy, vault, strategy, generic_accountant):
     accountant = generic_accountant
     accountant.add_vault(vault.address, sender=daddy)
 
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0)
 
     new_management = 20
     new_performance = 2_000
@@ -138,13 +138,6 @@ def test_set_custom_config(daddy, vault, strategy, generic_accountant):
     assert len(event) == 1
     assert event[0].vault == vault.address
     assert event[0].strategy == strategy.address
-    config = list(event[0].custom_config)
-
-    assert config[0] == new_management
-    assert config[1] == new_performance
-    assert config[2] == new_refund
-    assert config[3] == new_max
-    assert config[4] == True
 
     assert (
         accountant.fees(vault.address, strategy.address) != accountant.default_config()
@@ -154,7 +147,6 @@ def test_set_custom_config(daddy, vault, strategy, generic_accountant):
         new_performance,
         new_refund,
         new_max,
-        True,
     )
 
 
@@ -162,7 +154,7 @@ def test_remove_custom_config(daddy, vault, strategy, generic_accountant):
     accountant = generic_accountant
     accountant.add_vault(vault.address, sender=daddy)
 
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0)
 
     with ape.reverts("No custom fees set"):
         accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
@@ -182,7 +174,7 @@ def test_remove_custom_config(daddy, vault, strategy, generic_accountant):
         sender=daddy,
     )
 
-    assert accountant.fees(vault.address, strategy.address).custom == True
+    assert accountant.custom(vault.address, strategy.address) == True
     assert (
         accountant.fees(vault.address, strategy.address) != accountant.default_config()
     )
@@ -191,25 +183,17 @@ def test_remove_custom_config(daddy, vault, strategy, generic_accountant):
         new_performance,
         new_refund,
         new_max,
-        True,
     )
 
     tx = accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateCustomFeeConfig))
+    event = list(tx.decode_logs(accountant.RemovedCustomFeeConfig))
 
     assert event[0].strategy == strategy.address
     assert event[0].vault == vault.address
     assert len(event) == 1
 
-    config = list(event[0].custom_config)
-    assert config[0] == 0
-    assert config[1] == 0
-    assert config[2] == 0
-    assert config[3] == 0
-    assert config[4] == False
-
-    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, False)
+    assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0)
 
 
 def test_set_fee_manager(generic_accountant, daddy, user):
@@ -629,7 +613,6 @@ def test_report_profit__custom_config(
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
     fees, refunds = tx.return_value
-
     # Managment fees
     expected_management_fees = amount * config[0] // MAX_BPS
     # Perf fees
