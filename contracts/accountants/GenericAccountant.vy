@@ -350,12 +350,7 @@ def remove_custom_config(vault: address, strategy: address):
     assert self.custom[vault][strategy], "No custom fees set"
 
     # Set all the strategies custom fees to 0.
-    self.fees[vault][strategy] = Fee({
-        management_fee: 0,
-        performance_fee: 0,
-        refund_ratio: 0,
-        max_fee: 0
-    })
+    self.fees[vault][strategy] = empty(Fee)
     # Turn off the flag.
     self.custom[vault][strategy] = False
 
