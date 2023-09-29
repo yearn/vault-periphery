@@ -9,17 +9,7 @@ import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
  * @author yearn.finance
  * @notice
  *  This Permissionless Debt Allocator is meant to be used alongside
- *  a Yearn V3 vault to provide the needed triggers for a keeper
- *  to perform automative debt updates for the vaults strategies.
- *
- *  Each allocator contract will serve one Vault and each strategy
- *  that should be managed by this allocator will need to be added
- *  manually by setting a `minimumChange` and a `targetRatio`.
- *
- *  The allocator aims to allocate debt between the strategies
- *  based on their set target ratios. Which are denominated in basis
- *  points and repersnet the percent of total assets that specific
- *  strategy should hold.
+ *  a Yearn V3 vault.
  */
 contract PermissionlessDebtAllocator {
     struct Allocation {
@@ -35,10 +25,10 @@ contract PermissionlessDebtAllocator {
         address _vault,
         Allocation[] memory _newAllocations
     ) public {
-        // Validate all inputs
-        // TODO: make sure all assets are accounted for so apr cant be faked.
+        // Validate inputs
+        validateAllocation(_vault, _newAllocations);
 
-        // Get the current APR of the vault.
+        // Get the current and expected APR of the vault.
         (uint256 _currentApr, uint256 _expectedApr) = getCurrentAndExpectedApr(
             _vault,
             _newAllocations
@@ -50,7 +40,23 @@ contract PermissionlessDebtAllocator {
         _allocate(_vault, _newAllocations);
     }
 
-    // TODO: leaving certain strategies out will make this misleading.
+    function validateAllocation(
+        address _vault,
+        Allocation[] memory _newAllocations
+    ) public view {
+        uint256 _totalAssets = IVault(_vault).totalAssets();
+        if (_totalAssets == 0) return;
+
+        uint256 _accountedFor = IVault(_vault).totalIdle();
+        for (uint256 i = 0; i < _newAllocations.length; ++i) {
+            _accountedFor += IVault(_vault)
+                .strategies(_newAllocations[i].strategy)
+                .current_debt;
+        }
+
+        require(_totalAssets == _accountedFor, "cheater!");
+    }
+
     function getCurrentAndExpectedApr(
         address _vault,
         Allocation[] memory _newAllocations
@@ -58,18 +64,25 @@ contract PermissionlessDebtAllocator {
         uint256 _totalAssets = IVault(_vault).totalAssets();
         if (_totalAssets == 0) return (0, 0);
 
+        Allocation memory _allocation;
         address _strategy;
         uint256 _currentDebt;
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
-            _strategy = _newAllocations[i].strategy;
+            _allocation = _newAllocations[i];
+            _strategy = _allocation.strategy;
             _currentDebt = IVault(_vault).strategies(_strategy).current_debt;
-            _currentApr += (aprOracle.getStrategyApr(_strategy, 0) *
+            uint256 _strategyApr = (aprOracle.getStrategyApr(_strategy, 0) *
                 _currentDebt);
 
-            _expectedApr += (aprOracle.getStrategyApr(
-                _strategy,
-                int256(_newAllocations[i].newDebt) - int256(_currentDebt)
-            ) * uint256(int256(_newAllocations[i].newDebt)));
+            _currentApr += _strategyApr;
+            if (_currentDebt == uint256(int256(_allocation.newDebt))) {
+                _expectedApr += _strategyApr;
+            } else {
+                _expectedApr += (aprOracle.getStrategyApr(
+                    _strategy,
+                    int256(_allocation.newDebt) - int256(_currentDebt)
+                ) * uint256(int256(_allocation.newDebt)));
+            }
         }
 
         _currentApr /= _totalAssets;
@@ -93,7 +106,7 @@ contract PermissionlessDebtAllocator {
             if (_newDebt == _currentDebt) continue;
 
             if (
-                _allocation.newDebt == 0 ||
+                _newDebt == 0 ||
                 (_currentDebt > _newDebt &&
                     IVault(_vault).assess_share_of_unrealised_losses(
                         _allocation.strategy,
