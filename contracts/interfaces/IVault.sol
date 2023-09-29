@@ -42,4 +42,11 @@ interface IVault is IERC4626 {
     function transfer_role_manager(address role_manager) external;
 
     function accept_role_manager() external;
+
+    function process_report(address) external;
+
+    function assess_share_of_unrealised_losses(
+        address,
+        uint256
+    ) external view returns (uint256);
 }

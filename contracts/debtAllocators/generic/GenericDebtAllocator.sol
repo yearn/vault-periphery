@@ -4,7 +4,7 @@ pragma solidity 0.8.18;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Governance} from "@periphery/utils/Governance.sol";
-import {IVault} from "../interfaces/IVault.sol";
+import {IVault} from "../../interfaces/IVault.sol";
 
 /**
  * @title YearnV3 Generic Debt Allocator
