@@ -11,7 +11,7 @@
 
     It is designed to be able to be added to any number of vaults with any 
     underlying tokens. There is a default fee config that will be used for 
-    any strategy that reports through a vault thats has been added to this
+    any strategy that reports through a vault that has been added to this
     accountant. But also gives the ability for the fee_manager to choose 
     custom values for any value for any given strategy they want to.
 
@@ -87,7 +87,7 @@ struct Fee:
     # Ratio of reported loss to attempt to refund.
     refund_ratio: uint16
     # Max percent of the reported gain that the accountant can take.
-    # A max_fee of 0 will mean non is enforced.
+    # A max_fee of 0 will mean none is enforced.
     max_fee: uint16
 
 
@@ -225,7 +225,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     
     # 0 Max fee means it is not enforced.
     if fee.max_fee > 0:
-        # Ensure fee does not exceed more than the max_fee %.
+        # Ensure fee does not exceed the max_fee %.
         total_fees = min(gain * convert(fee.max_fee, uint256) / MAX_BPS, total_fees)
 
     return (total_fees, total_refunds)
@@ -233,13 +233,13 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
 @internal
 def erc20_safe_approve(token: address, spender: address, amount: uint256):
-    # Used only to approve tokens that are not the type managed by this Vault.
+    # Used only to approve tokens that are not the type managed by this vault.
     # Used to handle non-compliant tokens like USDT
     assert ERC20(token).approve(spender, amount, default_return_value=True), "approval failed"
 
 @internal
 def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
+    # Used only to send tokens that are not the type managed by this vault.
     assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
 
 
