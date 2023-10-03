@@ -321,3 +321,28 @@ def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy
     generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
     yield generic_debt_allocator
+
+
+@pytest.fixture(scope="session")
+def deploy_permissionless_debt_allocator(project, daddy, vault):
+    def deploy_permissionless_debt_allocator():
+        permissionless_debt_allocator = daddy.deploy(
+            project.PermissionlessDebtAllocator
+        )
+
+        return permissionless_debt_allocator
+
+    yield deploy_permissionless_debt_allocator
+
+
+@pytest.fixture(scope="session")
+def permissionless_debt_allocator(deploy_permissionless_debt_allocator, daddy, vault):
+    permissionless_debt_allocator = deploy_permissionless_debt_allocator()
+    # Give the allocator the needed roles for the vault.
+    vault.set_role(
+        permissionless_debt_allocator.address,
+        ROLES.REPORTING_MANAGER | ROLES.DEBT_MANAGER,
+        sender=daddy,
+    )
+
+    yield permissionless_debt_allocator
