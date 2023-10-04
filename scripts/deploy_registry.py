@@ -9,21 +9,18 @@ from copy import deepcopy
 
 def deploy_release_and_factory():
     print("Deploying Vault Registry on ChainID", chain.chain_id)
-    publish_flag = True
-    # if chain.chain_id == 1:
-    #    publish_flag = True
 
     if input("Do you want to continue? ") == "n":
         return
 
     release_registry = project.ReleaseRegistry
     factory = project.RegistryFactory
-    deployer = accounts.load("v3_deployer")
+    deployer = accounts.load("")
     deployer_contract = project.Deployer.at(
-        "0x488E1A80133870CB71EE2b08f926CE329d56B084"
+        "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "v3.0.1-beta"
+    salt_string = "v3.0.0"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -36,28 +33,31 @@ def deploy_release_and_factory():
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
+    release_address = "0x5a6E1eCC767d949D6da74e76b05DBB4870488ef6"
+    
+    if input("Do you want to deploy a new Release Registry? ") == "y":
 
-    # generate and deploy release registry
-    release_constructor = release_registry.constructor.encode_input("GOV")
+        # generate and deploy release registry
+        release_constructor = release_registry.constructor.encode_input("GOV")
 
-    release_deploy_bytecode = HexBytes(
-        HexBytes(release_registry.contract_type.deployment_bytecode.bytecode)
-        + release_constructor
-    )
+        release_deploy_bytecode = HexBytes(
+            HexBytes(release_registry.contract_type.deployment_bytecode.bytecode)
+            + release_constructor
+        )
 
-    print(f"Deploying Release Registry...")
+        print(f"Deploying Release Registry...")
 
-    release_tx = deployer_contract.deploy(
-        release_deploy_bytecode, salt, sender=deployer
-    )
+        release_tx = deployer_contract.deploy(
+            release_deploy_bytecode, salt, sender=deployer
+        )
 
-    release_event = list(release_tx.decode_logs(deployer_contract.Deployed))
+        release_event = list(release_tx.decode_logs(deployer_contract.Deployed))
 
-    release_address = release_event[0].addr
+        release_address = release_event[0].addr
 
-    print(f"Deployed the vault release to {release_address}")
+        print(f"Deployed the vault release to {release_address}")
 
-    # deploy factory
+    # Deploy factory
     print(f"Deploying factory...")
 
     factory_constructor = factory.constructor.encode_input(release_address)
@@ -75,7 +75,7 @@ def deploy_release_and_factory():
 
     deployed_factory = factory.at(factory_event[0].addr)
 
-    print(f"Deployed Rgistry Factory to {deployed_factory.address}")
+    print(f"Deployed Registry Factory to {deployed_factory.address}")
 
 
 def main():

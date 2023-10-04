@@ -14,7 +14,7 @@ def deploy_address_provider():
         return
 
     address_provider = project.AddressProvider
-    deployer = accounts.load("v3_deployer")
+    deployer = accounts.load("")
     deployer_contract = project.Deployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
