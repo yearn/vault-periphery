@@ -34,7 +34,7 @@ def deploy_release_and_factory():
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
     release_address = "0x5a6E1eCC767d949D6da74e76b05DBB4870488ef6"
-    
+
     if input("Do you want to deploy a new Release Registry? ") == "y":
 
         # generate and deploy release registry
