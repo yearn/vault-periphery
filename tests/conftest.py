@@ -62,7 +62,7 @@ def amount():
 def vault_blueprint(project, daddy):
     blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
         project.dependencies["yearn-vaults"][
-            "v3.0.0"
+            "v3.0.1"
         ].VaultV3.contract_type.deployment_bytecode.bytecode
     )  # ERC5202
     len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
@@ -81,7 +81,7 @@ def vault_blueprint(project, daddy):
 @pytest.fixture(scope="session")
 def vault_factory(project, daddy, vault_blueprint):
     vault_factory = daddy.deploy(
-        project.dependencies["yearn-vaults"]["v3.0.0"].VaultFactory,
+        project.dependencies["yearn-vaults"]["v3.0.1"].VaultFactory,
         "Vault V3 Factory",
         vault_blueprint,
         daddy.address,
@@ -141,7 +141,7 @@ def create_vault(project, daddy, vault_factory):
         )
 
         event = list(tx.decode_logs(vault_factory.NewVault))
-        vault = project.dependencies["yearn-vaults"]["v3.0.0"].VaultV3.at(
+        vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
             event[0].vault_address
         )
 
@@ -156,9 +156,9 @@ def create_vault(project, daddy, vault_factory):
             | ROLES.DEBT_MANAGER
             | ROLES.MAX_DEBT_MANAGER
             | ROLES.DEPOSIT_LIMIT_MANAGER
+            | ROLES.WITHDRAW_LIMIT_MANAGER
             | ROLES.MINIMUM_IDLE_MANAGER
             | ROLES.PROFIT_UNLOCK_MANAGER
-            | ROLES.SWEEPER
             | ROLES.EMERGENCY_MANAGER,
             sender=daddy,
         )
@@ -179,7 +179,7 @@ def vault(asset, create_vault):
 
 @pytest.fixture(scope="session")
 def create_strategy(project, management, asset):
-    def create_strategy(token=asset, apiVersion="3.0.0"):
+    def create_strategy(token=asset, apiVersion="3.0.1"):
         strategy = management.deploy(project.MockStrategy, token.address, apiVersion)
 
         return strategy

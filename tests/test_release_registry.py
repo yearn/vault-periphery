@@ -8,7 +8,7 @@ def test__deployment(release_registry, daddy):
     assert release_registry.governance() == daddy
     assert release_registry.numReleases() == 0
     assert release_registry.factories(0) == ZERO_ADDRESS
-    assert release_registry.releaseTargets("3.0.0") == 0
+    assert release_registry.releaseTargets("3.0.1") == 0
 
 
 def test_new_release(release_registry, daddy, vault_factory):

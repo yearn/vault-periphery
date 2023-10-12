@@ -40,7 +40,7 @@ contract RegistryFactory {
     /**
      * @notice Deploy a new Registry.
      * @param _name The name of the new registry.
-     * @param _governance Address to set as goveranance.
+     * @param _governance Address to set as governance.
      * @return Address of the new Registry.
      */
     function createNewRegistry(

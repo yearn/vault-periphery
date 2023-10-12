@@ -10,13 +10,13 @@
     https://github.com/yearn/yearn-vaults-v3/blob/master/contracts/VaultV3.vy
 
     It is designed to be able to be added to any number of vaults with any 
-    underlying tokens. There is a degault fee config that will be used for 
-    any strategy that reports through a vault thas has been added to this
+    underlying tokens. There is a default fee config that will be used for 
+    any strategy that reports through a vault thats has been added to this
     accountant. But also gives the ability for the fee_manager to choose 
     custom values for any value for any given strategy they want to.
 
     Funds received from the vaults can either be distributed to a specified
-    fee_recipient or redeemed for the underlying asset and held withen this
+    fee_recipient or redeemed for the underlying asset and held within this
     contract until distributed.
 """
 from vyper.interfaces import ERC20

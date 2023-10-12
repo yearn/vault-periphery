@@ -119,7 +119,7 @@ def get_base_fee_provider() -> address:
 def get_apr_oracle() -> address:
     """
     @ Get the current APR Oracle.
-    @return Current APR Oracel address.
+    @return Current APR Oracle address.
     """
     return self._get_address(APR_ORACLE)
 

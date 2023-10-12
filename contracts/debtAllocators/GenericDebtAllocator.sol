@@ -4,7 +4,7 @@ pragma solidity 0.8.18;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Governance} from "@periphery/utils/Governance.sol";
-import {IVault} from "../interfaces/IVault.sol";
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
 /**
  * @title YearnV3 Generic Debt Allocator
@@ -12,7 +12,7 @@ import {IVault} from "../interfaces/IVault.sol";
  * @notice
  *  This Generic Debt Allocator is meant to be used alongside
  *  a Yearn V3 vault to provide the needed triggers for a keeper
- *  to perform automative debt updates for the vaults strategies.
+ *  to perform automated debt updates for the vaults strategies.
  *
  *  Each allocator contract will serve one Vault and each strategy
  *  that should be managed by this allocator will need to be added
@@ -20,7 +20,7 @@ import {IVault} from "../interfaces/IVault.sol";
  *
  *  The allocator aims to allocate debt between the strategies
  *  based on their set target ratios. Which are denominated in basis
- *  points and repersnet the percent of total assets that specific
+ *  points and represent the percent of total assets that specific
  *  strategy should hold.
  */
 contract GenericDebtAllocator is Governance {
@@ -98,7 +98,7 @@ contract GenericDebtAllocator is Governance {
 
         // Cache the vault variable.
         IVault _vault = IVault(vault);
-        // Retrieve the strategy specifc parameters.
+        // Retrieve the strategy specific parameters.
         IVault.StrategyParams memory params = _vault.strategies(_strategy);
         // Make sure its an active strategy.
         require(params.activation != 0, "!active");
