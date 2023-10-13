@@ -5,7 +5,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Governance} from "@periphery/utils/Governance.sol";
 
-import {IFactory} from "../interfaces/IFactory.sol";
+import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {ReleaseRegistry} from "./ReleaseRegistry.sol";
 
 interface IVault {
@@ -57,7 +57,7 @@ contract Registry is Governance {
     );
 
     // Struct stored for every endorsed vault or strategy for
-    // off chain use to easily retreive info.
+    // off chain use to easily retrieve info.
     struct Info {
         // The token thats being used.
         address asset;
@@ -65,7 +65,7 @@ contract Registry is Governance {
         uint256 releaseVersion;
         // Time when the vault was deployed for easier indexing.
         uint256 deploymentTimestamp;
-        // String so that mangement to tag a vault with any info for FE's.
+        // String so that management to tag a vault with any info for FE's.
         string tag;
     }
 
@@ -87,13 +87,13 @@ contract Registry is Governance {
     // asset => array of all endorsed strategies.
     mapping(address => address[]) internal _endorsedStrategies;
 
-    // vault/strategy address => Info stuct.
+    // vault/strategy address => Info struct.
     mapping(address => Info) public info;
 
     /**
      * @param _governance Address to set as owner of the Registry.
      * @param _name The custom string for this custom registry to be called.
-     * @param _releaseRegistry The Permisionless releaseRegistry to deploy vaults through.
+     * @param _releaseRegistry The Permissionless releaseRegistry to deploy vaults through.
      */
     constructor(
         address _governance,
@@ -107,7 +107,7 @@ contract Registry is Governance {
     }
 
     /**
-     * @notice Returns the total numer of assets being used as the underlying.
+     * @notice Returns the total number of assets being used as the underlying.
      * @return The amount of assets.
      */
     function numAssets() external view returns (uint256) {
@@ -165,7 +165,7 @@ contract Registry is Governance {
     /**
      * @notice Get all endorsed vaults deployed using the Registry.
      * @dev This will return a nested array of all vaults deployed
-     * seperated by their underlying asset.
+     * separated by their underlying asset.
      *
      * This is only meant for off chain viewing and should not be used during any
      * on chain tx's.
@@ -189,7 +189,7 @@ contract Registry is Governance {
     /**
      * @notice Get all strategies endorsed through this registry.
      * @dev This will return a nested array of all endorsed strategies
-     * seperated by their underlying asset.
+     * separated by their underlying asset.
      *
      * This is only meant for off chain viewing and should not be used during any
      * on chain tx's.
@@ -249,8 +249,8 @@ contract Registry is Governance {
         require(factory != address(0), "Registry: unknown release");
 
         // Deploy New vault.
-        _vault = IFactory(factory).deploy_new_vault(
-            ERC20(_asset),
+        _vault = IVaultFactory(factory).deploy_new_vault(
+            _asset,
             _name,
             _symbol,
             _roleManager,
@@ -284,7 +284,7 @@ contract Registry is Governance {
             _releaseDelta; // dev: no releases
 
         // Get the API version for the target specified
-        string memory apiVersion = IFactory(
+        string memory apiVersion = IVaultFactory(
             ReleaseRegistry(releaseRegistry).factories(releaseTarget)
         ).api_version();
 
@@ -364,7 +364,7 @@ contract Registry is Governance {
             _releaseDelta; // dev: no releases
 
         // Get the API version for this release
-        string memory apiVersion = IFactory(
+        string memory apiVersion = IVaultFactory(
             ReleaseRegistry(releaseRegistry).factories(_releaseTarget)
         ).api_version();
 
@@ -425,7 +425,7 @@ contract Registry is Governance {
 
     /**
      * @notice Remove a `_vault` at a specific `_index`.
-     * @dev Can be used as an efficent way to remove a vault
+     * @dev Can be used as an efficient way to remove a vault
      * to not have to iterate over the full array.
      *
      * NOTE: This will not remove the asset from the `assets` array
@@ -442,7 +442,7 @@ contract Registry is Governance {
 
         // Get the asset the vault is using.
         address asset = IVault(_vault).asset();
-        // Get the relase version for this specific vault.
+        // Get the release version for this specific vault.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
             IVault(_vault).api_version()
         );
@@ -466,7 +466,7 @@ contract Registry is Governance {
 
     /**
      * @notice Remove a `_strategy` at a specific `_index`.
-     * @dev Can be used as a efficent way to remove a strategy
+     * @dev Can be used as a efficient way to remove a strategy
      * to not have to iterate over the full array.
      *
      * NOTE: This will not remove the asset from the `assets` array
@@ -483,7 +483,7 @@ contract Registry is Governance {
 
         // Get the asset the vault is using.
         address asset = IStrategy(_strategy).asset();
-        // Get the relase version for this specific vault.
+        // Get the release version for this specific vault.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
             IStrategy(_strategy).apiVersion()
         );

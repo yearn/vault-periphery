@@ -57,7 +57,7 @@ contract ReleaseRegistry is Governance {
     /**
      * @notice Issue a new release using a deployed factory.
      * @dev Stores the factory address in `factories` and the release
-     * target in `releaseTargests` with its associated API version.
+     * target in `releaseTargets` with its associated API version.
      *
      *   Throws if caller isn't `governance`.
      *   Throws if the api version is the same as the previous release.
@@ -72,7 +72,7 @@ contract ReleaseRegistry is Governance {
         string memory apiVersion = IFactory(_factory).api_version();
 
         if (releaseId > 0) {
-            // Make sure this isnt the same as the last one
+            // Make sure this isn't the same as the last one
             require(
                 keccak256(
                     bytes(IFactory(factories[releaseId - 1]).api_version())
