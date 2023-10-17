@@ -61,8 +61,10 @@ contract Registry is Governance {
         string tag;
     }
 
+    // Default type used for Multi strategy "allocator" vaults.
     uint256 public constant ALLOCATOR_VAULT_TYPE = 1;
 
+    // Default type used for single strategy vaults.
     uint256 public constant TOKENIZED_STRATEGY_TYPE = 2;
 
     // Custom name for this Registry.
@@ -390,13 +392,13 @@ contract Registry is Governance {
 
     /**
      * @notice Endorse an already deployed strategy.
-     * @dev To be used with default values for `_releaseDelta` and
-     * `_deploymentTimestamp`.
+     * @dev To be used with default values for `_releaseDelta` `_strategyType`
+     * and `_deploymentTimestamp`.
      *
      * @param _strategy Address of the strategy to endorse.
      */
     function endorseStrategy(address _strategy) external {
-        endorseStrategy(_strategy, 0, 0);
+        endorseStrategy(_strategy, 0, TOKENIZED_STRATEGY_TYPE, 0);
     }
 
     /**
@@ -409,11 +411,13 @@ contract Registry is Governance {
      *    Emits a `NewEndorsedStrategy` event.
      * @param _strategy The strategy that will be endorsed by the Registry.
      * @param _releaseDelta Specify the number of releases prior to the latest to use as a target.
+     * @param _strategyType The type of strategy to endorse.
      * @param _deploymentTimestamp The timestamp of when the strategy was deployed for FE use.
      */
     function endorseStrategy(
         address _strategy,
         uint256 _releaseDelta,
+        uint256 _strategyType,
         uint256 _deploymentTimestamp
     ) public onlyGovernance {
         // Will underflow if no releases created yet, or targeting prior to release history
@@ -442,7 +446,7 @@ contract Registry is Governance {
             _strategy,
             _asset,
             _releaseTarget,
-            TOKENIZED_STRATEGY_TYPE,
+            _strategyType,
             _deploymentTimestamp
         );
     }
