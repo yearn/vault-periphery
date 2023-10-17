@@ -4,7 +4,7 @@ pragma solidity 0.8.18;
 import {Governance} from "@periphery/utils/Governance.sol";
 
 interface IFactory {
-    function api_version() external view returns (string memory);
+    function apiVersion() external view returns (string memory);
 }
 
 /**
@@ -51,7 +51,7 @@ contract ReleaseRegistry is Governance {
      * @return The api version of the latest release.
      */
     function latestRelease() external view returns (string memory) {
-        return IFactory(factories[numReleases - 1]).api_version(); // dev: no release
+        return IFactory(factories[numReleases - 1]).apiVersion(); // dev: no release
     }
 
     /**
@@ -69,13 +69,13 @@ contract ReleaseRegistry is Governance {
         // Check if the release is different from the current one
         uint256 releaseId = numReleases;
 
-        string memory apiVersion = IFactory(_factory).api_version();
+        string memory apiVersion = IFactory(_factory).apiVersion();
 
         if (releaseId > 0) {
             // Make sure this isn't the same as the last one
             require(
                 keccak256(
-                    bytes(IFactory(factories[releaseId - 1]).api_version())
+                    bytes(IFactory(factories[releaseId - 1]).apiVersion())
                 ) != keccak256(bytes(apiVersion)),
                 "ReleaseRegistry: same api version"
             );
