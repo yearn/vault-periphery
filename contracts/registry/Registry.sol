@@ -46,11 +46,11 @@ contract Registry is Governance {
         // The token thats being used.
         address asset;
         // The release number corresponding to the release registries version.
-        uint256 releaseVersion;
+        uint96 releaseVersion;
         // Type of vault.
-        uint256 vaultType;
+        uint128 vaultType;
         // Time when the vault was deployed for easier indexing.
-        uint256 deploymentTimestamp;
+        uint128 deploymentTimestamp;
         // String so that management to tag a vault with any info for FE's.
         string tag;
     }
@@ -58,7 +58,7 @@ contract Registry is Governance {
     // Default type used for Multi strategy "allocator" vaults.
     uint256 public constant MULTI_STRATEGY_TYPE = 1;
 
-    // Default type used for single strategy vaults.
+    // Default type used for single "Tokenized" strategy vaults.
     uint256 public constant SINGLE_STRATEGY_TYPE = 2;
 
     // Custom name for this Registry.
@@ -77,7 +77,7 @@ contract Registry is Governance {
     mapping(address => address[]) internal _endorsedVaults;
 
     // vault/strategy address => Info struct.
-    mapping(address => Info) public info;
+    mapping(address => Info) public vaultInfo;
 
     /**
      * @param _governance Address to set as owner of the Registry.
@@ -286,7 +286,10 @@ contract Registry is Governance {
         uint256 _deploymentTimestamp
     ) public onlyGovernance {
         // Cannot endorse twice.
-        require(info[_vault].asset == address(0), "endorsed");
+        require(vaultInfo[_vault].asset == address(0), "endorsed");
+        require(_vaultType != 0, "no 0 type");
+        require(_vaultType <= type(uint128).max, "type too high");
+        require(_deploymentTimestamp <= block.timestamp, "!deployment time");
 
         // Will underflow if no releases created yet, or targeting prior to release history
         uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
@@ -322,17 +325,15 @@ contract Registry is Governance {
         uint256 _vaultType,
         uint256 _deploymentTimestamp
     ) internal {
-        require(_vaultType != 0, "no 0 type");
-
         // Add to the endorsed vaults array.
         _endorsedVaults[_asset].push(_vault);
 
         // Set the Info struct for this vault
-        info[_vault] = Info({
+        vaultInfo[_vault] = Info({
             asset: _asset,
-            releaseVersion: _releaseTarget,
-            vaultType: _vaultType,
-            deploymentTimestamp: _deploymentTimestamp,
+            releaseVersion: uint96(_releaseTarget),
+            vaultType: uint128(_vaultType),
+            deploymentTimestamp: uint128(_deploymentTimestamp),
             tag: ""
         });
 
@@ -358,8 +359,8 @@ contract Registry is Governance {
         address _vault,
         string memory _tag
     ) external onlyGovernance {
-        require(info[_vault].asset != address(0), "!Endorsed");
-        info[_vault].tag = _tag;
+        require(vaultInfo[_vault].asset != address(0), "!Endorsed");
+        vaultInfo[_vault].tag = _tag;
     }
 
     /**
@@ -377,7 +378,7 @@ contract Registry is Governance {
         address _vault,
         uint256 _index
     ) external onlyGovernance {
-        require(info[_vault].asset != address(0), "!endorsed");
+        require(vaultInfo[_vault].asset != address(0), "!endorsed");
 
         // Get the asset the vault is using.
         address asset = IVault(_vault).asset();
@@ -397,10 +398,15 @@ contract Registry is Governance {
         _endorsedVaults[asset].pop();
 
         // Emit the event.
-        emit RemovedVault(_vault, asset, releaseTarget, info[_vault].vaultType);
+        emit RemovedVault(
+            _vault,
+            asset,
+            releaseTarget,
+            vaultInfo[_vault].vaultType
+        );
 
         // Delete the struct.
-        delete info[_vault];
+        delete vaultInfo[_vault];
     }
 
     /**
