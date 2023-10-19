@@ -156,13 +156,23 @@ contract GenericDebtAllocator is Governance {
 
             // Check if it's over the threshold.
             if (toPull > config.minimumChange) {
+                // Can't lower debt if there is unrealised losses.
+                if (
+                    _vault.assess_share_of_unrealised_losses(
+                        _strategy,
+                        params.current_debt
+                    ) > 0
+                ) {
+                    return (false, bytes("unrealised loss"));
+                }
+
                 // If so return true and the calldata.
                 return (
                     true,
                     abi.encodeCall(
                         _vault.update_debt,
                         (_strategy, params.current_debt - toPull)
-                    )
+                    )   
                 );
             }
         }
