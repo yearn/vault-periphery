@@ -5,23 +5,23 @@ from utils.constants import ChangeType, ZERO_ADDRESS, MAX_BPS, MAX_INT
 
 def test_setup(daddy, vault, strategy, healthcheck_accountant, fee_recipient):
     accountant = healthcheck_accountant
-    assert accountant.fee_manager() == daddy
-    assert accountant.future_fee_manager() == ZERO_ADDRESS
-    assert accountant.fee_recipient() == fee_recipient
-    assert accountant.default_config().management_fee == 100
-    assert accountant.default_config().performance_fee == 1_000
-    assert accountant.default_config().refund_ratio == 0
-    assert accountant.default_config().max_fee == 0
-    assert accountant.default_config().max_gain == 10_000
-    assert accountant.default_config().max_loss == 0
+    assert accountant.feeManager() == daddy
+    assert accountant.futureFeeManager() == ZERO_ADDRESS
+    assert accountant.feeRecipient() == fee_recipient
+    assert accountant.defaultConfig().managementFee == 100
+    assert accountant.defaultConfig().performanceFee == 1_000
+    assert accountant.defaultConfig().refundRatio == 0
+    assert accountant.defaultConfig().maxFee == 0
+    assert accountant.defaultConfig().maxGain == 10_000
+    assert accountant.defaultConfig().maxLoss == 0
     assert accountant.vaults(vault.address) == False
     assert accountant.custom(vault.address, strategy.address) == False
-    assert accountant.fees(vault.address, strategy.address).management_fee == 0
-    assert accountant.fees(vault.address, strategy.address).performance_fee == 0
-    assert accountant.fees(vault.address, strategy.address).refund_ratio == 0
-    assert accountant.fees(vault.address, strategy.address).max_fee == 0
-    assert accountant.fees(vault.address, strategy.address).max_gain == 0
-    assert accountant.fees(vault.address, strategy.address).max_loss == 0
+    assert accountant.fees(vault.address, strategy.address).managementFee == 0
+    assert accountant.fees(vault.address, strategy.address).performanceFee == 0
+    assert accountant.fees(vault.address, strategy.address).refundRatio == 0
+    assert accountant.fees(vault.address, strategy.address).maxFee == 0
+    assert accountant.fees(vault.address, strategy.address).maxGain == 0
+    assert accountant.fees(vault.address, strategy.address).maxLoss == 0
 
 
 def test_add_vault(
@@ -43,7 +43,7 @@ def test_add_vault(
     new_max_gain = 10_000
     new_max_loss = 0
 
-    tx = accountant.update_default_config(
+    tx = accountant.updateDefaultConfig(
         new_management,
         new_performance,
         new_refund,
@@ -63,7 +63,7 @@ def test_add_vault(
         accountant.report(strategy, 0, 0, sender=vault)
 
     # set vault in accountant
-    tx = accountant.add_vault(vault.address, sender=daddy)
+    tx = accountant.addVault(vault.address, sender=daddy)
 
     event = list(tx.decode_logs(accountant.VaultChanged))
 
@@ -98,7 +98,7 @@ def test_remove_vault(
     new_max_gain = 10_000
     new_max_loss = 0
 
-    tx = accountant.update_default_config(
+    tx = accountant.updateDefaultConfig(
         new_management,
         new_performance,
         new_refund,
@@ -117,7 +117,7 @@ def test_remove_vault(
     assert accountant.vaults(vault.address) == False
 
     # set vault in accountant
-    tx = accountant.add_vault(vault.address, sender=daddy)
+    tx = accountant.addVault(vault.address, sender=daddy)
 
     event = list(tx.decode_logs(accountant.VaultChanged))
 
@@ -132,7 +132,7 @@ def test_remove_vault(
     assert fees == 100
     assert refunds == 0
 
-    tx = accountant.remove_vault(vault.address, sender=daddy)
+    tx = accountant.removeVault(vault.address, sender=daddy)
 
     event = list(tx.decode_logs(accountant.VaultChanged))
 
@@ -148,12 +148,12 @@ def test_remove_vault(
 
 def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     accountant = healthcheck_accountant
-    assert accountant.default_config().management_fee == 100
-    assert accountant.default_config().performance_fee == 1_000
-    assert accountant.default_config().refund_ratio == 0
-    assert accountant.default_config().max_fee == 0
-    assert accountant.default_config().max_gain == 10_000
-    assert accountant.default_config().max_loss == 0
+    assert accountant.defaultConfig().managementFee == 100
+    assert accountant.defaultConfig().performanceFee == 1_000
+    assert accountant.defaultConfig().refundRatio == 0
+    assert accountant.defaultConfig().maxFee == 0
+    assert accountant.defaultConfig().maxGain == 10_000
+    assert accountant.defaultConfig().maxLoss == 0
 
     new_management = 20
     new_performance = 2_000
@@ -162,7 +162,7 @@ def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     new_max_gain = 19
     new_max_loss = 27
 
-    tx = accountant.update_default_config(
+    tx = accountant.updateDefaultConfig(
         new_management,
         new_performance,
         new_refund,
@@ -175,7 +175,7 @@ def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     event = list(tx.decode_logs(accountant.UpdateDefaultFeeConfig))
 
     assert len(event) == 1
-    config = list(event[0].default_fee_config)
+    config = list(event[0].defaultFeeConfig)
     assert config[0] == new_management
     assert config[1] == new_performance
     assert config[2] == new_refund
@@ -183,17 +183,17 @@ def test_set_default_config(daddy, vault, strategy, healthcheck_accountant):
     assert config[4] == new_max_gain
     assert config[5] == new_max_loss
 
-    assert accountant.default_config().management_fee == new_management
-    assert accountant.default_config().performance_fee == new_performance
-    assert accountant.default_config().refund_ratio == new_refund
-    assert accountant.default_config().max_fee == new_max_fee
-    assert accountant.default_config().max_gain == new_max_gain
-    assert accountant.default_config().max_loss == new_max_loss
+    assert accountant.defaultConfig().managementFee == new_management
+    assert accountant.defaultConfig().performanceFee == new_performance
+    assert accountant.defaultConfig().refundRatio == new_refund
+    assert accountant.defaultConfig().maxFee == new_max_fee
+    assert accountant.defaultConfig().maxGain == new_max_gain
+    assert accountant.defaultConfig().maxLoss == new_max_loss
 
 
 def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0)
 
@@ -204,7 +204,7 @@ def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
     new_max_gain = 19
     new_max_loss = 27
 
-    tx = accountant.set_custom_config(
+    tx = accountant.setCustomConfig(
         vault.address,
         strategy.address,
         new_management,
@@ -231,7 +231,7 @@ def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
     assert config[5] == new_max_loss
 
     assert (
-        accountant.fees(vault.address, strategy.address) != accountant.default_config()
+        accountant.fees(vault.address, strategy.address) != accountant.defaultConfig()
     )
     assert accountant.fees(vault.address, strategy.address) == (
         new_management,
@@ -245,12 +245,12 @@ def test_set_custom_config(daddy, vault, strategy, healthcheck_accountant):
 
 def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     assert accountant.fees(vault.address, strategy.address) == (0, 0, 0, 0, 0, 0)
 
     with ape.reverts("No custom fees set"):
-        accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
+        accountant.removeCustomConfig(vault.address, strategy.address, sender=daddy)
 
     new_management = 20
     new_performance = 2_000
@@ -259,7 +259,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
     new_max_gain = 19
     new_max_loss = 27
 
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address,
         strategy.address,
         new_management,
@@ -273,7 +273,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
 
     assert accountant.custom(vault.address, strategy.address) == True
     assert (
-        accountant.fees(vault.address, strategy.address) != accountant.default_config()
+        accountant.fees(vault.address, strategy.address) != accountant.defaultConfig()
     )
     assert accountant.fees(vault.address, strategy.address) == (
         new_management,
@@ -284,7 +284,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
         new_max_loss,
     )
 
-    tx = accountant.remove_custom_config(vault.address, strategy.address, sender=daddy)
+    tx = accountant.removeCustomConfig(vault.address, strategy.address, sender=daddy)
 
     event = list(tx.decode_logs(accountant.RemovedCustomFeeConfig))
 
@@ -297,68 +297,68 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
 
 def test_set_fee_manager(healthcheck_accountant, daddy, user):
     accountant = healthcheck_accountant
-    assert accountant.fee_manager() == daddy
-    assert accountant.future_fee_manager() == ZERO_ADDRESS
+    assert accountant.feeManager() == daddy
+    assert accountant.futureFeeManager() == ZERO_ADDRESS
 
     with ape.reverts("not fee manager"):
-        accountant.set_future_fee_manager(user, sender=user)
+        accountant.setFutureFeeManager(user, sender=user)
 
     with ape.reverts("not future fee manager"):
-        accountant.accept_fee_manager(sender=user)
+        accountant.acceptFeeManager(sender=user)
 
     with ape.reverts("not future fee manager"):
-        accountant.accept_fee_manager(sender=daddy)
+        accountant.acceptFeeManager(sender=daddy)
 
     with ape.reverts("ZERO ADDRESS"):
-        accountant.set_future_fee_manager(ZERO_ADDRESS, sender=daddy)
+        accountant.setFutureFeeManager(ZERO_ADDRESS, sender=daddy)
 
-    tx = accountant.set_future_fee_manager(user, sender=daddy)
+    tx = accountant.setFutureFeeManager(user, sender=daddy)
 
     event = list(tx.decode_logs(accountant.SetFutureFeeManager))
 
     assert len(event) == 1
-    assert event[0].future_fee_manager == user.address
+    assert event[0].futureFeeManager == user.address
 
-    assert accountant.fee_manager() == daddy
-    assert accountant.future_fee_manager() == user
+    assert accountant.feeManager() == daddy
+    assert accountant.futureFeeManager() == user
 
     with ape.reverts("not future fee manager"):
-        accountant.accept_fee_manager(sender=daddy)
+        accountant.acceptFeeManager(sender=daddy)
 
-    tx = accountant.accept_fee_manager(sender=user)
+    tx = accountant.acceptFeeManager(sender=user)
 
     event = list(tx.decode_logs(accountant.NewFeeManager))
 
     assert len(event) == 1
-    assert event[0].fee_manager == user.address
+    assert event[0].feeManager == user.address
 
-    assert accountant.fee_manager() == user
-    assert accountant.future_fee_manager() == ZERO_ADDRESS
+    assert accountant.feeManager() == user
+    assert accountant.futureFeeManager() == ZERO_ADDRESS
 
 
 def test_set_fee_recipient(healthcheck_accountant, daddy, user, fee_recipient):
     accountant = healthcheck_accountant
-    assert accountant.fee_manager() == daddy
-    assert accountant.fee_recipient() == fee_recipient
+    assert accountant.feeManager() == daddy
+    assert accountant.feeRecipient() == fee_recipient
 
     with ape.reverts("not fee manager"):
-        accountant.set_fee_recipient(user, sender=user)
+        accountant.setFeeRecipient(user, sender=user)
 
     with ape.reverts("not fee manager"):
-        accountant.set_fee_recipient(user, sender=fee_recipient)
+        accountant.setFeeRecipient(user, sender=fee_recipient)
 
     with ape.reverts("ZERO ADDRESS"):
-        accountant.set_fee_recipient(ZERO_ADDRESS, sender=daddy)
+        accountant.setFeeRecipient(ZERO_ADDRESS, sender=daddy)
 
-    tx = accountant.set_fee_recipient(user, sender=daddy)
+    tx = accountant.setFeeRecipient(user, sender=daddy)
 
     event = list(tx.decode_logs(accountant.UpdateFeeRecipient))
 
     assert len(event) == 1
-    assert event[0].old_fee_recipient == fee_recipient.address
-    assert event[0].new_fee_recipient == user.address
+    assert event[0].oldFeeRecipient == fee_recipient.address
+    assert event[0].newFeeRecipient == user.address
 
-    assert accountant.fee_recipient() == user
+    assert accountant.feeRecipient() == user
 
 
 def test_distribute(
@@ -419,9 +419,9 @@ def test_withdraw_underlying(
     assert asset.balanceOf(accountant.address) == 0
 
     with ape.reverts("not fee manager"):
-        accountant.withdraw_underlying(vault.address, amount, sender=user)
+        accountant.withdrawUnderlying(vault.address, amount, sender=user)
 
-    tx = accountant.withdraw_underlying(vault.address, amount, sender=daddy)
+    tx = accountant.withdrawUnderlying(vault.address, amount, sender=daddy)
 
     assert vault.balanceOf(user) == 0
     assert vault.balanceOf(accountant.address) == 0
@@ -440,9 +440,9 @@ def test_report_profit(
     asset,
 ):
     accountant = healthcheck_accountant
-    config = list(accountant.default_config())
+    config = list(accountant.defaultConfig())
 
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     vault.add_strategy(strategy.address, sender=daddy)
     vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
@@ -486,9 +486,9 @@ def test_report_no_profit(
     asset,
 ):
     accountant = healthcheck_accountant
-    config = list(accountant.default_config())
+    config = list(accountant.defaultConfig())
 
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     vault.add_strategy(strategy.address, sender=daddy)
     vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
@@ -533,10 +533,10 @@ def test_report_max_fee(
 ):
     accountant = healthcheck_accountant
     # SEt max fee of 10% of gain
-    accountant.update_default_config(100, 1_000, 0, 100, 10_000, 0, sender=daddy)
-    config = list(accountant.default_config())
+    accountant.updateDefaultConfig(100, 1_000, 0, 100, 10_000, 0, sender=daddy)
+    config = list(accountant.defaultConfig())
 
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     vault.add_strategy(strategy.address, sender=daddy)
     vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
@@ -583,12 +583,10 @@ def test_report_refund(
 ):
     accountant = healthcheck_accountant
     # SEt refund ratio to 100%
-    accountant.update_default_config(
-        100, 1_000, 10_000, 0, 10_000, 10_000, sender=daddy
-    )
-    config = list(accountant.default_config())
+    accountant.updateDefaultConfig(100, 1_000, 10_000, 0, 10_000, 10_000, sender=daddy)
+    config = list(accountant.defaultConfig())
 
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     vault.add_strategy(strategy.address, sender=daddy)
     vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
@@ -640,12 +638,10 @@ def test_report_refund_not_enough_asset(
 ):
     accountant = healthcheck_accountant
     # SEt refund ratio to 100%
-    accountant.update_default_config(
-        100, 1_000, 10_000, 0, 10_000, 10_000, sender=daddy
-    )
-    config = list(accountant.default_config())
+    accountant.updateDefaultConfig(100, 1_000, 10_000, 0, 10_000, 10_000, sender=daddy)
+    config = list(accountant.defaultConfig())
 
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
 
     vault.add_strategy(strategy.address, sender=daddy)
     vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
@@ -696,8 +692,8 @@ def test_report_profit__custom_config(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
-    accountant.set_custom_config(
+    accountant.addVault(vault.address, sender=daddy)
+    accountant.setCustomConfig(
         vault.address, strategy.address, 200, 2_000, 0, 0, 10_000, 0, sender=daddy
     )
     config = list(accountant.fees(vault.address, strategy.address))
@@ -743,8 +739,8 @@ def test_report_no_profit__custom_config(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
-    accountant.set_custom_config(
+    accountant.addVault(vault.address, sender=daddy)
+    accountant.setCustomConfig(
         vault.address, strategy.address, 200, 2_000, 0, 0, 10_000, 0, sender=daddy
     )
     config = list(accountant.fees(vault.address, strategy.address))
@@ -791,9 +787,9 @@ def test_report_max_fee__custom_config(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
     # SEt max fee of 10% of gain
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address, strategy.address, 200, 2_000, 0, 100, 10_000, 0, sender=daddy
     )
     config = list(accountant.fees(vault.address, strategy.address))
@@ -842,9 +838,9 @@ def test_report_profit__custom_zero_max_gain__reverts(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
     # SEt max gain to 0%
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address, strategy.address, 200, 2_000, 0, 100, 0, 0, sender=daddy
     )
     config = list(accountant.fees(vault.address, strategy.address))
@@ -882,9 +878,9 @@ def test_report_loss__custom_zero_max_loss__reverts(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
     # SEt max gain to 0%
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address, strategy.address, 200, 2_000, 0, 100, 0, 0, sender=daddy
     )
     config = list(accountant.fees(vault.address, strategy.address))
@@ -922,9 +918,9 @@ def test_report_refund__custom_config(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
     # SEt refund ratio to 100%
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address,
         strategy.address,
         200,
@@ -986,9 +982,9 @@ def test_report_refund_not_enough_asset__custom_config(
     asset,
 ):
     accountant = healthcheck_accountant
-    accountant.add_vault(vault.address, sender=daddy)
+    accountant.addVault(vault.address, sender=daddy)
     # SEt refund ratio to 100%
-    accountant.set_custom_config(
+    accountant.setCustomConfig(
         vault.address,
         strategy.address,
         200,

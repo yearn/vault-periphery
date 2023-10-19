@@ -12,11 +12,11 @@
     It is designed to be able to be added to any number of vaults with any 
     underlying tokens. There is a default fee config that will be used for 
     any strategy that reports through a vault that has been added to this
-    accountant. But also gives the ability for the fee_manager to choose 
+    accountant. But also gives the ability for the feeManager to choose 
     custom values for any value for any given strategy they want to.
 
     Funds received from the vaults can either be distributed to a specified
-    fee_recipient or redeemed for the underlying asset and held within this
+    feeRecipient or redeemed for the underlying asset and held within this
     contract until distributed.
 """
 from vyper.interfaces import ERC20
@@ -31,7 +31,7 @@ struct StrategyParams:
 interface IVault:
     def asset() -> address: view
     def strategies(strategy: address) -> StrategyParams: view
-    def withdraw(amount: uint256, receiver: address, owner: address, max_loss: uint256) -> uint256: nonpayable
+    def withdraw(amount: uint256, receiver: address, owner: address, maxLoss: uint256) -> uint256: nonpayable
 
 ### EVENTS ###
 
@@ -40,29 +40,29 @@ event VaultChanged:
     change: ChangeType
 
 event UpdateDefaultFeeConfig:
-    default_fee_config: Fee
+    defaultFeeConfig: Fee
 
 event SetFutureFeeManager:
-    future_fee_manager: indexed(address)
+    futureFeeManager: indexed(address)
 
 event NewFeeManager:
-    fee_manager: indexed(address)
+    feeManager: indexed(address)
 
 event UpdateFeeRecipient:
-    old_fee_recipient: indexed(address)
-    new_fee_recipient: indexed(address)
+    oldFeeRecipient: indexed(address)
+    newFeeRecipient: indexed(address)
 
 event UpdateCustomFeeConfig:
     vault: indexed(address)
     strategy: indexed(address)
-    custom_config: Fee
+    customConfig: Fee
 
 event RemovedCustomFeeConfig:
     vault: indexed(address)
     strategy: indexed(address)
 
 event UpdateMaxLoss:
-    max_loss: uint256
+    maxLoss: uint256
 
 event DistributeRewards:
     token: indexed(address)
@@ -81,14 +81,14 @@ enum ChangeType:
 # i.e. 10_000 == 100%.
 struct Fee:
     # Annual management fee to charge on strategy debt.
-    management_fee: uint16
+    managementFee: uint16
     # Performance fee to charge on reported gain.
-    performance_fee: uint16
+    performanceFee: uint16
     # Ratio of reported loss to attempt to refund.
-    refund_ratio: uint16
+    refundRatio: uint16
     # Max percent of the reported gain that the accountant can take.
-    # A max_fee of 0 will mean none is enforced.
-    max_fee: uint16
+    # A maxFee of 0 will mean none is enforced.
+    maxFee: uint16
 
 
 ### CONSTANTS ###
@@ -111,18 +111,18 @@ MANAGEMENT_FEE_THRESHOLD: constant(uint16) = 200
 ### STORAGE ###
 
 # Address in charge of the accountant.
-fee_manager: public(address)
+feeManager: public(address)
 # Address to become the fee manager.
-future_fee_manager: public(address)
+futureFeeManager: public(address)
 # Address to distribute the accumulated fees to.
-fee_recipient: public(address)
+feeRecipient: public(address)
 # Max loss variable to use on withdraws.
-max_loss: public(uint256)
+maxLoss: public(uint256)
 
 # Mapping of vaults that this serves as an accountant for.
 vaults: public(HashMap[address, bool])
 # Default config to use unless a custom one is set.
-default_config: public(Fee)
+defaultConfig: public(Fee)
 # Mapping vault => strategy => custom Fee config
 fees: public(HashMap[address, HashMap[address, Fee]])
 # Mapping vault => strategy => flag to use a custom config.
@@ -135,15 +135,16 @@ def __init__(
     default_management: uint16, 
     default_performance: uint16, 
     default_refund: uint16, 
-    default_max_fee: uint16
+    default_maxFee: uint16
 ):
     """
     @notice Initialize the accountant and default fee config.
     @param fee_manager Address to be in charge of this accountant.
+    @param fee_recipient Address to receive fees.
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max_fee Default max fee to allow as a percent of gain.
+    @param default_maxFee Default max fee to allow as a percent of gain.
     """
     assert fee_manager != empty(address), "ZERO ADDRESS"
     assert fee_recipient != empty(address), "ZERO ADDRESS"
@@ -151,18 +152,18 @@ def __init__(
     assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     # Set initial addresses
-    self.fee_manager = fee_manager
-    self.fee_recipient = fee_recipient
+    self.feeManager = fee_manager
+    self.feeRecipient = fee_recipient
 
     # Set the default fee config
-    self.default_config = Fee({
-        management_fee: default_management,
-        performance_fee: default_performance,
-        refund_ratio: default_refund,
-        max_fee: default_max_fee
+    self.defaultConfig = Fee({
+        managementFee: default_management,
+        performanceFee: default_performance,
+        refundRatio: default_refund,
+        maxFee: default_maxFee
     })
 
-    log UpdateDefaultFeeConfig(self.default_config)
+    log UpdateDefaultFeeConfig(self.defaultConfig)
 
 
 @external
@@ -171,7 +172,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     @notice To be called by a vault during the process_report in which the accountant
         will charge fees based on the gain or loss the strategy is reporting.
     @dev Can only be called by a vault that has been added to this accountant.
-        Will default to the default_config for all amounts unless a custom config
+        Will default to the defaultConfig for all amounts unless a custom config
         has been set for a specific strategy.
     @param strategy The strategy that is reporting.
     @param gain The profit the strategy is reporting if any.
@@ -188,45 +189,45 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         fee = self.fees[msg.sender][strategy]
     else:
         # Otherwise use the default.
-        fee = self.default_config
+        fee = self.defaultConfig
 
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
 
     # Charge management fees no matter gain or loss.
-    if fee.management_fee > 0:
+    if fee.managementFee > 0:
         # Retrieve the strategies params from the vault.
         strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
         # Time since last harvest.
         duration: uint256 = block.timestamp - strategy_params.last_report
-        # management_fee is an annual amount, so charge based on the time passed.
+        # managementFee is an annual amount, so charge based on the time passed.
         total_fees = (
             strategy_params.current_debt
             * duration
-            * convert(fee.management_fee, uint256)
+            * convert(fee.managementFee, uint256)
             / MAX_BPS
             / SECS_PER_YEAR
         )
 
     # Only charge performance fees if there is a gain.
     if gain > 0:
-        total_fees += (gain * convert(fee.performance_fee, uint256)) / MAX_BPS
+        total_fees += (gain * convert(fee.performanceFee, uint256)) / MAX_BPS
     else:
         # Means we should have a loss.
-        if fee.refund_ratio > 0:
+        if fee.refundRatio > 0:
             # Cache the underlying asset the vault uses.
             asset: address = IVault(msg.sender).asset()
             # Give back either all we have or based on refund ratio.
-            total_refunds = min(loss * convert(fee.refund_ratio, uint256) / MAX_BPS, ERC20(asset).balanceOf(self))
+            total_refunds = min(loss * convert(fee.refundRatio, uint256) / MAX_BPS, ERC20(asset).balanceOf(self))
 
             if total_refunds > 0:
                 # Approve the vault to pull the underlying asset.
                 self.erc20_safe_approve(asset, msg.sender, total_refunds)
     
     # 0 Max fee means it is not enforced.
-    if fee.max_fee > 0:
-        # Ensure fee does not exceed the max_fee %.
-        total_fees = min(gain * convert(fee.max_fee, uint256) / MAX_BPS, total_fees)
+    if fee.maxFee > 0:
+        # Ensure fee does not exceed the maxFee %.
+        total_fees = min(gain * convert(fee.maxFee, uint256) / MAX_BPS, total_fees)
 
     return (total_fees, total_refunds)
 
@@ -244,14 +245,14 @@ def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 
 @external
-def add_vault(vault: address):
+def addVault(vault: address):
     """
     @notice Add a new vault for this accountant to charge fees for.
     @dev This is not used to set any of the fees for the specific 
     vault or strategy. Each fee will be set separately. 
     @param vault The address of a vault to allow to use this accountant.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     assert not self.vaults[vault], "already added"
 
     self.vaults[vault] = True
@@ -260,12 +261,12 @@ def add_vault(vault: address):
 
 
 @external
-def remove_vault(vault: address):
+def removeVault(vault: address):
     """
     @notice Removes a vault for this accountant to charge fee for.
     @param vault The address of a vault to allow to use this accountant.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     assert self.vaults[vault], "not added"
 
     self.vaults[vault] = False
@@ -274,41 +275,41 @@ def remove_vault(vault: address):
 
 
 @external
-def update_default_config(
+def updateDefaultConfig(
     default_management: uint16, 
     default_performance: uint16, 
     default_refund: uint16, 
-    default_max_fee: uint16
+    default_maxFee: uint16
 ):
     """
     @notice Update the default config used for all strategies.
     @param default_management Default annual management fee to charge.
     @param default_performance Default performance fee to charge.
     @param default_refund Default refund ratio to give back on losses.
-    @param default_max_fee Default max fee to allow as a percent of gain.
+    @param default_maxFee Default max fee to allow as a percent of gain.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
     assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
-    self.default_config = Fee({
-        management_fee: default_management,
-        performance_fee: default_performance,
-        refund_ratio: default_refund,
-        max_fee: default_max_fee
+    self.defaultConfig = Fee({
+        managementFee: default_management,
+        performanceFee: default_performance,
+        refundRatio: default_refund,
+        maxFee: default_maxFee
     })
 
-    log UpdateDefaultFeeConfig(self.default_config)
+    log UpdateDefaultFeeConfig(self.defaultConfig)
 
 
 @external
-def set_custom_config(
+def setCustomConfig(
     vault: address,
     strategy: address,
     custom_management: uint16, 
     custom_performance: uint16, 
     custom_refund: uint16, 
-    custom_max_fee: uint16
+    custom_maxFee: uint16
 ):
     """
     @notice Used to set a custom fee amounts for a specific strategy.
@@ -319,19 +320,19 @@ def set_custom_config(
     @param custom_management Custom annual management fee to charge.
     @param custom_performance Custom performance fee to charge.
     @param custom_refund Custom refund ratio to give back on losses.
-    @param custom_max_fee Custom max fee to allow as a percent of gain.
+    @param custom_maxFee Custom max fee to allow as a percent of gain.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     assert self.vaults[vault], "vault not added"
     assert custom_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
     assert custom_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     # Set this strategies custom config.
     self.fees[vault][strategy] = Fee({
-        management_fee: custom_management,
-        performance_fee: custom_performance,
-        refund_ratio: custom_refund,
-        max_fee: custom_max_fee
+        managementFee: custom_management,
+        performanceFee: custom_performance,
+        refundRatio: custom_refund,
+        maxFee: custom_maxFee
     })
 
     # Make sure flag is declared as True.
@@ -341,12 +342,12 @@ def set_custom_config(
 
 
 @external
-def remove_custom_config(vault: address, strategy: address):
+def removeCustomConfig(vault: address, strategy: address):
     """
     @notice Removes a previously set custom config for a strategy.
     @param strategy The strategy to remove custom setting for.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     assert self.custom[vault][strategy], "No custom fees set"
 
     # Set all the strategies custom fees to 0.
@@ -358,20 +359,20 @@ def remove_custom_config(vault: address, strategy: address):
     log RemovedCustomFeeConfig(vault, strategy)
 
 @external
-def set_max_loss(max_loss: uint256):
+def setMaxLoss(maxLoss: uint256):
     """
     @notice Set the max loss parameter to be used on withdraws.
-    @param max_loss Amount in basis points.
+    @param maxLoss Amount in basis points.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert max_loss <= MAX_BPS, "higher than 100%"
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert maxLoss <= MAX_BPS, "higher than 100%"
 
-    self.max_loss = max_loss
+    self.maxLoss = maxLoss
 
-    log UpdateMaxLoss(max_loss)
+    log UpdateMaxLoss(maxLoss)
 
 @external
-def withdraw_underlying(vault: address, amount: uint256):
+def withdrawUnderlying(vault: address, amount: uint256):
     """
     @notice Can be used by the fee manager to simply withdraw the underlying
         asset from a vault it charges fees for.
@@ -381,8 +382,8 @@ def withdraw_underlying(vault: address, amount: uint256):
     @param vault The vault to redeem from.
     @param amount The amount in the underlying to withdraw.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
-    IVault(vault).withdraw(amount, self, self, self.max_loss)
+    assert msg.sender == self.feeManager, "not fee manager"
+    IVault(vault).withdraw(amount, self, self, self.maxLoss)
 
 
 @external
@@ -394,59 +395,59 @@ def distribute(token: address) -> uint256:
     @param token The token to distribute.
     @return The amount of token distributed.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
 
     rewards: uint256 = ERC20(token).balanceOf(self)
-    self._erc20_safe_transfer(token, self.fee_recipient, rewards)
+    self._erc20_safe_transfer(token, self.feeRecipient, rewards)
 
     log DistributeRewards(token, rewards)
     return rewards
 
 
 @external
-def set_future_fee_manager(future_fee_manager: address):
+def setFutureFeeManager(futureFeeManager: address):
     """
-    @notice Step 1 of 2 to set a new fee_manager.
-    @dev The address is set to future_fee_manager and will need to
-        call accept_fee_manager in order to update the actual fee_manager.
-    @param future_fee_manager Address to set to future_fee_manager.
+    @notice Step 1 of 2 to set a new feeManager.
+    @dev The address is set to futureFeeManager and will need to
+        call accept_feeManager in order to update the actual feeManager.
+    @param futureFeeManager Address to set to futureFeeManager.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert future_fee_manager != empty(address), "ZERO ADDRESS"
-    self.future_fee_manager = future_fee_manager
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert futureFeeManager != empty(address), "ZERO ADDRESS"
+    self.futureFeeManager = futureFeeManager
 
-    log SetFutureFeeManager(future_fee_manager)
+    log SetFutureFeeManager(futureFeeManager)
 
 
 @external
-def accept_fee_manager():
+def acceptFeeManager():
     """
-    @notice to be called by the future_fee_manager to accept the role change.
+    @notice to be called by the futureFeeManager to accept the role change.
     """
-    assert msg.sender == self.future_fee_manager, "not future fee manager"
-    self.fee_manager = self.future_fee_manager
-    self.future_fee_manager = empty(address)
+    assert msg.sender == self.futureFeeManager, "not future fee manager"
+    self.feeManager = self.futureFeeManager
+    self.futureFeeManager = empty(address)
 
     log NewFeeManager(msg.sender)
 
 
 @external
-def set_fee_recipient(new_fee_recipient: address):
+def setFeeRecipient(newFeeRecipient: address):
     """
     @notice Set a new address to receive distributed rewards.
-    @param new_fee_recipient Address to receive distributed fees.
+    @param newFeeRecipient Address to receive distributed fees.
     """
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert new_fee_recipient != empty(address), "ZERO ADDRESS"
-    old_fee_recipient: address = self.fee_recipient
-    self.fee_recipient = new_fee_recipient
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert newFeeRecipient != empty(address), "ZERO ADDRESS"
+    oldFeeRecipient: address = self.feeRecipient
+    self.feeRecipient = newFeeRecipient
 
-    log UpdateFeeRecipient(old_fee_recipient, new_fee_recipient)
+    log UpdateFeeRecipient(oldFeeRecipient, newFeeRecipient)
 
 
 @view
 @external
-def performance_fee_threshold() -> uint16:
+def performanceFeeThreshold() -> uint16:
     """
     @notice External function to get the max a performance fee can be.
     @return Max performance fee the accountant can charge.
@@ -456,7 +457,7 @@ def performance_fee_threshold() -> uint16:
 
 @view
 @external
-def management_fee_threshold() -> uint16:
+def managementFeeThreshold() -> uint16:
     """
     @notice External function to get the max a management fee can be.
     @return Max management fee the accountant can charge.
