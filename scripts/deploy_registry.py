@@ -8,6 +8,7 @@ from copy import deepcopy
 
 deployer = accounts.load("")
 
+
 def deploy_release_and_factory():
     print("Deploying Vault Registry on ChainID", chain.chain_id)
 
@@ -38,7 +39,9 @@ def deploy_release_and_factory():
     if input("Do you want to deploy a new Release Registry? ") == "y":
 
         # generate and deploy release registry
-        release_constructor = release_registry.constructor.encode_input("0x33333333D5eFb92f19a5F94a43456b3cec2797AE")
+        release_constructor = release_registry.constructor.encode_input(
+            "0x33333333D5eFb92f19a5F94a43456b3cec2797AE"
+        )
 
         release_deploy_bytecode = HexBytes(
             HexBytes(release_registry.contract_type.deployment_bytecode.bytecode)
