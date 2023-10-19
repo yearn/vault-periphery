@@ -5,14 +5,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Governance} from "@periphery/utils/Governance.sol";
 
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {ReleaseRegistry} from "./ReleaseRegistry.sol";
-
-interface IVault {
-    function asset() external view returns (address);
-
-    function apiVersion() external view returns (string memory);
-}
 
 /**
  * @title YearnV3 Registry
