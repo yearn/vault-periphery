@@ -172,7 +172,7 @@ contract GenericDebtAllocator is Governance {
                     abi.encodeCall(
                         _vault.update_debt,
                         (_strategy, params.current_debt - toPull)
-                    )   
+                    )
                 );
             }
         }
