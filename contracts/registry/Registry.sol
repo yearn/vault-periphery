@@ -55,10 +55,10 @@ contract Registry is Governance {
         string tag;
     }
 
-    // Default type used for Multi strategy "allocator" vaults.
+    // Default type used for Multi strategy "Allocator" vaults.
     uint256 public constant MULTI_STRATEGY_TYPE = 1;
 
-    // Default type used for single "Tokenized" strategy vaults.
+    // Default type used for Single "Tokenized" Strategy vaults.
     uint256 public constant SINGLE_STRATEGY_TYPE = 2;
 
     // Custom name for this Registry.
@@ -156,8 +156,8 @@ contract Registry is Governance {
 
     /**
      * @notice
-     *    Create a new vault for the given asset using a given release in the
-     *     release registry.
+     *    Create and endorse a new multi strategy "Allocator"
+     *      vault and endorse it in this registry.
      * @dev
      *   Throws if caller isn't `owner`.
      *   Throws if no releases are registered yet.
@@ -189,8 +189,8 @@ contract Registry is Governance {
 
     /**
      * @notice
-     *    Create a new vault for the given asset using a given release in the
-     *     release registry.
+     *    Create and endorse a new multi strategy "Allocator"
+     *      vault and endorse it in this registry.
      * @dev
      *   Throws if caller isn't `owner`.
      *   Throws if no releases are registered yet.
@@ -227,7 +227,7 @@ contract Registry is Governance {
 
         // Deploy New vault.
         _vault = IVaultFactory(factory).deploy_new_vault(
-            _asset,
+            ERC20(_asset),
             _name,
             _symbol,
             _roleManager,
@@ -423,7 +423,6 @@ contract Registry is Governance {
     ) external onlyGovernance {
         require(assetIsUsed[_asset], "!in use");
         require(_endorsedVaults[_asset].length == 0, "still in use");
-
         require(assets[_index] == _asset, "wrong asset");
 
         // Replace `_asset` with the last index.

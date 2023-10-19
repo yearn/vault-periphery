@@ -22,13 +22,13 @@ def test_new_release(release_registry, daddy, vault_factory):
     assert len(event) == 1
     assert event[0].releaseId == 0
     assert event[0].factory == vault_factory
-    assert event[0].apiVersion == vault_factory.api_version()
+    assert event[0].apiVersion == vault_factory.apiVersion()
 
     assert release_registry.numReleases() == 1
     assert release_registry.factories(0) == vault_factory.address
-    assert release_registry.releaseTargets(vault_factory.api_version()) == 0
+    assert release_registry.releaseTargets(vault_factory.apiVersion()) == 0
     assert release_registry.latestFactory() == vault_factory.address
-    assert release_registry.latestRelease() == vault_factory.api_version()
+    assert release_registry.latestRelease() == vault_factory.apiVersion()
 
     new_api = "4.3.2"
     # Deploy a new mock factory with a different api
@@ -45,13 +45,13 @@ def test_new_release(release_registry, daddy, vault_factory):
 
     assert release_registry.numReleases() == 2
     assert release_registry.factories(1) == new_factory.address
-    assert release_registry.releaseTargets(new_factory.api_version()) == 1
+    assert release_registry.releaseTargets(new_factory.apiVersion()) == 1
     assert release_registry.latestFactory() == new_factory.address
     assert release_registry.latestRelease() == new_api
 
     # make sure the first factory is still returning
     assert release_registry.factories(0) == vault_factory.address
-    assert release_registry.releaseTargets(vault_factory.api_version()) == 0
+    assert release_registry.releaseTargets(vault_factory.apiVersion()) == 0
 
 
 def test_access(release_registry, daddy, user, vault_factory):
@@ -82,12 +82,12 @@ def test__add_same_factory(release_registry, daddy, vault_factory):
     assert len(event) == 1
     assert event[0].releaseId == 0
     assert event[0].factory == vault_factory
-    assert event[0].apiVersion == vault_factory.api_version()
+    assert event[0].apiVersion == vault_factory.apiVersion()
 
     assert release_registry.numReleases() == 1
     assert release_registry.factories(0) == vault_factory.address
     assert release_registry.latestFactory() == vault_factory.address
-    assert release_registry.latestRelease() == vault_factory.api_version()
+    assert release_registry.latestRelease() == vault_factory.apiVersion()
 
     with ape.reverts("ReleaseRegistry: same api version"):
         release_registry.newRelease(vault_factory.address, sender=daddy)

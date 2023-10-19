@@ -16,6 +16,8 @@ dependencies:
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
     ref: v3.0.1
+    exclude: 
+     - test/
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
     ref: v3.0.1
