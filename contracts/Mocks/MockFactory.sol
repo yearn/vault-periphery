@@ -2,11 +2,11 @@
 pragma solidity 0.8.18;
 
 contract MockFactory {
-    string public api_version;
+    string public apiVersion;
 
     address public vault_bluePrint;
 
-    constructor(string memory apiVersion) {
-        api_version = apiVersion;
+    constructor(string memory _apiVersion) {
+        apiVersion = _apiVersion;
     }
 }

@@ -6,6 +6,8 @@ import os
 import hashlib
 from copy import deepcopy
 
+deployer = accounts.load("")
+
 
 def deploy_release_and_factory():
     print("Deploying Vault Registry on ChainID", chain.chain_id)
@@ -15,12 +17,11 @@ def deploy_release_and_factory():
 
     release_registry = project.ReleaseRegistry
     factory = project.RegistryFactory
-    deployer = accounts.load("")
     deployer_contract = project.Deployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "v3.0.0"
+    salt_string = "v3.0.1"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -38,7 +39,9 @@ def deploy_release_and_factory():
     if input("Do you want to deploy a new Release Registry? ") == "y":
 
         # generate and deploy release registry
-        release_constructor = release_registry.constructor.encode_input("GOV")
+        release_constructor = release_registry.constructor.encode_input(
+            "0x33333333D5eFb92f19a5F94a43456b3cec2797AE"
+        )
 
         release_deploy_bytecode = HexBytes(
             HexBytes(release_registry.contract_type.deployment_bytecode.bytecode)

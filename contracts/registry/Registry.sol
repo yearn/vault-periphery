@@ -5,20 +5,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Governance} from "@periphery/utils/Governance.sol";
 
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {ReleaseRegistry} from "./ReleaseRegistry.sol";
-
-interface IVault {
-    function asset() external view returns (address);
-
-    function api_version() external view returns (string memory);
-}
-
-interface IStrategy {
-    function asset() external view returns (address);
-
-    function apiVersion() external view returns (string memory);
-}
 
 /**
  * @title YearnV3 Registry
@@ -35,25 +24,15 @@ contract Registry is Governance {
     event NewEndorsedVault(
         address indexed vault,
         address indexed asset,
-        uint256 releaseVersion
-    );
-
-    event NewEndorsedStrategy(
-        address indexed strategy,
-        address indexed asset,
-        uint256 releaseVersion
+        uint256 releaseVersion,
+        uint256 vaultType
     );
 
     event RemovedVault(
         address indexed vault,
         address indexed asset,
-        uint256 releaseVersion
-    );
-
-    event RemovedStrategy(
-        address indexed strategy,
-        address indexed asset,
-        uint256 releaseVersion
+        uint256 releaseVersion,
+        uint256 vaultType
     );
 
     // Struct stored for every endorsed vault or strategy for
@@ -62,12 +41,20 @@ contract Registry is Governance {
         // The token thats being used.
         address asset;
         // The release number corresponding to the release registries version.
-        uint256 releaseVersion;
+        uint96 releaseVersion;
+        // Type of vault.
+        uint128 vaultType;
         // Time when the vault was deployed for easier indexing.
-        uint256 deploymentTimestamp;
+        uint128 deploymentTimestamp;
         // String so that management to tag a vault with any info for FE's.
         string tag;
     }
+
+    // Default type used for Multi strategy "Allocator" vaults.
+    uint256 public constant MULTI_STRATEGY_TYPE = 1;
+
+    // Default type used for Single "Tokenized" Strategy vaults.
+    uint256 public constant SINGLE_STRATEGY_TYPE = 2;
 
     // Custom name for this Registry.
     string public name;
@@ -84,11 +71,8 @@ contract Registry is Governance {
     // asset => array of all endorsed vaults.
     mapping(address => address[]) internal _endorsedVaults;
 
-    // asset => array of all endorsed strategies.
-    mapping(address => address[]) internal _endorsedStrategies;
-
     // vault/strategy address => Info struct.
-    mapping(address => Info) public info;
+    mapping(address => Info) public vaultInfo;
 
     /**
      * @param _governance Address to set as owner of the Registry.
@@ -131,16 +115,6 @@ contract Registry is Governance {
     }
 
     /**
-     * @notice The amount of endorsed strategies for a specific token.
-     * @return The amount of endorsed strategies.
-     */
-    function numEndorsedStrategies(
-        address _asset
-    ) public view returns (uint256) {
-        return _endorsedStrategies[_asset].length;
-    }
-
-    /**
      * @notice Get the array of vaults endorsed for an `_asset`.
      * @param _asset The underlying token used by the vaults.
      * @return The endorsed vaults.
@@ -149,17 +123,6 @@ contract Registry is Governance {
         address _asset
     ) external view returns (address[] memory) {
         return _endorsedVaults[_asset];
-    }
-
-    /**
-     * @notice Get the array of strategies endorsed for an `_asset`.
-     * @param _asset The underlying token used by the strategies.
-     * @return The endorsed strategies.
-     */
-    function getEndorsedStrategies(
-        address _asset
-    ) external view returns (address[] memory) {
-        return _endorsedStrategies[_asset];
     }
 
     /**
@@ -187,33 +150,42 @@ contract Registry is Governance {
     }
 
     /**
-     * @notice Get all strategies endorsed through this registry.
-     * @dev This will return a nested array of all endorsed strategies
-     * separated by their underlying asset.
-     *
-     * This is only meant for off chain viewing and should not be used during any
-     * on chain tx's.
-     *
-     * @return allEndorsedStrategies A nested array containing all strategies.
+     * @notice
+     *    Create and endorse a new multi strategy "Allocator"
+     *      vault and endorse it in this registry.
+     * @dev
+     *   Throws if caller isn't `owner`.
+     *   Throws if no releases are registered yet.
+     *   Emits a `NewEndorsedVault` event.
+     * @param _asset The asset that may be deposited into the new Vault.
+     * @param _name Specify a custom Vault name. .
+     * @param _symbol Specify a custom Vault symbol name.
+     * @param _roleManager The address authorized for guardian interactions in the new Vault.
+     * @param _profitMaxUnlockTime The time strategy profits will unlock over.
+     * @return _vault address of the newly-deployed vault
      */
-    function getAllEndorsedStrategies()
-        external
-        view
-        returns (address[][] memory allEndorsedStrategies)
-    {
-        address[] memory allAssets = assets;
-        uint256 length = assets.length;
-
-        allEndorsedStrategies = new address[][](length);
-        for (uint256 i; i < length; ++i) {
-            allEndorsedStrategies[i] = _endorsedStrategies[allAssets[i]];
-        }
+    function newEndorsedVault(
+        address _asset,
+        string memory _name,
+        string memory _symbol,
+        address _roleManager,
+        uint256 _profitMaxUnlockTime
+    ) public returns (address _vault) {
+        return
+            newEndorsedVault(
+                _asset,
+                _name,
+                _symbol,
+                _roleManager,
+                _profitMaxUnlockTime,
+                0 // Default to latest version.
+            );
     }
 
     /**
      * @notice
-     *    Create a new vault for the given asset using a given release in the
-     *     release registry.
+     *    Create and endorse a new multi strategy "Allocator"
+     *      vault and endorse it in this registry.
      * @dev
      *   Throws if caller isn't `owner`.
      *   Throws if no releases are registered yet.
@@ -250,7 +222,7 @@ contract Registry is Governance {
 
         // Deploy New vault.
         _vault = IVaultFactory(factory).deploy_new_vault(
-            _asset,
+            ERC20(_asset),
             _name,
             _symbol,
             _roleManager,
@@ -258,7 +230,35 @@ contract Registry is Governance {
         );
 
         // Register the vault with this Registry
-        _registerVault(_vault, _asset, _releaseTarget, block.timestamp);
+        _registerVault(
+            _vault,
+            _asset,
+            _releaseTarget,
+            MULTI_STRATEGY_TYPE,
+            block.timestamp
+        );
+    }
+
+    /**
+     * @notice Endorse an already deployed multi strategy vault.
+     * @dev To be used with default values for `_releaseDelta`, `_vaultType`
+     * and `_deploymentTimestamp`.
+
+     * @param _vault Address of the vault to endorse.
+     */
+    function endorseMultiStrategyVault(address _vault) external {
+        endorseVault(_vault, 0, MULTI_STRATEGY_TYPE, 0);
+    }
+
+    /**
+     * @notice Endorse an already deployed Single Strategy vault.
+     * @dev To be used with default values for `_releaseDelta`, `_vaultType`
+     * and `_deploymentTimestamp`.
+     *
+     * @param _vault Address of the vault to endorse.
+     */
+    function endorseSingleStrategyVault(address _vault) external {
+        endorseVault(_vault, 0, SINGLE_STRATEGY_TYPE, 0);
     }
 
     /**
@@ -271,25 +271,34 @@ contract Registry is Governance {
      *    Emits a `NewEndorsedVault` event.
      * @param _vault The vault that will be endorsed by the Registry.
      * @param _releaseDelta Specify the number of releases prior to the latest to use as a target.
+     * @param _vaultType Type of vault to endorse.
      * @param _deploymentTimestamp The timestamp of when the vault was deployed for FE use.
      */
     function endorseVault(
         address _vault,
         uint256 _releaseDelta,
+        uint256 _vaultType,
         uint256 _deploymentTimestamp
     ) public onlyGovernance {
+        // Cannot endorse twice.
+        require(vaultInfo[_vault].asset == address(0), "endorsed");
+        require(_vaultType != 0, "no 0 type");
+        require(_vaultType <= type(uint128).max, "type too high");
+        require(_deploymentTimestamp <= block.timestamp, "!deployment time");
+
         // Will underflow if no releases created yet, or targeting prior to release history
-        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).numReleases() -
+        uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
+            .numReleases() -
             1 -
             _releaseDelta; // dev: no releases
 
         // Get the API version for the target specified
         string memory apiVersion = IVaultFactory(
-            ReleaseRegistry(releaseRegistry).factories(releaseTarget)
-        ).api_version();
+            ReleaseRegistry(releaseRegistry).factories(_releaseTarget)
+        ).apiVersion();
 
         require(
-            keccak256(bytes(IVault(_vault).api_version())) ==
+            keccak256(bytes(IVault(_vault).apiVersion())) ==
                 keccak256(bytes((apiVersion))),
             "Wrong API Version"
         );
@@ -298,36 +307,28 @@ contract Registry is Governance {
         _registerVault(
             _vault,
             IVault(_vault).asset(),
-            releaseTarget,
+            _releaseTarget,
+            _vaultType,
             _deploymentTimestamp
         );
-    }
-
-    /**
-     * @notice Endorse an already deployed vault.
-     * @dev To be used with default values for `_releaseDelta` and
-     * `_deploymentTimestamp`.
-     *
-     * @param _vault Address of the vault to endorse.
-     */
-    function endorseVault(address _vault) external {
-        endorseVault(_vault, 0, 0);
     }
 
     function _registerVault(
         address _vault,
         address _asset,
         uint256 _releaseTarget,
+        uint256 _vaultType,
         uint256 _deploymentTimestamp
     ) internal {
         // Add to the endorsed vaults array.
         _endorsedVaults[_asset].push(_vault);
 
         // Set the Info struct for this vault
-        info[_vault] = Info({
+        vaultInfo[_vault] = Info({
             asset: _asset,
-            releaseVersion: _releaseTarget,
-            deploymentTimestamp: _deploymentTimestamp,
+            releaseVersion: uint96(_releaseTarget),
+            vaultType: uint128(_vaultType),
+            deploymentTimestamp: uint128(_deploymentTimestamp),
             tag: ""
         });
 
@@ -337,73 +338,7 @@ contract Registry is Governance {
             assetIsUsed[_asset] = true;
         }
 
-        emit NewEndorsedVault(_vault, _asset, _releaseTarget);
-    }
-
-    /**
-     * @notice
-     *    Adds an existing strategy to the list of "endorsed" strategies for that asset.
-     * @dev
-     *    Throws if caller isn't `owner`.
-     *    Throws if no releases are registered yet.
-     *    Throws if `strategies`'s api version does not match the release specified.
-     *    Emits a `NewEndorsedStrategy` event.
-     * @param _strategy The strategy that will be endorsed by the Registry.
-     * @param _releaseDelta Specify the number of releases prior to the latest to use as a target.
-     * @param _deploymentTimestamp The timestamp of when the strategy was deployed for FE use.
-     */
-    function endorseStrategy(
-        address _strategy,
-        uint256 _releaseDelta,
-        uint256 _deploymentTimestamp
-    ) public onlyGovernance {
-        // Will underflow if no releases created yet, or targeting prior to release history
-        uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
-            .numReleases() -
-            1 -
-            _releaseDelta; // dev: no releases
-
-        // Get the API version for this release
-        string memory apiVersion = IVaultFactory(
-            ReleaseRegistry(releaseRegistry).factories(_releaseTarget)
-        ).api_version();
-
-        // Make sure the API versions match
-        require(
-            keccak256(bytes((IStrategy(_strategy).apiVersion()))) ==
-                keccak256(bytes((apiVersion))),
-            "Wrong API Version"
-        );
-
-        address _asset = IStrategy(_strategy).asset();
-
-        _endorsedStrategies[_asset].push(_strategy);
-
-        info[_strategy] = Info({
-            asset: _asset,
-            releaseVersion: _releaseTarget,
-            deploymentTimestamp: _deploymentTimestamp,
-            tag: ""
-        });
-
-        if (!assetIsUsed[_asset]) {
-            // We have a new asset to add
-            assets.push(_asset);
-            assetIsUsed[_asset] = true;
-        }
-
-        emit NewEndorsedStrategy(_strategy, _asset, _releaseTarget);
-    }
-
-    /**
-     * @notice Endorse an already deployed strategy.
-     * @dev To be used with default values for `_releaseDelta` and
-     * `_deploymentTimestamp`.
-     *
-     * @param _strategy Address of the strategy to endorse.
-     */
-    function endorseStrategy(address _strategy) external {
-        endorseStrategy(_strategy, 0, 0);
+        emit NewEndorsedVault(_vault, _asset, _releaseTarget, _vaultType);
     }
 
     /**
@@ -419,8 +354,8 @@ contract Registry is Governance {
         address _vault,
         string memory _tag
     ) external onlyGovernance {
-        require(info[_vault].asset != address(0), "!Endorsed");
-        info[_vault].tag = _tag;
+        require(vaultInfo[_vault].asset != address(0), "!Endorsed");
+        vaultInfo[_vault].tag = _tag;
     }
 
     /**
@@ -438,13 +373,13 @@ contract Registry is Governance {
         address _vault,
         uint256 _index
     ) external onlyGovernance {
-        require(info[_vault].asset != address(0), "!endorsed");
+        require(vaultInfo[_vault].asset != address(0), "!endorsed");
 
         // Get the asset the vault is using.
         address asset = IVault(_vault).asset();
         // Get the release version for this specific vault.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
-            IVault(_vault).api_version()
+            IVault(_vault).apiVersion()
         );
 
         require(_endorsedVaults[asset][_index] == _vault, "wrong index");
@@ -457,52 +392,16 @@ contract Registry is Governance {
         // Pop the last item off the array.
         _endorsedVaults[asset].pop();
 
-        // Reset the info config.
-        delete info[_vault];
-
         // Emit the event.
-        emit RemovedVault(_vault, asset, releaseTarget);
-    }
-
-    /**
-     * @notice Remove a `_strategy` at a specific `_index`.
-     * @dev Can be used as a efficient way to remove a strategy
-     * to not have to iterate over the full array.
-     *
-     * NOTE: This will not remove the asset from the `assets` array
-     * if it is no longer in use and will have to be done manually.
-     *
-     * @param _strategy Address of the strategy to remove.
-     * @param _index Index in the `endorsedStrategies` array `_strategy` sits at.
-     */
-    function removeStrategy(
-        address _strategy,
-        uint256 _index
-    ) external onlyGovernance {
-        require(info[_strategy].asset != address(0), "!endorsed");
-
-        // Get the asset the vault is using.
-        address asset = IStrategy(_strategy).asset();
-        // Get the release version for this specific vault.
-        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
-            IStrategy(_strategy).apiVersion()
+        emit RemovedVault(
+            _vault,
+            asset,
+            releaseTarget,
+            vaultInfo[_vault].vaultType
         );
 
-        require(_endorsedStrategies[asset][_index] == _strategy, "wrong index");
-
-        // Set the last index to the spot we are removing.
-        _endorsedStrategies[asset][_index] = _endorsedStrategies[asset][
-            _endorsedStrategies[asset].length - 1
-        ];
-
-        // Pop the last item off the array.
-        _endorsedStrategies[asset].pop();
-
-        // Reset the info config.
-        delete info[_strategy];
-
-        // Emit the event.
-        emit RemovedStrategy(_strategy, asset, releaseTarget);
+        // Delete the struct.
+        delete vaultInfo[_vault];
     }
 
     /**
@@ -518,12 +417,7 @@ contract Registry is Governance {
         uint256 _index
     ) external onlyGovernance {
         require(assetIsUsed[_asset], "!in use");
-        require(
-            _endorsedVaults[_asset].length == 0 &&
-                _endorsedStrategies[_asset].length == 0,
-            "still in use"
-        );
-
+        require(_endorsedVaults[_asset].length == 0, "still in use");
         require(assets[_index] == _asset, "wrong asset");
 
         // Replace `_asset` with the last index.
