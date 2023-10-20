@@ -6,7 +6,7 @@ import os
 import hashlib
 from copy import deepcopy
 
-deployer = accounts.load("v3_deployer")
+deployer = accounts.load("")
 
 
 def deploy_release_and_factory():
