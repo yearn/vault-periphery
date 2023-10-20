@@ -20,7 +20,7 @@ def deploy_address_provider():
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "v3.0.0"
+    salt_string = "address provider"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
