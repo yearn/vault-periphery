@@ -21,7 +21,7 @@ def deploy_release_and_factory():
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "v3.0.1"
+    salt_string = "registry"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -34,7 +34,7 @@ def deploy_release_and_factory():
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
-    release_address = "0x5a6E1eCC767d949D6da74e76b05DBB4870488ef6"
+    release_address = "0x990089173D5d5287c344092Be0bB37950A67d17B"
 
     if input("Do you want to deploy a new Release Registry? ") == "y":
 
