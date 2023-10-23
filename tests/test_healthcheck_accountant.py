@@ -300,7 +300,7 @@ def test_set_fee_manager(healthcheck_accountant, daddy, user):
     assert accountant.feeManager() == daddy
     assert accountant.futureFeeManager() == ZERO_ADDRESS
 
-    with ape.reverts("not fee manager"):
+    with ape.reverts("!fee manager"):
         accountant.setFutureFeeManager(user, sender=user)
 
     with ape.reverts("not future fee manager"):
@@ -341,10 +341,10 @@ def test_set_fee_recipient(healthcheck_accountant, daddy, user, fee_recipient):
     assert accountant.feeManager() == daddy
     assert accountant.feeRecipient() == fee_recipient
 
-    with ape.reverts("not fee manager"):
+    with ape.reverts("!fee manager"):
         accountant.setFeeRecipient(user, sender=user)
 
-    with ape.reverts("not fee manager"):
+    with ape.reverts("!fee manager"):
         accountant.setFeeRecipient(user, sender=fee_recipient)
 
     with ape.reverts("ZERO ADDRESS"):
@@ -385,7 +385,7 @@ def test_distribute(
     assert vault.balanceOf(daddy.address) == 0
     assert vault.balanceOf(fee_recipient.address) == 0
 
-    with ape.reverts("not fee manager"):
+    with ape.reverts("!fee manager"):
         accountant.distribute(vault.address, sender=user)
 
     tx = accountant.distribute(vault.address, sender=daddy)
@@ -418,7 +418,7 @@ def test_withdraw_underlying(
     assert vault.balanceOf(accountant.address) == amount
     assert asset.balanceOf(accountant.address) == 0
 
-    with ape.reverts("not fee manager"):
+    with ape.reverts("!fee manager"):
         accountant.withdrawUnderlying(vault.address, amount, sender=user)
 
     tx = accountant.withdrawUnderlying(vault.address, amount, sender=daddy)

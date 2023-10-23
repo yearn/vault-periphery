@@ -46,6 +46,7 @@ contract HealthCheckAccountant {
 
     /// @notice Enum defining change types (added or removed).
     enum ChangeType {
+        NULL,
         ADDED,
         REMOVED
     }

@@ -252,7 +252,7 @@ def addVault(vault: address):
     vault or strategy. Each fee will be set separately. 
     @param vault The address of a vault to allow to use this accountant.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert not self.vaults[vault], "already added"
 
     self.vaults[vault] = True
@@ -266,7 +266,7 @@ def removeVault(vault: address):
     @notice Removes a vault for this accountant to charge fee for.
     @param vault The address of a vault to allow to use this accountant.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert self.vaults[vault], "not added"
 
     self.vaults[vault] = False
@@ -288,7 +288,7 @@ def updateDefaultConfig(
     @param default_refund Default refund ratio to give back on losses.
     @param default_maxFee Default max fee to allow as a percent of gain.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert default_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
     assert default_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
@@ -322,7 +322,7 @@ def setCustomConfig(
     @param custom_refund Custom refund ratio to give back on losses.
     @param custom_maxFee Custom max fee to allow as a percent of gain.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert self.vaults[vault], "vault not added"
     assert custom_management <= MANAGEMENT_FEE_THRESHOLD, "exceeds management fee threshold"
     assert custom_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
@@ -347,7 +347,7 @@ def removeCustomConfig(vault: address, strategy: address):
     @notice Removes a previously set custom config for a strategy.
     @param strategy The strategy to remove custom setting for.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert self.custom[vault][strategy], "No custom fees set"
 
     # Set all the strategies custom fees to 0.
@@ -364,7 +364,7 @@ def setMaxLoss(maxLoss: uint256):
     @notice Set the max loss parameter to be used on withdraws.
     @param maxLoss Amount in basis points.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert maxLoss <= MAX_BPS, "higher than 100%"
 
     self.maxLoss = maxLoss
@@ -382,7 +382,7 @@ def withdrawUnderlying(vault: address, amount: uint256):
     @param vault The vault to redeem from.
     @param amount The amount in the underlying to withdraw.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     IVault(vault).withdraw(amount, self, self, self.maxLoss)
 
 
@@ -395,7 +395,7 @@ def distribute(token: address) -> uint256:
     @param token The token to distribute.
     @return The amount of token distributed.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
 
     rewards: uint256 = ERC20(token).balanceOf(self)
     self._erc20_safe_transfer(token, self.feeRecipient, rewards)
@@ -412,7 +412,7 @@ def setFutureFeeManager(futureFeeManager: address):
         call accept_feeManager in order to update the actual feeManager.
     @param futureFeeManager Address to set to futureFeeManager.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert futureFeeManager != empty(address), "ZERO ADDRESS"
     self.futureFeeManager = futureFeeManager
 
@@ -437,7 +437,7 @@ def setFeeRecipient(newFeeRecipient: address):
     @notice Set a new address to receive distributed rewards.
     @param newFeeRecipient Address to receive distributed fees.
     """
-    assert msg.sender == self.feeManager, "not fee manager"
+    assert msg.sender == self.feeManager, "!fee manager"
     assert newFeeRecipient != empty(address), "ZERO ADDRESS"
     oldFeeRecipient: address = self.feeRecipient
     self.feeRecipient = newFeeRecipient

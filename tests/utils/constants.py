@@ -4,7 +4,7 @@ from utils.helpers import to_bytes32
 DAY = 86400
 WEEK = 7 * DAY
 YEAR = 31_556_952  # same value used in vault
-MAX_INT = 2 ** 256 - 1
+MAX_INT = 2**256 - 1
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 MAX_BPS = 10_000
 
