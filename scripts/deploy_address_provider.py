@@ -56,5 +56,6 @@ def deploy_address_provider():
     print("------------------")
     print(f"Encoded Constructor to use for verifaction {constructor.hex()}")
 
+
 def main():
     deploy_address_provider()

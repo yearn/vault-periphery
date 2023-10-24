@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
 import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
@@ -16,10 +16,8 @@ contract GenericDebtAllocatorFactory {
     // Original allocator to use for cloning.
     address public immutable original;
 
-    constructor(address _vault, address _governance) {
-        original = address(new GenericDebtAllocator(_vault, _governance));
-
-        emit NewDebtAllocator(original, _vault);
+    constructor() {
+        original = address(new GenericDebtAllocator(address(1), address(2)));
     }
 
     /**
