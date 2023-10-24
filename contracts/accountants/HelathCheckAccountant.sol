@@ -100,10 +100,10 @@ contract HealthCheckAccountant {
     Fee public defaultConfig;
 
     /// @notice Mapping vault => strategy => custom Fee config if any.
-    mapping(address => mapping(address => Fee)) public fees;
+    mapping(address => mapping(address => Fee)) public customConfig;
 
     /// @notice Mapping vault => strategy => flag to use a custom config.
-    mapping(address => mapping(address => bool)) public custom;
+    mapping(address => mapping(address => uint256)) internal _custom;
 
     constructor(
         address _feeManager,
@@ -165,8 +165,8 @@ contract HealthCheckAccountant {
         Fee memory fee;
 
         // Check if there is a custom config to use.
-        if (custom[msg.sender][strategy]) {
-            fee = fees[msg.sender][strategy];
+        if (_custom[msg.sender][strategy] != 0) {
+            fee = customConfig[msg.sender][strategy];
         } else {
             // Otherwise use the default.
             fee = defaultConfig;
@@ -337,7 +337,7 @@ contract HealthCheckAccountant {
         require(customMaxLoss <= MAX_BPS, "too high");
 
         // Set the strategy's custom config.
-        fees[vault][strategy] = Fee({
+        customConfig[vault][strategy] = Fee({
             managementFee: customManagement,
             performanceFee: customPerformance,
             refundRatio: customRefund,
@@ -347,9 +347,13 @@ contract HealthCheckAccountant {
         });
 
         // Set the custom flag.
-        custom[vault][strategy] = true;
+        _custom[vault][strategy] = 1;
 
-        emit UpdateCustomFeeConfig(vault, strategy, fees[vault][strategy]);
+        emit UpdateCustomFeeConfig(
+            vault,
+            strategy,
+            customConfig[vault][strategy]
+        );
     }
 
     /**
@@ -362,16 +366,32 @@ contract HealthCheckAccountant {
         address strategy
     ) external onlyFeeManager {
         // Ensure custom fees are set for the specified vault and strategy.
-        require(custom[vault][strategy], "No custom fees set");
+        require(_custom[vault][strategy] != 0, "No custom fees set");
 
         // Set all the strategy's custom fees to 0.
-        delete fees[vault][strategy];
+        delete customConfig[vault][strategy];
 
         // Clear the custom flag.
-        custom[vault][strategy] = false;
+        _custom[vault][strategy] = 0;
 
         // Emit relevant event.
         emit RemovedCustomFeeConfig(vault, strategy);
+    }
+
+    /**
+     * @notice Public getter to check for custom setting.
+     * @dev We use uint256 for the flag since its cheaper so this
+     *   will convert it to a bool for easy view functions.
+     *
+     * @param vault Address of the vault.
+     * @param strategy Address of the strategy
+     * @return If a custom fee config is set.
+     */
+    function custom(
+        address vault,
+        address strategy
+    ) external view returns (bool) {
+        return _custom[vault][strategy] != 0;
     }
 
     /**

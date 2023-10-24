@@ -4,7 +4,7 @@
     "@commitlint/cli": "^17.0.0",
     "@commitlint/config-conventional": "^17.0.0",
     "@openzeppelin/contracts": "4.8.2",
-    "hardhat": "^2.13.0",
+    "hardhat": "^2.18.2",
     "prettier": "^2.5.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
     "pretty-quick": "^3.1.3",

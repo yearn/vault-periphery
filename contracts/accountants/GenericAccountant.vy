@@ -124,7 +124,7 @@ vaults: public(HashMap[address, bool])
 # Default config to use unless a custom one is set.
 defaultConfig: public(Fee)
 # Mapping vault => strategy => custom Fee config
-fees: public(HashMap[address, HashMap[address, Fee]])
+customConfig: public(HashMap[address, HashMap[address, Fee]])
 # Mapping vault => strategy => flag to use a custom config.
 custom: public(HashMap[address, HashMap[address, bool]])
 
@@ -186,7 +186,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
     # Check if it there is a custom config to use.
     if self.custom[msg.sender][strategy]:
-        fee = self.fees[msg.sender][strategy]
+        fee = self.customConfig[msg.sender][strategy]
     else:
         # Otherwise use the default.
         fee = self.defaultConfig
@@ -328,7 +328,7 @@ def setCustomConfig(
     assert custom_performance <= PERFORMANCE_FEE_THRESHOLD, "exceeds performance fee threshold"
 
     # Set this strategies custom config.
-    self.fees[vault][strategy] = Fee({
+    self.customConfig[vault][strategy] = Fee({
         managementFee: custom_management,
         performanceFee: custom_performance,
         refundRatio: custom_refund,
@@ -338,7 +338,7 @@ def setCustomConfig(
     # Make sure flag is declared as True.
     self.custom[vault][strategy] = True
 
-    log UpdateCustomFeeConfig(vault, strategy, self.fees[vault][strategy])
+    log UpdateCustomFeeConfig(vault, strategy, self.customConfig[vault][strategy])
 
 
 @external
@@ -351,7 +351,7 @@ def removeCustomConfig(vault: address, strategy: address):
     assert self.custom[vault][strategy], "No custom fees set"
 
     # Set all the strategies custom fees to 0.
-    self.fees[vault][strategy] = empty(Fee)
+    self.customConfig[vault][strategy] = empty(Fee)
     # Turn off the flag.
     self.custom[vault][strategy] = False
 
