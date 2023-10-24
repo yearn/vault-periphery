@@ -6,6 +6,7 @@ plugins:
   - name: etherscan
   - name: hardhat
   - name: infura
+  - name: polygon
 
 default_ecosystem: ethereum
 

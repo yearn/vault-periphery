@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: GNU AGPLv3
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.18;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "@yearn-vaults/interfaces/IVault.sol";
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
 contract HealthCheckAccountant {
     using SafeERC20 for ERC20;
@@ -125,7 +125,6 @@ contract HealthCheckAccountant {
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(defaultMaxFee <= MAX_BPS, "too high");
         require(defaultMaxGain <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 

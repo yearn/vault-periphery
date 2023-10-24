@@ -16,10 +16,9 @@ contract GenericDebtAllocatorFactory {
     // Original allocator to use for cloning.
     address public immutable original;
 
-    constructor(address _vault, address _governance) {
-        original = address(new GenericDebtAllocator(_vault, _governance));
-
-        emit NewDebtAllocator(original, _vault);
+    constructor() {
+        // Deploy dummy version for original.
+        original = address(new GenericDebtAllocator(address(1), address(2)));
     }
 
     /**
