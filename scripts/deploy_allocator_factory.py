@@ -9,18 +9,18 @@ from copy import deepcopy
 deployer = accounts.load("")
 
 
-def deploy_address_provider():
-    print("Deploying Address Provider on ChainID", chain.chain_id)
+def deploy_allocator_factory():
+    print("Deploying Generic Debt Allocator Factory on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
         return
 
-    address_provider = project.AddressProvider
+    allocator_factory = project.GenericDebtAllocatorFactory
     deployer_contract = project.Deployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "address provider"
+    salt_string = "Generic Debt Allocator Factory"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -35,16 +35,11 @@ def deploy_address_provider():
     print("Init balance:", deployer.balance / 1e18)
 
     # generate and deploy
-    constructor = address_provider.constructor.encode_input(
-        "0x33333333D5eFb92f19a5F94a43456b3cec2797AE"
-    )
-
     deploy_bytecode = HexBytes(
-        HexBytes(address_provider.contract_type.deployment_bytecode.bytecode)
-        + constructor
+        HexBytes(allocator_factory.contract_type.deployment_bytecode.bytecode)
     )
 
-    print(f"Deploying Address Provider...")
+    print(f"Deploying the Factory...")
 
     tx = deployer_contract.deploy(deploy_bytecode, salt, sender=deployer)
 
@@ -52,10 +47,8 @@ def deploy_address_provider():
 
     address = event[0].addr
 
-    print(f"Deployed the address provider to {address}")
-    print("------------------")
-    print(f"Encoded Constructor to use for verifaction {constructor.hex()}")
+    print(f"Deployed the Factory to {address}")
 
 
 def main():
-    deploy_address_provider()
+    deploy_allocator_factory()

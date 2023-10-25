@@ -328,11 +328,9 @@ def address_provider(deploy_address_provider):
 
 
 @pytest.fixture(scope="session")
-def deploy_generic_debt_allocator_factory(project, vault, daddy):
-    def deploy_generic_debt_allocator_factory(initial_vault=vault, gov=daddy):
-        generic_debt_allocator_factory = gov.deploy(
-            project.GenericDebtAllocatorFactory, initial_vault, gov
-        )
+def deploy_generic_debt_allocator_factory(project, daddy):
+    def deploy_generic_debt_allocator_factory(gov=daddy):
+        generic_debt_allocator_factory = gov.deploy(project.GenericDebtAllocatorFactory)
 
         return generic_debt_allocator_factory
 

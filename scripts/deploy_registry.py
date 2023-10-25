@@ -59,6 +59,8 @@ def deploy_release_and_factory():
         release_address = release_event[0].addr
 
         print(f"Deployed the vault release to {release_address}")
+        print("------------------")
+    print(f"Encoded Constructor to use for verifaction {release_constructor.hex()}")
 
     # Deploy factory
     print(f"Deploying factory...")
@@ -79,6 +81,8 @@ def deploy_release_and_factory():
     deployed_factory = factory.at(factory_event[0].addr)
 
     print(f"Deployed Registry Factory to {deployed_factory.address}")
+    print("------------------")
+    print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()}")
 
 
 def main():
