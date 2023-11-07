@@ -16,34 +16,48 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
  *
  *  Each allocator contract will serve one Vault and each strategy
  *  that should be managed by this allocator will need to be added
- *  manually by setting a `minimumChange` and a `targetRatio`.
+ *  manually by setting a `targetRatio` and `maxRatio`.
  *
  *  The allocator aims to allocate debt between the strategies
  *  based on their set target ratios. Which are denominated in basis
  *  points and represent the percent of total assets that specific
  *  strategy should hold.
+ *
+ *  The trigger will attempt to allocate up to the `maxRatio` when
+ *  the strategy has `minimumChange` amount less than the `targetRatio`.
+ *  And will pull funds from the strategy when it has `minimumChange`
+ *  more than its `maxRatio`.
  */
 contract GenericDebtAllocator is Governance {
-    event SetTargetDebtRatio(
+    event UpdatedStrategyDebtRatios(
         address indexed strategy,
         uint256 targetRatio,
+        uint256 maxRatio,
         uint256 totalDebtRatio
     );
 
-    event SetMinimumChange(address indexed strategy, uint256 minimumChange);
+    event UpdatedMinimumChange(uint256 minimumChange);
 
-    event SetMaxAcceptableBaseFee(uint256 maxAcceptableBaseFee);
+    event UpdatedMaxAcceptableBaseFee(uint256 maxAcceptableBaseFee);
+
+    event UpdatedMinimumWait(uint256 newMinimumWait);
 
     // Struct for each strategies info.
     struct Config {
-        // The percent in Basis Points the strategy should have.
+        // The ideal percent in Basis Points the strategy should have.
         uint256 targetRatio;
-        // The minimum amount denominated in asset that will
-        // need to be moved to trigger a debt update.
-        uint256 minimumChange;
+        // The max percent of assets the strategy should hold.
+        uint256 maxRatio;
+        // Timestamp of the last time debt was updated.
+        // The debt updates must be done through this allocator
+        // for this to be used.
+        uint256 lastUpdate;
     }
 
     uint256 internal constant MAX_BPS = 10_000;
+
+    // Vaults DEBT_MANAGER enumerator.
+    uint256 internal constant DEBT_MANAGER = 64;
 
     // Mapping of strategy => its config.
     mapping(address => Config) public configs;
@@ -55,12 +69,23 @@ contract GenericDebtAllocator is Governance {
     // Can't be more than 10_000.
     uint256 public debtRatio;
 
+    // The minimum amount denominated in asset that will
+    // need to be moved to trigger a debt update.
+    uint256 public minimumChange;
+
+    // Time to wait between debt updates.
+    uint256 public minimumWait;
+
     // Max the chains base fee can be during debt update.
     // Will default to max uint256 and need to be set to be used.
     uint256 public maxAcceptableBaseFee;
 
-    constructor(address _vault, address _governance) Governance(_governance) {
-        initialize(_vault, _governance);
+    constructor(
+        address _vault,
+        address _governance,
+        uint256 _minimumChange
+    ) Governance(_governance) {
+        initialize(_vault, _governance, _minimumChange);
     }
 
     /**
@@ -68,13 +93,40 @@ contract GenericDebtAllocator is Governance {
      * @dev Should be called atomically after cloning.
      * @param _vault Address of the vault this allocates debt for.
      * @param _governance Address to govern this contract.
+     * @param _minimumChange The minimum in asset that must be moved.
      */
-    function initialize(address _vault, address _governance) public {
+    function initialize(
+        address _vault,
+        address _governance,
+        uint256 _minimumChange
+    ) public {
         require(address(vault) == address(0), "!initialized");
         vault = _vault;
         governance = _governance;
+        minimumChange = _minimumChange;
         // Default max base fee to uint256 max
         maxAcceptableBaseFee = type(uint256).max;
+    }
+
+    /**
+     * @notice Debt update wrapper for the vault.
+     * @dev This can be used if a minimum time between debt updates
+     *   is desired to be enforced.
+     *
+     *   This contract and the msg.sender must have the DEBT_MANAGER
+     *   role assigned to them.
+     *
+     *   The function signature matches the vault so no update to the
+     *   call data is required.
+     */
+    function update_debt(address _strategy, uint256 _targetDebt) external {
+        IVault _vault = IVault(vault);
+        require(
+            (IVault(_vault).roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
+            "!authorized"
+        );
+        IVault(_vault).update_debt(_strategy, _targetDebt);
+        configs[_strategy].lastUpdate = block.timestamp;
     }
 
     /**
@@ -82,7 +134,7 @@ contract GenericDebtAllocator is Governance {
      * @dev This should be called by a keeper to decide if a strategies
      * debt should be updated and if so by how much.
      *
-     * This cannot be used to withdraw down to 0 debt.
+     * NOTE: This cannot be used to withdraw down to 0 debt.
      *
      * @param _strategy Address of the strategy to check.
      * @return . Bool representing if the debt should be updated.
@@ -108,9 +160,22 @@ contract GenericDebtAllocator is Governance {
         // Make sure we have a target debt.
         require(config.targetRatio != 0, "no targetRatio");
 
+        if (block.timestamp - config.lastUpdate <= minimumWait) {
+            return (false, "min wait");
+        }
+
+        uint256 vaultAssets = _vault.totalAssets();
+
         // Get the target debt for the strategy based on vault assets.
         uint256 targetDebt = Math.min(
-            (_vault.totalAssets() * config.targetRatio) / MAX_BPS,
+            (vaultAssets * config.targetRatio) / MAX_BPS,
+            // Make sure it is not more than the max allowed.
+            params.max_debt
+        );
+
+        // Get the max debt we would want the strategy to have.
+        uint256 maxDebt = Math.min(
+            (vaultAssets * config.maxRatio) / MAX_BPS,
             // Make sure it is not more than the max allowed.
             params.max_debt
         );
@@ -125,8 +190,9 @@ contract GenericDebtAllocator is Governance {
                 return (false, bytes("No Idle"));
             }
 
+            // Add up to the max if possible
             uint256 toAdd = Math.min(
-                targetDebt - params.current_debt,
+                maxDebt - params.current_debt,
                 // Can't take more than is available.
                 Math.min(
                     currentIdle - minIdle,
@@ -135,7 +201,7 @@ contract GenericDebtAllocator is Governance {
             );
 
             // If the amount to add is over our threshold.
-            if (toAdd > config.minimumChange) {
+            if (toAdd > minimumChange) {
                 // Return true and the calldata.
                 return (
                     true,
@@ -146,7 +212,7 @@ contract GenericDebtAllocator is Governance {
                 );
             }
             // If target debt is lower than the current.
-        } else if (targetDebt < params.current_debt) {
+        } else if (maxDebt < params.current_debt) {
             // Find out by how much.
             uint256 toPull = Math.min(
                 params.current_debt - targetDebt,
@@ -155,7 +221,7 @@ contract GenericDebtAllocator is Governance {
             );
 
             // Check if it's over the threshold.
-            if (toPull > config.minimumChange) {
+            if (toPull > minimumChange) {
                 // Can't lower debt if there is unrealised losses.
                 if (
                     _vault.assess_share_of_unrealised_losses(
@@ -188,15 +254,21 @@ contract GenericDebtAllocator is Governance {
      *
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
+     * @param _maxRatio Max ratio to give on debt increases.
      */
-    function setTargetDebtRatio(
+    function setStrategyDebtRatios(
         address _strategy,
-        uint256 _targetRatio
+        uint256 _targetRatio,
+        uint256 _maxRatio
     ) external onlyGovernance {
         // Make sure the strategy is added to the vault.
         require(IVault(vault).strategies(_strategy).activation != 0, "!active");
         // Make sure a minimumChange has been set.
-        require(configs[_strategy].minimumChange != 0, "!minimum");
+        require(minimumChange != 0, "!minimum");
+        // Cannot be more than 100%.
+        require(_maxRatio <= MAX_BPS, "max too high");
+        // Max cannot be lower than the target.
+        require(_maxRatio >= _targetRatio, "max ratio");
 
         // Get what will be the new total debt ratio.
         uint256 newDebtRatio = debtRatio -
@@ -208,9 +280,16 @@ contract GenericDebtAllocator is Governance {
 
         // Write to storage.
         configs[_strategy].targetRatio = _targetRatio;
+        configs[_strategy].maxRatio = _maxRatio;
+
         debtRatio = newDebtRatio;
 
-        emit SetTargetDebtRatio(_strategy, _targetRatio, newDebtRatio);
+        emit UpdatedStrategyDebtRatios(
+            _strategy,
+            _targetRatio,
+            _maxRatio,
+            newDebtRatio
+        );
     }
 
     /**
@@ -218,20 +297,25 @@ contract GenericDebtAllocator is Governance {
      * @dev This is the amount of debt that will needed to be
      * added or pulled for it to trigger an update.
      *
-     * @param _strategy The address of the strategy to update.
      * @param _minimumChange The new minimum to set for the strategy.
      */
-    function setMinimumChange(
-        address _strategy,
-        uint256 _minimumChange
-    ) external onlyGovernance {
-        // Make sure the strategy is added to the vault.
-        require(IVault(vault).strategies(_strategy).activation != 0, "!active");
-
+    function setMinimumChange(uint256 _minimumChange) external onlyGovernance {
+        require(_minimumChange > 0, "zero");
         // Set the new minimum.
-        configs[_strategy].minimumChange = _minimumChange;
+        minimumChange = _minimumChange;
 
-        emit SetMinimumChange(_strategy, _minimumChange);
+        emit UpdatedMinimumChange(_minimumChange);
+    }
+
+    /**
+     * @notice Set the minimum time to wait before re-updating a strategies debt.
+     * @dev This is only enforced per strategy.
+     * @param _minimumWait The minimum time in seconds to wait.
+     */
+    function setMinimumTime(uint256 _minimumWait) external onlyGovernance {
+        minimumWait = _minimumWait;
+
+        emit UpdatedMinimumWait(_minimumWait);
     }
 
     /**
@@ -248,6 +332,6 @@ contract GenericDebtAllocator is Governance {
     ) external onlyGovernance {
         maxAcceptableBaseFee = _maxAcceptableBaseFee;
 
-        emit SetMaxAcceptableBaseFee(_maxAcceptableBaseFee);
+        emit UpdatedMaxAcceptableBaseFee(_maxAcceptableBaseFee);
     }
 }

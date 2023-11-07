@@ -17,12 +17,13 @@ contract GenericDebtAllocatorFactory {
     address public immutable original;
 
     constructor() {
-        original = address(new GenericDebtAllocator(address(1), address(2)));
+        original = address(new GenericDebtAllocator(address(1), address(2), 0));
     }
 
     /**
      * @notice Clones a new debt allocator.
-     * @dev defaults to msg.sender as the governance role.
+     * @dev defaults to msg.sender as the governance role and 0
+     *  for the `minimumChange`.
      *
      * @param _vault The vault for the allocator to be hooked to.
      * @return Address of the new generic debt allocator
@@ -30,7 +31,22 @@ contract GenericDebtAllocatorFactory {
     function newGenericDebtAllocator(
         address _vault
     ) external returns (address) {
-        return newGenericDebtAllocator(_vault, msg.sender);
+        return newGenericDebtAllocator(_vault, msg.sender, 0);
+    }
+
+    /**
+     * @notice Clones a new debt allocator.
+     * @dev defaults to 0 for the `minimumChange`.
+     *
+     * @param _vault The vault for the allocator to be hooked to.
+     * @param _governance Address to serve as governance.
+     * @return Address of the new generic debt allocator
+     */
+    function newGenericDebtAllocator(
+        address _vault,
+        address _governance
+    ) external returns (address) {
+        return newGenericDebtAllocator(_vault, _governance, 0);
     }
 
     /**
@@ -41,7 +57,8 @@ contract GenericDebtAllocatorFactory {
      */
     function newGenericDebtAllocator(
         address _vault,
-        address _governance
+        address _governance,
+        uint256 _minimumChange
     ) public returns (address newAllocator) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
@@ -60,7 +77,11 @@ contract GenericDebtAllocatorFactory {
             newAllocator := create(0, clone_code, 0x37)
         }
 
-        GenericDebtAllocator(newAllocator).initialize(_vault, _governance);
+        GenericDebtAllocator(newAllocator).initialize(
+            _vault,
+            _governance,
+            _minimumChange
+        );
 
         emit NewDebtAllocator(newAllocator, _vault);
     }
