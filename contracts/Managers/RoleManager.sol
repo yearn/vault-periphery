@@ -3,26 +3,27 @@ pragma solidity 0.8.18;
 
 import {Governance} from "@periphery/utils/Governance.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-import {VaultConstant} from "@yearn-vaults/interfaces/VaultConstants.sol";
+import {VaultConstants} from "@yearn-vaults/interfaces/VaultConstants.sol";
 import {IStrategy} from "@tokenized-strategy/interfaces/IStrategy.sol";
 
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {Registry} from "../registry/Registry.sol";
-import {GenericDebAllocatorFactory, GenericDebAllocator} from "../debtAllocators/GenericDebAllocatorFactory.sol";
+import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
 contract RoleManager is Governance, VaultConstants {
     struct VaultConfig {
         address asset;
         address debtAllocator;
         uint256 rating;
+        uint256 minDebtChange;
         StrategyInfo[] strategies;
     }
 
     struct StrategyInfo {
         address strategy;
         uint256 maxDebt;
-        uint256 targetRatio
-        uint256 minChange;
+        uint256 targetRatio;
+        uint256 maxRatio;
     }
 
     address public daddy;
@@ -40,6 +41,8 @@ contract RoleManager is Governance, VaultConstants {
 
     uint256 public defaultProfitMaxUnlock = 10 days;
 
+    uint256 public maxAcceptableBaseFee = 100e9;
+
     mapping(address => VaultConfig) public vaultConfig;
 
     address[] public vaults;
@@ -55,105 +58,117 @@ contract RoleManager is Governance, VaultConstants {
     function newVault(
         address _asset,
         string memory _name,
-        string memory _symbol
+        string memory _symbol,
+        uint256 _rating
     ) external returns (address) {
-        return newVault(_asset, _name, _symbol, defaultProfitMaxUnlock);
+        return
+            newVault(
+                _asset,
+                _name,
+                _symbol,
+                _rating,
+                defaultProfitMaxUnlock,
+                0
+            );
     }
 
     function newVault(
         address _asset,
         string memory _name,
         string memory _symbol,
-        uint256 _profitMaxUnlockTime,
         uint256 _rating,
+        uint256 _profitMaxUnlockTime,
         uint256 _depositLimit
-        StrategyInfo[] memory _strategies
-    ) external onlyGovernance returns (address _vault) {
-        _vault = Registry(registry).newEndorsedVault(_asset, _name, _symbol, address(this), _profitMaxUnlockTime);
+    ) public onlyGovernance returns (address _vault) {
+        _vault = Registry(registry).newEndorsedVault(
+            _asset,
+            _name,
+            _symbol,
+            address(this),
+            _profitMaxUnlockTime
+        );
 
         _sanctify(_vault);
 
-        _setStrategies(_vault, strategies);
-
-        address _debtAllocator = _allocate(_vault, _strategies);
-
-        _limit(_vault, _depositLimit);
+        address _debtAllocator = _deployAllocator(_vault);
 
         vaultConfig[_vault] = VaultConfig({
-            asset: _asset;
-            debtAllocator: _debtAllocator;
-            rating: _rating;
-            strategies: _strategies
+            asset: _asset,
+            debtAllocator: _debtAllocator,
+            rating: _rating,
+            minDebtChange: _depositLimit / 10,
+            strategies: new StrategyInfo[](0)
         });
 
-        vault.push(_vault);
+        vaults.push(_vault);
     }
 
     // GIVE OUT ROLES
     function _sanctify(address _vault) internal {
-        IVault(_vault).set_role(
-            address(this),
-            ALL
-        );
+        IVault(_vault).set_role(daddy, daddyRoles);
 
-        IVault(_vault).set_role(
-            daddy,
-            daddyRoles
-        );
-
-        IVault(_vault).set_role(
-            brain, 
-            brainRoles
-        );
+        IVault(_vault).set_role(brain, brainRoles);
 
         IVault(_vault).set_role(keeper, keeperRoles);
 
         IVault(_vault).set_role(security, securityRoles);
 
         IVault(_vault).set_accountant(accountant);
+
+        HealthCheckAccountant(accountant).addVault(_vault);
     }
 
-    /// ADD STRATEGIES
-    function _setStrategies(address _vault, StrategyInfo[] memory _strategies) internal {
-        for(uint256 i = 0; i < _strategies.length, ++i) {
-            _setStrategy(_vault, _strategies[i]);
-        }
+     // DEbt allocator
+    function _deployAllocator(
+        address _vault
+    ) internal returns (address _debtAllocator) {
+        _debtAllocator = GenericDebtAllocatorFactory(allocatorFactory)
+            .newGenericDebtAllocator(_vault);
+        
+        GenericDebtAllocator(_debtAllocator).setMaxAcceptableBaseFee(maxAcceptableBaseFee);
+
+        // Give sms control of the debt allocator.
+        GenericDebtAllocator(_debtAllocator).transferGovernance(brain);        
     }
 
-    function _setStrategy(address _vault, StrategyInfo memory _strategy) internal {
-        // This will check both that the strategy has been endorsed and
-        // uses the same underlying asset with one call.
-        require(Registry(registry).vaultInfo(_strategy.strategy).asset == IVault(_vault).asset(), "!endorsed");
-
-        IVault(_vault).add_strategy(_strategy.strategy);
-
-        IVault(_vault).update_max_debt_for_strategy(
+    function _allocateStrategy(
+        address _debtAllocator,
+        StrategyInfo memory _strategy
+    ) internal {
+        GenericDebtAllocator(_debtAllocator).setTargetDebtRatio(
             _strategy.strategy,
-            _strategy.maxDebt
+            _strategy.targetRatio
         );
     }
 
-    // DEbt allocator
-    function _allocate(address _vault, StrategyInfo memory _strategies) internal returns (address _debtAllocator) {
-        _debtAllocator = GenericDebtAllocatorFactory(allocatorFactory).newGenericDebtAllocator(_vault);
+    function _limit(address _vault, uint256 _depositLimit) internal {
+        IVault(_vault).set_deposit_limit(_depositLimit);
+    }
 
-        for(uint256 i = 0; i < _strategies.length, ++i) {
-            _allocateStrategy(_debtAllocator, _strategies[i]);
+    function setRole(address _vault, address _account, uint256 _role) external onlyGovernance {
+        IVault(_vault).set_role(_account, _role);
+    }
+
+    function transferRoleManager(address _vault, address _newManager) external onlyGovernance {
+        IVault(_vault).transfer_role_manager(_newManager);
+    }
+
+    function acceptRoleManager(address _vault) external onlyGovernance {
+        IVault(_vault).accept_role_manager();
+
+        vaultConfig[_vault].asset = IVault(_vault).asset();
+
+        vaults.push(_vault);
+    }
+
+    function setAccountant(address _newAccountant) external onlyGovernance {
+        // Transfer ownership over the last accountant to daddy.        
+        if (accountant != address(0)) {
+            HealthCheckAccountant(accountant).setFutureFeeManager(daddy);
         }
 
+        HealthCheckAccountant(_newAccountant).acceptFeeManager();
 
+        accountant = _newAccountant;
     }
-
-    function _allocateStrategy(address _debtAllocator, StrategyInfo _strategy) internal {
-        
-    }
-
-    function _limit(address _vault, uint256 _depositLimit) internal {
-        IVault(_vault).set_deposit_limit(_depositLimit)
-    }
-    
-
-    // ADJUST DEBT
-
-    // REPORT
 }
