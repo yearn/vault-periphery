@@ -1,6 +1,6 @@
 import ape
 from ape import chain, project
-from utils.constants import ZERO_ADDRESS, MAX_INT
+from utils.constants import ZERO_ADDRESS, MAX_INT, ROLES
 
 
 def test_setup(generic_debt_allocator_factory, user, strategy, vault):
@@ -103,6 +103,7 @@ def test_should_update_debt(
     generic_debt_allocator, vault, strategy, daddy, deposit_into_vault, amount
 ):
     assert generic_debt_allocator.configs(strategy.address) == (0, 0, 0)
+    vault.add_role(generic_debt_allocator, ROLES.DEBT_MANAGER, sender=daddy)
 
     with ape.reverts("!active"):
         generic_debt_allocator.shouldUpdateDebt(strategy.address)
@@ -140,7 +141,8 @@ def test_should_update_debt(
     print("Made ", vault.update_debt.encode_input(strategy.address, amount // 2))
     assert bytes == vault.update_debt.encode_input(strategy.address, amount // 2)
 
-    vault.update_debt(strategy, amount // 2, sender=daddy)
+    generic_debt_allocator.update_debt(strategy, amount // 2, sender=daddy)
+    chain.mine(1)
 
     # Should now be false again once allocated
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
@@ -157,6 +159,15 @@ def test_should_update_debt(
     assert bytes == vault.update_debt.encode_input(
         strategy.address, int(amount * 5_001 // 10_000)
     )
+
+    # Set a minimumWait time
+    generic_debt_allocator.setMinimumWait(MAX_INT, sender=daddy)
+    # Should now be false
+    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
+    assert bool == False
+    assert bytes == ("min wait").encode("utf-8")
+
+    generic_debt_allocator.setMinimumWait(0, sender=daddy)
 
     # Lower the max debt so its == to current debt
     vault.update_max_debt_for_strategy(strategy, int(amount // 2), sender=daddy)
@@ -199,3 +210,41 @@ def test_should_update_debt(
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy.address, amount // 4)
+
+
+def test_update_debt(
+    generic_debt_allocator, vault, strategy, daddy, user, deposit_into_vault, amount
+):
+    assert generic_debt_allocator.configs(strategy) == (0, 0, 0)
+    deposit_into_vault(vault, amount)
+
+    assert vault.totalIdle() == amount
+    assert vault.totalDebt() == 0
+
+    vault.add_strategy(strategy, sender=daddy)
+    vault.update_max_debt_for_strategy(strategy, MAX_INT, sender=daddy)
+
+    # This reverts by the allocator
+    with ape.reverts("not allowed"):
+        generic_debt_allocator.update_debt(strategy, amount, sender=user)
+
+    # This reverts by the vault
+    with ape.reverts("not allowed"):
+        generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
+
+    vault.add_role(generic_debt_allocator, ROLES.DEBT_MANAGER, sender=daddy)
+
+    generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
+
+    timestamp = generic_debt_allocator.configs(strategy)[2]
+    assert timestamp != 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == amount
+
+    vault.add_role(user, ROLES.DEBT_MANAGER, sender=daddy)
+
+    generic_debt_allocator.update_debt(strategy, 0, sender=user)
+
+    assert generic_debt_allocator.configs(strategy)[2] != timestamp
+    assert vault.totalIdle() == amount
+    assert vault.totalDebt() == 0

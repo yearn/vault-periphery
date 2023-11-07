@@ -123,7 +123,7 @@ contract GenericDebtAllocator is Governance {
         IVault _vault = IVault(vault);
         require(
             (IVault(_vault).roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
-            "!authorized"
+            "not allowed"
         );
         IVault(_vault).update_debt(_strategy, _targetDebt);
         configs[_strategy].lastUpdate = block.timestamp;
@@ -312,7 +312,7 @@ contract GenericDebtAllocator is Governance {
      * @dev This is only enforced per strategy.
      * @param _minimumWait The minimum time in seconds to wait.
      */
-    function setMinimumTime(uint256 _minimumWait) external onlyGovernance {
+    function setMinimumWait(uint256 _minimumWait) external onlyGovernance {
         minimumWait = _minimumWait;
 
         emit UpdatedMinimumWait(_minimumWait);
