@@ -105,6 +105,8 @@ contract HealthCheckAccountant {
     /// @notice Mapping vault => strategy => flag to use a custom config.
     mapping(address => mapping(address => uint256)) internal _custom;
 
+    mapping(address => mapping(address => bool)) public refund;
+
     constructor(
         address _feeManager,
         address _feeRecipient,
@@ -160,6 +162,17 @@ contract HealthCheckAccountant {
     ) external returns (uint256 totalFees, uint256 totalRefunds) {
         // Make sure this is a valid vault.
         require(vaults[msg.sender], "!authorized");
+
+        // If the strategy is a reward refunder.
+        if (refund[msg.sender][strategy]) {
+            // Make sure the vault is max approved.
+            ERC20(IVault(msg.sender).asset()).safeApprove(
+                msg.sender,
+                type(uint256).max
+            );
+            // The vault will pull the full balance of asset.
+            return (0, type(uint256).max);
+        }
 
         // Declare the config to use
         Fee memory fee;
