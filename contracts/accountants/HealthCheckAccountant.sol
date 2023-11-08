@@ -105,8 +105,6 @@ contract HealthCheckAccountant {
     /// @notice Mapping vault => strategy => flag to use a custom config.
     mapping(address => mapping(address => uint256)) internal _custom;
 
-    mapping(address => mapping(address => bool)) public refund;
-
     constructor(
         address _feeManager,
         address _feeRecipient,
@@ -159,20 +157,9 @@ contract HealthCheckAccountant {
         address strategy,
         uint256 gain,
         uint256 loss
-    ) external returns (uint256 totalFees, uint256 totalRefunds) {
+    ) public virtual returns (uint256 totalFees, uint256 totalRefunds) {
         // Make sure this is a valid vault.
         require(vaults[msg.sender], "!authorized");
-
-        // If the strategy is a reward refunder.
-        if (refund[msg.sender][strategy]) {
-            // Make sure the vault is max approved.
-            ERC20(IVault(msg.sender).asset()).safeApprove(
-                msg.sender,
-                type(uint256).max
-            );
-            // The vault will pull the full balance of asset.
-            return (0, type(uint256).max);
-        }
 
         // Declare the config to use
         Fee memory fee;
@@ -248,7 +235,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external onlyFeeManager {
+    function addVault(address vault) external virtual onlyFeeManager {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -261,7 +248,7 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(address vault) external onlyFeeManager {
+    function removeVault(address vault) external virtual onlyFeeManager {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
 
@@ -286,7 +273,7 @@ contract HealthCheckAccountant {
         uint16 defaultMaxFee,
         uint16 defaultMaxGain,
         uint16 defaultMaxLoss
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Check for threshold and limit conditions.
         require(
             defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
@@ -333,7 +320,7 @@ contract HealthCheckAccountant {
         uint16 customMaxFee,
         uint16 customMaxGain,
         uint16 customMaxLoss
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure the vault has been added.
         require(vaults[vault], "vault not added");
         // Check for threshold and limit conditions.
@@ -377,7 +364,7 @@ contract HealthCheckAccountant {
     function removeCustomConfig(
         address vault,
         address strategy
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure custom fees are set for the specified vault and strategy.
         require(_custom[vault][strategy] != 0, "No custom fees set");
 
@@ -403,7 +390,7 @@ contract HealthCheckAccountant {
     function custom(
         address vault,
         address strategy
-    ) external view returns (bool) {
+    ) external view virtual returns (bool) {
         return _custom[vault][strategy] != 0;
     }
 
@@ -415,7 +402,7 @@ contract HealthCheckAccountant {
     function withdrawUnderlying(
         address vault,
         uint256 amount
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         IVault(vault).withdraw(amount, address(this), address(this), maxLoss);
     }
 
@@ -423,7 +410,7 @@ contract HealthCheckAccountant {
      * @notice Sets the `maxLoss` parameter to be used on withdraws.
      * @param _maxLoss The amount in basis points to set as the maximum loss.
      */
-    function setMaxLoss(uint256 _maxLoss) external onlyFeeManager {
+    function setMaxLoss(uint256 _maxLoss) external virtual onlyFeeManager {
         // Ensure that the provided `maxLoss` does not exceed 100% (in basis points).
         require(_maxLoss <= MAX_BPS, "higher than 100%");
 
@@ -437,7 +424,7 @@ contract HealthCheckAccountant {
      * @notice Function to distribute all accumulated fees to the designated recipient.
      * @param token The token to distribute.
      */
-    function distribute(address token) external {
+    function distribute(address token) external virtual {
         distribute(token, ERC20(token).balanceOf(address(this)));
     }
 
@@ -446,7 +433,10 @@ contract HealthCheckAccountant {
      * @param token The token to distribute.
      * @param amount amount of token to distribute.
      */
-    function distribute(address token, uint256 amount) public onlyFeeManager {
+    function distribute(
+        address token,
+        uint256 amount
+    ) public virtual onlyFeeManager {
         ERC20(token).safeTransfer(feeRecipient, amount);
 
         emit DistributeRewards(token, amount);
@@ -458,7 +448,7 @@ contract HealthCheckAccountant {
      */
     function setFutureFeeManager(
         address _futureFeeManager
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure the futureFeeManager is not a zero address.
         require(_futureFeeManager != address(0), "ZERO ADDRESS");
         futureFeeManager = _futureFeeManager;
@@ -470,7 +460,7 @@ contract HealthCheckAccountant {
      * @notice Function to accept the role change and become the new fee manager.
      * @dev This function allows the future fee manager to accept the role change and become the new fee manager.
      */
-    function acceptFeeManager() external {
+    function acceptFeeManager() external virtual {
         // Make sure the sender is the future fee manager.
         require(msg.sender == futureFeeManager, "not future fee manager");
         feeManager = futureFeeManager;
@@ -483,7 +473,9 @@ contract HealthCheckAccountant {
      * @notice Function to set a new address to receive distributed rewards.
      * @param newFeeRecipient Address to receive distributed fees.
      */
-    function setFeeRecipient(address newFeeRecipient) external onlyFeeManager {
+    function setFeeRecipient(
+        address newFeeRecipient
+    ) external virtual onlyFeeManager {
         // Ensure the newFeeRecipient is not a zero address.
         require(newFeeRecipient != address(0), "ZERO ADDRESS");
         address oldRecipient = feeRecipient;
@@ -497,7 +489,7 @@ contract HealthCheckAccountant {
      * @dev This function provides the maximum performance fee that the accountant can charge.
      * @return The maximum performance fee.
      */
-    function performanceFeeThreshold() external view returns (uint16) {
+    function performanceFeeThreshold() external view virtual returns (uint16) {
         return PERFORMANCE_FEE_THRESHOLD;
     }
 
@@ -506,7 +498,7 @@ contract HealthCheckAccountant {
      * @dev This function provides the maximum management fee that the accountant can charge.
      * @return The maximum management fee.
      */
-    function managementFeeThreshold() external view returns (uint16) {
+    function managementFeeThreshold() external view virtual returns (uint16) {
         return MANAGEMENT_FEE_THRESHOLD;
     }
 }
