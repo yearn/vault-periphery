@@ -41,7 +41,7 @@ contract ReleaseRegistry is Governance {
      * @dev Throws if no releases are registered yet.
      * @return The address of the factory for the latest release.
      */
-    function latestFactory() external view returns (address) {
+    function latestFactory() external view virtual returns (address) {
         return factories[numReleases - 1];
     }
 
@@ -50,7 +50,7 @@ contract ReleaseRegistry is Governance {
      * @dev Throws if no releases are registered yet.
      * @return The api version of the latest release.
      */
-    function latestRelease() external view returns (string memory) {
+    function latestRelease() external view virtual returns (string memory) {
         return IFactory(factories[numReleases - 1]).apiVersion(); // dev: no release
     }
 
@@ -65,7 +65,7 @@ contract ReleaseRegistry is Governance {
      *
      * @param _factory The factory that will be used create new vaults.
      */
-    function newRelease(address _factory) external onlyGovernance {
+    function newRelease(address _factory) external virtual onlyGovernance {
         // Check if the release is different from the current one
         uint256 releaseId = numReleases;
 

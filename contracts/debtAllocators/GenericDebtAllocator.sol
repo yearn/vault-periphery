@@ -99,7 +99,7 @@ contract GenericDebtAllocator is Governance {
         address _vault,
         address _governance,
         uint256 _minimumChange
-    ) public {
+    ) public virtual {
         require(address(vault) == address(0), "!initialized");
         vault = _vault;
         governance = _governance;
@@ -119,7 +119,10 @@ contract GenericDebtAllocator is Governance {
      *   The function signature matches the vault so no update to the
      *   call data is required.
      */
-    function update_debt(address _strategy, uint256 _targetDebt) external {
+    function update_debt(
+        address _strategy,
+        uint256 _targetDebt
+    ) external virtual {
         IVault _vault = IVault(vault);
         require(
             (IVault(_vault).roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
@@ -142,7 +145,7 @@ contract GenericDebtAllocator is Governance {
      */
     function shouldUpdateDebt(
         address _strategy
-    ) external view returns (bool, bytes memory) {
+    ) external view virtual returns (bool, bytes memory) {
         // Check the base fee isn't too high.
         if (block.basefee > maxAcceptableBaseFee) {
             return (false, bytes("Base Fee"));
@@ -260,7 +263,7 @@ contract GenericDebtAllocator is Governance {
         address _strategy,
         uint256 _targetRatio,
         uint256 _maxRatio
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         // Make sure the strategy is added to the vault.
         require(IVault(vault).strategies(_strategy).activation != 0, "!active");
         // Make sure a minimumChange has been set.
@@ -299,7 +302,9 @@ contract GenericDebtAllocator is Governance {
      *
      * @param _minimumChange The new minimum to set for the strategy.
      */
-    function setMinimumChange(uint256 _minimumChange) external onlyGovernance {
+    function setMinimumChange(
+        uint256 _minimumChange
+    ) external virtual onlyGovernance {
         require(_minimumChange > 0, "zero");
         // Set the new minimum.
         minimumChange = _minimumChange;
@@ -312,7 +317,9 @@ contract GenericDebtAllocator is Governance {
      * @dev This is only enforced per strategy.
      * @param _minimumWait The minimum time in seconds to wait.
      */
-    function setMinimumWait(uint256 _minimumWait) external onlyGovernance {
+    function setMinimumWait(
+        uint256 _minimumWait
+    ) external virtual onlyGovernance {
         minimumWait = _minimumWait;
 
         emit UpdatedMinimumWait(_minimumWait);
@@ -329,7 +336,7 @@ contract GenericDebtAllocator is Governance {
      */
     function setMaxAcceptableBaseFee(
         uint256 _maxAcceptableBaseFee
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         maxAcceptableBaseFee = _maxAcceptableBaseFee;
 
         emit UpdatedMaxAcceptableBaseFee(_maxAcceptableBaseFee);

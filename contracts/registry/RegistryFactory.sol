@@ -23,7 +23,7 @@ contract RegistryFactory {
         releaseRegistry = _releaseRegistry;
     }
 
-    function name() external pure returns (string memory) {
+    function name() external pure virtual returns (string memory) {
         return "Custom Vault Registry Factory";
     }
 
@@ -33,7 +33,9 @@ contract RegistryFactory {
      * @param _name The name of the new registry.
      * @return Address of the new Registry.
      */
-    function createNewRegistry(string memory _name) external returns (address) {
+    function createNewRegistry(
+        string memory _name
+    ) external virtual returns (address) {
         return createNewRegistry(_name, msg.sender);
     }
 
@@ -46,7 +48,7 @@ contract RegistryFactory {
     function createNewRegistry(
         string memory _name,
         address _governance
-    ) public returns (address) {
+    ) public virtual returns (address) {
         Registry newRegistry = new Registry(
             _governance,
             _name,

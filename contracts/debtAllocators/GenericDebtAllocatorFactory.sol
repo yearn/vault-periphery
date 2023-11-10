@@ -30,7 +30,7 @@ contract GenericDebtAllocatorFactory {
      */
     function newGenericDebtAllocator(
         address _vault
-    ) external returns (address) {
+    ) external virtual returns (address) {
         return newGenericDebtAllocator(_vault, msg.sender, 0);
     }
 
@@ -45,7 +45,7 @@ contract GenericDebtAllocatorFactory {
     function newGenericDebtAllocator(
         address _vault,
         address _governance
-    ) external returns (address) {
+    ) external virtual returns (address) {
         return newGenericDebtAllocator(_vault, _governance, 0);
     }
 
@@ -59,7 +59,7 @@ contract GenericDebtAllocatorFactory {
         address _vault,
         address _governance,
         uint256 _minimumChange
-    ) public returns (address newAllocator) {
+    ) public virtual returns (address newAllocator) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
         assembly {

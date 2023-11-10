@@ -94,7 +94,7 @@ contract Registry is Governance {
      * @notice Returns the total number of assets being used as the underlying.
      * @return The amount of assets.
      */
-    function numAssets() external view returns (uint256) {
+    function numAssets() external view virtual returns (uint256) {
         return assets.length;
     }
 
@@ -102,7 +102,7 @@ contract Registry is Governance {
      * @notice Get the full array of tokens being used.
      * @return The full array of underlying tokens being used/.
      */
-    function getAssets() external view returns (address[] memory) {
+    function getAssets() external view virtual returns (address[] memory) {
         return assets;
     }
 
@@ -110,7 +110,9 @@ contract Registry is Governance {
      * @notice The amount of endorsed vaults for a specific token.
      * @return The amount of endorsed vaults.
      */
-    function numEndorsedVaults(address _asset) public view returns (uint256) {
+    function numEndorsedVaults(
+        address _asset
+    ) public view virtual returns (uint256) {
         return _endorsedVaults[_asset].length;
     }
 
@@ -121,7 +123,7 @@ contract Registry is Governance {
      */
     function getEndorsedVaults(
         address _asset
-    ) external view returns (address[] memory) {
+    ) external view virtual returns (address[] memory) {
         return _endorsedVaults[_asset];
     }
 
@@ -138,6 +140,7 @@ contract Registry is Governance {
     function getAllEndorsedVaults()
         external
         view
+        virtual
         returns (address[][] memory allEndorsedVaults)
     {
         address[] memory allAssets = assets;
@@ -170,7 +173,7 @@ contract Registry is Governance {
         string memory _symbol,
         address _roleManager,
         uint256 _profitMaxUnlockTime
-    ) public returns (address _vault) {
+    ) public virtual returns (address _vault) {
         return
             newEndorsedVault(
                 _asset,
@@ -205,7 +208,7 @@ contract Registry is Governance {
         address _roleManager,
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
-    ) public onlyGovernance returns (address _vault) {
+    ) public virtual onlyGovernance returns (address _vault) {
         // Get the target release based on the delta given.
         uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -246,7 +249,7 @@ contract Registry is Governance {
 
      * @param _vault Address of the vault to endorse.
      */
-    function endorseMultiStrategyVault(address _vault) external {
+    function endorseMultiStrategyVault(address _vault) external virtual {
         endorseVault(_vault, 0, MULTI_STRATEGY_TYPE, 0);
     }
 
@@ -257,7 +260,7 @@ contract Registry is Governance {
      *
      * @param _vault Address of the vault to endorse.
      */
-    function endorseSingleStrategyVault(address _vault) external {
+    function endorseSingleStrategyVault(address _vault) external virtual {
         endorseVault(_vault, 0, SINGLE_STRATEGY_TYPE, 0);
     }
 
@@ -279,7 +282,7 @@ contract Registry is Governance {
         uint256 _releaseDelta,
         uint256 _vaultType,
         uint256 _deploymentTimestamp
-    ) public onlyGovernance {
+    ) public virtual onlyGovernance {
         // Cannot endorse twice.
         require(vaultInfo[_vault].asset == address(0), "endorsed");
         require(_vaultType != 0, "no 0 type");
@@ -319,7 +322,7 @@ contract Registry is Governance {
         uint256 _releaseTarget,
         uint256 _vaultType,
         uint256 _deploymentTimestamp
-    ) internal {
+    ) internal virtual {
         // Add to the endorsed vaults array.
         _endorsedVaults[_asset].push(_vault);
 
@@ -353,7 +356,7 @@ contract Registry is Governance {
     function tagVault(
         address _vault,
         string memory _tag
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         require(vaultInfo[_vault].asset != address(0), "!Endorsed");
         vaultInfo[_vault].tag = _tag;
     }
@@ -372,7 +375,7 @@ contract Registry is Governance {
     function removeVault(
         address _vault,
         uint256 _index
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         require(vaultInfo[_vault].asset != address(0), "!endorsed");
 
         // Get the asset the vault is using.
@@ -415,7 +418,7 @@ contract Registry is Governance {
     function removeAsset(
         address _asset,
         uint256 _index
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         require(assetIsUsed[_asset], "!in use");
         require(_endorsedVaults[_asset].length == 0, "still in use");
         require(assets[_index] == _asset, "wrong asset");
