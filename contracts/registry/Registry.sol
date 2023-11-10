@@ -35,6 +35,15 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
+    modifier onlyEndorsers() {
+        _isEndorser();
+        _;
+    }
+
+    function _isEndorser() internal view {
+        require(msg.sender == governance || endorsers[msg.sender], "!endorse");
+    }
+
     // Struct stored for every endorsed vault or strategy for
     // off chain use to easily retrieve info.
     struct Info {
@@ -58,6 +67,9 @@ contract Registry is Governance {
 
     // Custom name for this Registry.
     string public name;
+
+    // Mapping for any address that is allowed to deploy or endorse.
+    mapping(address => bool) public endorsers;
 
     // Address used to get the specific versions from.
     address public immutable releaseRegistry;
@@ -208,7 +220,7 @@ contract Registry is Governance {
         address _roleManager,
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
-    ) public virtual onlyGovernance returns (address _vault) {
+    ) public onlyEndorsers returns (address _vault) {
         // Get the target release based on the delta given.
         uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -282,7 +294,7 @@ contract Registry is Governance {
         uint256 _releaseDelta,
         uint256 _vaultType,
         uint256 _deploymentTimestamp
-    ) public virtual onlyGovernance {
+    ) public onlyEndorsers {
         // Cannot endorse twice.
         require(vaultInfo[_vault].asset == address(0), "endorsed");
         require(_vaultType != 0, "no 0 type");
@@ -431,5 +443,17 @@ contract Registry is Governance {
 
         // No longer used.
         assetIsUsed[_asset] = false;
+    }
+
+    /**
+     * @notice Set a new address to be able to endorse or remove an existing endorser.
+     * @param _account The address to set.
+     * @param _canEndorse Bool if the `_account` can or cannot endorse.
+     */
+    function setEndorser(
+        address _account,
+        bool _canEndorse
+    ) external onlyGovernance {
+        endorsers[_account] = _canEndorse;
     }
 }
