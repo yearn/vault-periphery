@@ -17,18 +17,24 @@ contract HealthCheckAccountant {
     event UpdateDefaultFeeConfig(Fee defaultFeeConfig);
 
     /// @notice An event emitted when the future fee manager is set.
-    event SetFutureFeeManager(address futureFeeManager);
+    event SetFutureFeeManager(address indexed futureFeeManager);
 
     /// @notice An event emitted when a new fee manager is accepted.
-    event NewFeeManager(address feeManager);
+    event NewFeeManager(address indexed feeManager);
+
+    /// @notice An event emitted when a new vault manager is set.
+    event UpdateVaultManager(address indexed newVaultManager);
 
     /// @notice An event emitted when the fee recipient is updated.
-    event UpdateFeeRecipient(address oldFeeRecipient, address newFeeRecipient);
+    event UpdateFeeRecipient(
+        address indexed oldFeeRecipient,
+        address indexed newFeeRecipient
+    );
 
     /// @notice An event emitted when a custom fee configuration is updated.
     event UpdateCustomFeeConfig(
-        address vault,
-        address strategy,
+        address indexed vault,
+        address indexed strategy,
         Fee custom_config
     );
 
@@ -42,7 +48,7 @@ contract HealthCheckAccountant {
     event UpdateMaxLoss(uint256 maxLoss);
 
     /// @notice An event emitted when rewards are distributed.
-    event DistributeRewards(address token, uint256 rewards);
+    event DistributeRewards(address indexed token, uint256 rewards);
 
     /// @notice Enum defining change types (added or removed).
     enum ChangeType {
@@ -66,8 +72,20 @@ contract HealthCheckAccountant {
         _;
     }
 
+    modifier onlyVaultManagers() {
+        _checkVaultManagers();
+        _;
+    }
+
     function _checkFeeManager() internal view virtual {
-        require(feeManager == msg.sender, "!fee manager");
+        require(msg.sender == feeManager, "!fee manager");
+    }
+
+    function _checkVaultManagers() internal view virtual {
+        require(
+            msg.sender == feeManager || msg.sender == vaultManager,
+            "!vault manager"
+        );
     }
 
     /// @notice Constant defining the maximum basis points.
@@ -91,7 +109,11 @@ contract HealthCheckAccountant {
     /// @notice The address of the fee recipient.
     address public feeRecipient;
 
+    /// @notice The amount of max loss to use when redeeming from vaults.
     uint256 public maxLoss;
+
+    /// @notice An address that can add or remove vaults.
+    address public vaultManager;
 
     /// @notice Mapping to track added vaults.
     mapping(address => bool) public vaults;
@@ -235,7 +257,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external virtual onlyFeeManager {
+    function addVault(address vault) external virtual onlyVaultManagers {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -248,7 +270,7 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(address vault) external virtual onlyFeeManager {
+    function removeVault(address vault) external virtual onlyVaultManagers {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
 
@@ -467,6 +489,18 @@ contract HealthCheckAccountant {
         futureFeeManager = address(0);
 
         emit NewFeeManager(msg.sender);
+    }
+
+    /**
+     * @notice Function to set a new vault manager.
+     * @param newVaultManager Address to add or remove vaults.
+     */
+    function setVaultManager(
+        address newVaultManager
+    ) external virtual onlyFeeManager {
+        vaultManager = newVaultManager;
+
+        emit UpdateVaultManager(newVaultManager);
     }
 
     /**

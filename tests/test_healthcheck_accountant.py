@@ -27,6 +27,7 @@ def test_setup(daddy, vault, strategy, healthcheck_accountant, fee_recipient):
 def test_add_vault(
     daddy,
     vault,
+    user,
     strategy,
     healthcheck_accountant,
     amount,
@@ -62,6 +63,9 @@ def test_add_vault(
     with ape.reverts("!authorized"):
         accountant.report(strategy, 0, 0, sender=vault)
 
+    with ape.reverts("!vault manager"):
+        accountant.addVault(vault.address, sender=user)
+
     # set vault in accountant
     tx = accountant.addVault(vault.address, sender=daddy)
 
@@ -82,6 +86,7 @@ def test_add_vault(
 def test_remove_vault(
     daddy,
     vault,
+    user,
     strategy,
     healthcheck_accountant,
     amount,
@@ -132,7 +137,158 @@ def test_remove_vault(
     assert fees == 100
     assert refunds == 0
 
+    with ape.reverts("!vault manager"):
+        accountant.removeVault(vault.address, sender=user)
+
     tx = accountant.removeVault(vault.address, sender=daddy)
+
+    event = list(tx.decode_logs(accountant.VaultChanged))
+
+    assert len(event) == 1
+    assert event[0].vault == vault.address
+    assert event[0].change == ChangeType.REMOVED
+    assert accountant.vaults(vault.address) == False
+
+    # Should now not be able to report.
+    with ape.reverts("!authorized"):
+        accountant.report(strategy, 0, 0, sender=vault)
+
+
+def test_add_vault__vault_manager(
+    daddy,
+    vault_manager,
+    vault,
+    user,
+    strategy,
+    healthcheck_accountant,
+    amount,
+    deposit_into_vault,
+    provide_strategy_with_debt,
+):
+    accountant = healthcheck_accountant
+    assert accountant.vaults(vault.address) == False
+
+    with ape.reverts("!fee manager"):
+        accountant.setVaultManager(vault_manager, sender=user)
+
+    tx = accountant.setVaultManager(vault_manager, sender=daddy)
+
+    event = list(tx.decode_logs(accountant.UpdateVaultManager))[0]
+    assert event.newVaultManager == vault_manager.address
+
+    new_management = 0
+    new_performance = 1_000
+    new_refund = 0
+    new_max_fee = 0
+    new_max_gain = 10_000
+    new_max_loss = 0
+
+    tx = accountant.updateDefaultConfig(
+        new_management,
+        new_performance,
+        new_refund,
+        new_max_fee,
+        new_max_gain,
+        new_max_loss,
+        sender=daddy,
+    )
+
+    vault.add_strategy(strategy.address, sender=daddy)
+    vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
+
+    deposit_into_vault(vault, amount)
+    provide_strategy_with_debt(daddy, strategy, vault, amount)
+
+    with ape.reverts("!authorized"):
+        accountant.report(strategy, 0, 0, sender=vault)
+
+    with ape.reverts("!vault manager"):
+        accountant.addVault(vault.address, sender=user)
+
+    # set vault in accountant
+    tx = accountant.addVault(vault.address, sender=vault_manager)
+
+    event = list(tx.decode_logs(accountant.VaultChanged))
+
+    assert len(event) == 1
+    assert event[0].vault == vault.address
+    assert event[0].change == ChangeType.ADDED
+    assert accountant.vaults(vault.address) == True
+
+    # Should work now
+    tx = accountant.report(strategy, 1_000, 0, sender=vault)
+    fees, refunds = tx.return_value
+    assert fees == 100
+    assert refunds == 0
+
+
+def test_remove_vault__vault_manager(
+    daddy,
+    vault_manager,
+    vault,
+    user,
+    strategy,
+    healthcheck_accountant,
+    amount,
+    deposit_into_vault,
+    provide_strategy_with_debt,
+):
+    accountant = healthcheck_accountant
+    assert accountant.vaults(vault.address) == False
+
+    with ape.reverts("!fee manager"):
+        accountant.setVaultManager(vault_manager, sender=user)
+
+    tx = accountant.setVaultManager(vault_manager, sender=daddy)
+
+    event = list(tx.decode_logs(accountant.UpdateVaultManager))[0]
+    assert event.newVaultManager == vault_manager.address
+
+    new_management = 0
+    new_performance = 1_000
+    new_refund = 0
+    new_max_fee = 0
+    new_max_gain = 10_000
+    new_max_loss = 0
+
+    tx = accountant.updateDefaultConfig(
+        new_management,
+        new_performance,
+        new_refund,
+        new_max_fee,
+        new_max_gain,
+        new_max_loss,
+        sender=daddy,
+    )
+
+    vault.add_strategy(strategy.address, sender=daddy)
+    vault.update_max_debt_for_strategy(strategy.address, MAX_INT, sender=daddy)
+
+    deposit_into_vault(vault, amount)
+    provide_strategy_with_debt(daddy, strategy, vault, amount)
+
+    assert accountant.vaults(vault.address) == False
+
+    with ape.reverts("!vault manager"):
+        accountant.removeVault(vault.address, sender=user)
+
+    # set vault in accountant
+    tx = accountant.addVault(vault.address, sender=vault_manager)
+
+    event = list(tx.decode_logs(accountant.VaultChanged))
+
+    assert len(event) == 1
+    assert event[0].vault == vault.address
+    assert event[0].change == ChangeType.ADDED
+    assert accountant.vaults(vault.address) == True
+
+    # Should work
+    tx = accountant.report(strategy, 1_000, 0, sender=vault)
+    fees, refunds = tx.return_value
+    assert fees == 100
+    assert refunds == 0
+
+    tx = accountant.removeVault(vault.address, sender=vault_manager)
 
     event = list(tx.decode_logs(accountant.VaultChanged))
 

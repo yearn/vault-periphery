@@ -31,6 +31,11 @@ def user(accounts):
 
 
 @pytest.fixture(scope="session")
+def vault_manager(accounts):
+    return accounts[7]
+
+
+@pytest.fixture(scope="session")
 def create_token(project, daddy, user, amount):
     def create_token(
         name="Test Token", symbol="yTest", initialUser=user, initialAmount=amount
