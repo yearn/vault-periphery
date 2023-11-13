@@ -10,6 +10,7 @@ import {HealthCheckAccountant, ERC20, SafeERC20, IVault} from "./HealthCheckAcco
 contract RefundAccountant is HealthCheckAccountant {
     using SafeERC20 for ERC20;
 
+    /// @notice An event emitted when a refund is added for a strategy.
     event UpdateRefund(
         address indexed vault,
         address indexed strategy,
