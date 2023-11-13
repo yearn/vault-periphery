@@ -1018,9 +1018,9 @@ def test_report_profit__custom_zero_max_gain__reverts(
 ):
     accountant = healthcheck_accountant
     accountant.addVault(vault.address, sender=daddy)
-    # SEt max gain to 0%
+    # SEt max gain to 1%
     accountant.setCustomConfig(
-        vault.address, strategy.address, 200, 2_000, 0, 100, 0, 0, sender=daddy
+        vault.address, strategy.address, 200, 2_000, 0, 100, 1, 0, sender=daddy
     )
     config = list(accountant.customConfig(vault.address, strategy.address))
 

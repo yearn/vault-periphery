@@ -77,6 +77,11 @@ contract HealthCheckAccountant {
         _;
     }
 
+    modifier onlyAddedVaults() {
+        _checkVaultIsAdded();
+        _;
+    }
+
     function _checkFeeManager() internal view virtual {
         require(msg.sender == feeManager, "!fee manager");
     }
@@ -86,6 +91,10 @@ contract HealthCheckAccountant {
             msg.sender == feeManager || msg.sender == vaultManager,
             "!vault manager"
         );
+    }
+
+    function _checkVaultIsAdded() internal view virtual {
+        require(vaults[msg.sender], "!authorized");
     }
 
     /// @notice Constant defining the maximum basis points.
@@ -148,7 +157,6 @@ contract HealthCheckAccountant {
             "exceeds performance fee threshold"
         );
         require(defaultMaxFee <= MAX_BPS, "too high");
-        require(defaultMaxGain <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         feeManager = _feeManager;
@@ -179,10 +187,12 @@ contract HealthCheckAccountant {
         address strategy,
         uint256 gain,
         uint256 loss
-    ) public virtual returns (uint256 totalFees, uint256 totalRefunds) {
-        // Make sure this is a valid vault.
-        require(vaults[msg.sender], "!authorized");
-
+    )
+        public
+        virtual
+        onlyAddedVaults
+        returns (uint256 totalFees, uint256 totalRefunds)
+    {
         // Declare the config to use
         Fee memory fee;
 
@@ -212,12 +222,18 @@ contract HealthCheckAccountant {
 
         // Only charge performance fees if there is a gain.
         if (gain > 0) {
-            require(
-                gain <= (strategyParams.current_debt * (fee.maxGain)) / MAX_BPS,
-                "too much gain"
-            );
+            // Setting `maxGain` to 0 will disable the healthcheck on profits.
+            if (fee.maxGain > 0) {
+                require(
+                    gain <=
+                        (strategyParams.current_debt * (fee.maxGain)) / MAX_BPS,
+                    "too much gain"
+                );
+            }
+
             totalFees += (gain * (fee.performanceFee)) / MAX_BPS;
         } else {
+            // Setting `maxLoss` to 10_000 will disable the healthcheck on losses.
             if (fee.maxLoss < MAX_BPS) {
                 require(
                     loss <=
@@ -306,7 +322,6 @@ contract HealthCheckAccountant {
             "exceeds performance fee threshold"
         );
         require(defaultMaxFee <= MAX_BPS, "too high");
-        require(defaultMaxGain <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         // Update the default fee configuration.
@@ -355,7 +370,6 @@ contract HealthCheckAccountant {
             "exceeds performance fee threshold"
         );
         require(customMaxFee <= MAX_BPS, "too high");
-        require(customMaxGain <= MAX_BPS, "too high");
         require(customMaxLoss <= MAX_BPS, "too high");
 
         // Set the strategy's custom config.

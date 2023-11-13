@@ -13,12 +13,15 @@ contract RewardAccountant is HealthCheckAccountant {
         uint256 amount
     );
 
+    /// @notice Struct to hold reward info to refund.
     struct RewardRefund {
+        // If the accountant should refund on the report.
         bool refund;
+        // The amount if any to refund.
         uint248 amount;
     }
 
-    // Mapping of vault => strategy => struct if there is a reward refund to give.
+    /// @notice Mapping of vault => strategy => struct if there is a reward refund to give.
     mapping(address => mapping(address => RewardRefund)) public rewardRefund;
 
     constructor(
@@ -57,17 +60,20 @@ contract RewardAccountant is HealthCheckAccountant {
         uint256 gain,
         uint256 loss
     ) public override returns (uint256 totalFees, uint256 totalRefunds) {
+        (totalFees, totalRefunds) = super.report(strategy, gain, loss);
+
+        RewardRefund memory refundConfig = rewardRefund[msg.sender][strategy];
         // If the strategy is a reward refunder.
-        if (rewardRefund[msg.sender][strategy].refund) {
-            uint256 amount = uint256(rewardRefund[msg.sender][strategy].amount);
+        if (refundConfig.refund) {
+            totalRefunds += uint256(refundConfig.amount);
 
-            // Make sure the vault is max approved.
-            ERC20(IVault(msg.sender).asset()).safeApprove(msg.sender, amount);
+            // Make sure the vault is approved.
+            ERC20(IVault(msg.sender).asset()).safeApprove(
+                msg.sender,
+                totalRefunds
+            );
 
-            // The vault will pull the full balance of if less than amount.
-            return (0, amount);
-        } else {
-            return super.report(strategy, gain, loss);
+            delete rewardRefund[msg.sender][strategy];
         }
     }
 
