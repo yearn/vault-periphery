@@ -22,70 +22,70 @@ def test_setup(daddy, vault, strategy, refund_accountant, fee_recipient):
     assert accountant.customConfig(vault.address, strategy.address).maxFee == 0
     assert accountant.customConfig(vault.address, strategy.address).maxGain == 0
     assert accountant.customConfig(vault.address, strategy.address).maxLoss == 0
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
 
 
 def test_add_reward_refund(daddy, vault, strategy, refund_accountant):
     accountant = refund_accountant
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
 
     amount = int(100)
 
     with ape.reverts("not added"):
-        accountant.setRewardRefund(vault, strategy, True, amount, sender=daddy)
+        accountant.setRefund(vault, strategy, True, amount, sender=daddy)
 
     accountant.addVault(vault, sender=daddy)
 
     with ape.reverts("!active"):
-        accountant.setRewardRefund(vault, strategy, True, amount, sender=daddy)
+        accountant.setRefund(vault, strategy, True, amount, sender=daddy)
 
     vault.add_strategy(strategy, sender=daddy)
 
-    tx = accountant.setRewardRefund(vault, strategy, True, amount, sender=daddy)
+    tx = accountant.setRefund(vault, strategy, True, amount, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateRewardRefund))
+    event = list(tx.decode_logs(accountant.UpdateRefund))
 
     assert len(event) == 1
     assert event[0].vault == vault.address
     assert event[0].strategy == strategy.address
     assert event[0].refund == True
     assert event[0].amount == amount
-    assert accountant.rewardRefund(vault.address, strategy.address) == (True, 100)
+    assert accountant.refund(vault.address, strategy.address) == (True, 100)
 
     with ape.reverts("no refund and non zero amount"):
-        accountant.setRewardRefund(vault, strategy, False, amount, sender=daddy)
+        accountant.setRefund(vault, strategy, False, amount, sender=daddy)
 
-    tx = accountant.setRewardRefund(vault, strategy, False, 0, sender=daddy)
+    tx = accountant.setRefund(vault, strategy, False, 0, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateRewardRefund))
+    event = list(tx.decode_logs(accountant.UpdateRefund))
 
     assert len(event) == 1
     assert event[0].vault == vault.address
     assert event[0].strategy == strategy.address
     assert event[0].refund == False
     assert event[0].amount == 0
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
 
 
 def test_reward_refund(
     daddy, vault, strategy, refund_accountant, user, asset, deposit_into_vault
 ):
     accountant = refund_accountant
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
 
     amount = int(100)
     accountant.addVault(vault, sender=daddy)
     vault.add_strategy(strategy, sender=daddy)
 
-    tx = accountant.setRewardRefund(vault, strategy, True, amount, sender=daddy)
+    tx = accountant.setRefund(vault, strategy, True, amount, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateRewardRefund))
+    event = list(tx.decode_logs(accountant.UpdateRefund))
     assert len(event) == 1
     assert event[0].vault == vault.address
     assert event[0].strategy == strategy.address
     assert event[0].refund == True
     assert event[0].amount == amount
-    assert accountant.rewardRefund(vault.address, strategy.address) == (True, 100)
+    assert accountant.refund(vault.address, strategy.address) == (True, 100)
 
     vault.set_accountant(accountant, sender=daddy)
 
@@ -120,7 +120,7 @@ def test_reward_refund(
     assert vault.fullProfitUnlockDate() > 0
 
     # Make sure the amounts got reset.
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
     tx = accountant.report(strategy, 0, 0, sender=vault)
     assert tx.return_value == (0, 0)
 
@@ -137,8 +137,8 @@ def test_reward_refund__with_gain(
 ):
     accountant = refund_accountant
     # Set performance fee to 10% and 0 management fee
-    accountant.updateDefaultConfig(0, 1_000, 0, 100, 10_000, 0, sender=daddy)
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    accountant.updateDefaultConfig(0, 1_000, 0, 10_000, 10_000, 0, sender=daddy)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
 
     accountant.addVault(vault, sender=daddy)
     vault.add_strategy(strategy, sender=daddy)
@@ -150,15 +150,15 @@ def test_reward_refund__with_gain(
     gain = to_deposit // 10
     loss = 0
 
-    tx = accountant.setRewardRefund(vault, strategy, True, refund, sender=daddy)
+    tx = accountant.setRefund(vault, strategy, True, refund, sender=daddy)
 
-    event = list(tx.decode_logs(accountant.UpdateRewardRefund))
+    event = list(tx.decode_logs(accountant.UpdateRefund))
     assert len(event) == 1
     assert event[0].vault == vault.address
     assert event[0].strategy == strategy.address
     assert event[0].refund == True
     assert event[0].amount == refund
-    assert accountant.rewardRefund(vault.address, strategy.address) == (True, refund)
+    assert accountant.refund(vault.address, strategy.address) == (True, refund)
 
     vault.set_accountant(accountant, sender=daddy)
 
@@ -195,7 +195,84 @@ def test_reward_refund__with_gain(
     assert vault.fullProfitUnlockDate() > 0
 
     # Make sure the amounts got reset.
-    assert accountant.rewardRefund(vault.address, strategy.address) == (False, 0)
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
+    tx = accountant.report(strategy, 0, 0, sender=vault)
+    assert tx.return_value == (0, 0)
+
+
+def test_reward_refund__with_loss__and_refund(
+    daddy,
+    vault,
+    strategy,
+    refund_accountant,
+    user,
+    asset,
+    deposit_into_vault,
+    provide_strategy_with_debt,
+):
+    accountant = refund_accountant
+    # Set refund ratio to 100%
+    accountant.updateDefaultConfig(
+        0, 1_000, 10_000, 10_000, 10_000, 10_000, sender=daddy
+    )
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
+
+    accountant.addVault(vault, sender=daddy)
+    vault.add_strategy(strategy, sender=daddy)
+
+    user_balance = asset.balanceOf(user)
+    to_deposit = user_balance // 2
+
+    refund = to_deposit // 10
+    gain = 0
+    loss = to_deposit // 10
+
+    tx = accountant.setRefund(vault, strategy, True, refund, sender=daddy)
+
+    event = list(tx.decode_logs(accountant.UpdateRefund))
+    assert len(event) == 1
+    assert event[0].vault == vault.address
+    assert event[0].strategy == strategy.address
+    assert event[0].refund == True
+    assert event[0].amount == refund
+    assert accountant.refund(vault.address, strategy.address) == (True, refund)
+
+    vault.set_accountant(accountant, sender=daddy)
+
+    # Deposit into vault
+    deposit_into_vault(vault, to_deposit)
+    # Give strategy debt.
+    provide_strategy_with_debt(daddy, strategy, vault, int(to_deposit))
+    # simulate loss.
+    asset.transfer(user, loss, sender=strategy)
+
+    # Fund the accountant for a refund. Over fund to make sure it only sends amount.
+    asset.transfer(accountant, refund + loss, sender=user)
+
+    assert vault.totalAssets() == to_deposit
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == to_deposit
+    assert vault.profitUnlockingRate() == 0
+    assert vault.fullProfitUnlockDate() == 0
+
+    tx = vault.process_report(strategy, sender=daddy)
+
+    event = list(tx.decode_logs(vault.StrategyReported))[0]
+
+    assert event.strategy == strategy.address
+    assert event.total_fees == 0
+    assert event.gain == gain
+    assert event.loss == loss
+    assert event.total_refunds == refund + loss
+    assert event.current_debt == to_deposit - loss
+
+    assert vault.totalAssets() == refund + to_deposit
+    assert vault.totalIdle() == refund + loss
+    assert vault.profitUnlockingRate() > 0
+    assert vault.fullProfitUnlockDate() > 0
+
+    # Make sure the amounts got reset.
+    assert accountant.refund(vault.address, strategy.address) == (False, 0)
     tx = accountant.report(strategy, 0, 0, sender=vault)
     assert tx.return_value == (0, 0)
 

@@ -7,6 +7,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
+/// @title Health Check Accountant.
+/// @dev Will charge fees issue refunds as well as run healthcheck on any
+///     reported gains or losses during a strategies report.
 contract HealthCheckAccountant {
     using SafeERC20 for ERC20;
 
@@ -254,7 +257,7 @@ contract HealthCheckAccountant {
 
                 if (totalRefunds > 0) {
                     // Approve the vault to pull the underlying asset.
-                    ERC20(asset).safeApprove(msg.sender, totalRefunds);
+                    _checkAllowance(msg.sender, asset, totalRefunds);
                 }
             }
         }
@@ -289,6 +292,12 @@ contract HealthCheckAccountant {
     function removeVault(address vault) external virtual onlyVaultManagers {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
+
+        address asset = IVault(vault).asset();
+        // Remove any allowances left.
+        if (ERC20(asset).allowance(address(this), vault) != 0) {
+            ERC20(asset).safeApprove(vault, 0);
+        }
 
         vaults[vault] = false;
 
@@ -530,6 +539,25 @@ contract HealthCheckAccountant {
         feeRecipient = newFeeRecipient;
 
         emit UpdateFeeRecipient(oldRecipient, newFeeRecipient);
+    }
+
+    /**
+     * @dev Internal safe function to make sure the contract you want to
+     * interact with has enough allowance to pull the desired tokens.
+     *
+     * @param _contract The address of the contract that will move the token.
+     * @param _token The ERC-20 token that will be getting spent.
+     * @param _amount The amount of `_token` to be spent.
+     */
+    function _checkAllowance(
+        address _contract,
+        address _token,
+        uint256 _amount
+    ) internal {
+        if (ERC20(_token).allowance(address(this), _contract) < _amount) {
+            ERC20(_token).approve(_contract, 0);
+            ERC20(_token).approve(_contract, _amount);
+        }
     }
 
     /**

@@ -3,18 +3,22 @@ pragma solidity 0.8.18;
 
 import {HealthCheckAccountant, ERC20, SafeERC20, IVault} from "./HealthCheckAccountant.sol";
 
-contract RewardAccountant is HealthCheckAccountant {
+/// @title Refund Accountant
+/// @dev Allows for configurable refunds to be given to specific strategies for a vault.
+///     This can be used to auto compound reward into vault or provide retroactive refunds
+///     from a previous loss.
+contract RefundAccountant is HealthCheckAccountant {
     using SafeERC20 for ERC20;
 
-    event UpdateRewardRefund(
+    event UpdateRefund(
         address indexed vault,
         address indexed strategy,
         bool refund,
         uint256 amount
     );
 
-    /// @notice Struct to hold reward info to refund.
-    struct RewardRefund {
+    /// @notice Struct to hold refund info for a strategy.
+    struct Refund {
         // If the accountant should refund on the report.
         bool refund;
         // The amount if any to refund.
@@ -22,7 +26,7 @@ contract RewardAccountant is HealthCheckAccountant {
     }
 
     /// @notice Mapping of vault => strategy => struct if there is a reward refund to give.
-    mapping(address => mapping(address => RewardRefund)) public rewardRefund;
+    mapping(address => mapping(address => Refund)) public refund;
 
     constructor(
         address _feeManager,
@@ -62,18 +66,19 @@ contract RewardAccountant is HealthCheckAccountant {
     ) public override returns (uint256 totalFees, uint256 totalRefunds) {
         (totalFees, totalRefunds) = super.report(strategy, gain, loss);
 
-        RewardRefund memory refundConfig = rewardRefund[msg.sender][strategy];
+        Refund memory refundConfig = refund[msg.sender][strategy];
         // If the strategy is a reward refunder.
         if (refundConfig.refund) {
             totalRefunds += uint256(refundConfig.amount);
 
             // Make sure the vault is approved.
-            ERC20(IVault(msg.sender).asset()).safeApprove(
+            _checkAllowance(
                 msg.sender,
+                IVault(msg.sender).asset(),
                 totalRefunds
             );
 
-            delete rewardRefund[msg.sender][strategy];
+            delete refund[msg.sender][strategy];
         }
     }
 
@@ -86,7 +91,7 @@ contract RewardAccountant is HealthCheckAccountant {
      * @param _refund Bool to turn it on or off.
      * @param _amount Amount to refund per report.
      */
-    function setRewardRefund(
+    function setRefund(
         address _vault,
         address _strategy,
         bool _refund,
@@ -99,11 +104,11 @@ contract RewardAccountant is HealthCheckAccountant {
         );
         require(_refund || _amount == 0, "no refund and non zero amount");
 
-        rewardRefund[_vault][_strategy] = RewardRefund({
+        refund[_vault][_strategy] = Refund({
             refund: _refund,
             amount: uint248(_amount)
         });
 
-        emit UpdateRewardRefund(_vault, _strategy, _refund, uint256(_amount));
+        emit UpdateRefund(_vault, _strategy, _refund, uint256(_amount));
     }
 }

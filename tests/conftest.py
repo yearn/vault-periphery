@@ -283,7 +283,7 @@ def deploy_refund_accountant(project, daddy, fee_recipient):
         max_loss=0,
     ):
         accountant = daddy.deploy(
-            project.RewardAccountant,
+            project.RefundAccountant,
             manager,
             fee_recipient,
             management_fee,
