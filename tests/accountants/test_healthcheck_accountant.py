@@ -15,7 +15,7 @@ def test_setup(daddy, vault, strategy, healthcheck_accountant, fee_recipient):
     assert accountant.defaultConfig().maxGain == 10_000
     assert accountant.defaultConfig().maxLoss == 0
     assert accountant.vaults(vault.address) == False
-    assert accountant.custom(vault.address, strategy.address) == False
+    assert accountant.useCustomConfig(vault.address, strategy.address) == False
     assert accountant.customConfig(vault.address, strategy.address).managementFee == 0
     assert accountant.customConfig(vault.address, strategy.address).performanceFee == 0
     assert accountant.customConfig(vault.address, strategy.address).refundRatio == 0
@@ -60,7 +60,7 @@ def test_add_vault(
     deposit_into_vault(vault, amount)
     provide_strategy_with_debt(daddy, strategy, vault, amount)
 
-    with ape.reverts("!authorized"):
+    with ape.reverts("vault not added"):
         accountant.report(strategy, 0, 0, sender=vault)
 
     with ape.reverts("!vault manager"):
@@ -150,7 +150,7 @@ def test_remove_vault(
     assert accountant.vaults(vault.address) == False
 
     # Should now not be able to report.
-    with ape.reverts("!authorized"):
+    with ape.reverts("vault not added"):
         accountant.report(strategy, 0, 0, sender=vault)
 
 
@@ -227,7 +227,7 @@ def test_remove_vault__non_zero_allomance(
     assert accountant.vaults(vault.address) == False
 
     # Should now not be able to report.
-    with ape.reverts("!authorized"):
+    with ape.reverts("vault not added"):
         accountant.report(strategy, 0, 0, sender=vault)
 
 
@@ -276,7 +276,7 @@ def test_add_vault__vault_manager(
     deposit_into_vault(vault, amount)
     provide_strategy_with_debt(daddy, strategy, vault, amount)
 
-    with ape.reverts("!authorized"):
+    with ape.reverts("vault not added"):
         accountant.report(strategy, 0, 0, sender=vault)
 
     with ape.reverts("!vault manager"):
@@ -375,7 +375,7 @@ def test_remove_vault__vault_manager(
     assert accountant.vaults(vault.address) == False
 
     # Should now not be able to report.
-    with ape.reverts("!authorized"):
+    with ape.reverts("vault not added"):
         accountant.report(strategy, 0, 0, sender=vault)
 
 
@@ -519,7 +519,7 @@ def test_remove_custom_config(daddy, vault, strategy, healthcheck_accountant):
         sender=daddy,
     )
 
-    assert accountant.custom(vault.address, strategy.address) == True
+    assert accountant.useCustomConfig(vault.address, strategy.address) == True
     assert (
         accountant.customConfig(vault.address, strategy.address)
         != accountant.defaultConfig()

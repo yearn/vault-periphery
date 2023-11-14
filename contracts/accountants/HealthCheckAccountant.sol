@@ -8,8 +8,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
 /// @title Health Check Accountant.
-/// @dev Will charge fees issue refunds as well as run healthcheck on any
-///     reported gains or losses during a strategies report.
+/// @dev Will charge fees, issue refunds, and run health check on any reported
+///     gains or losses during a strategy's report.
 contract HealthCheckAccountant {
     using SafeERC20 for ERC20;
 
@@ -75,8 +75,8 @@ contract HealthCheckAccountant {
         _;
     }
 
-    modifier onlyVaultManagers() {
-        _checkVaultManagers();
+    modifier onlyVaultOrFeeManagers() {
+        _checkVaultOrFeeManager();
         _;
     }
 
@@ -89,7 +89,7 @@ contract HealthCheckAccountant {
         require(msg.sender == feeManager, "!fee manager");
     }
 
-    function _checkVaultManagers() internal view virtual {
+    function _checkVaultOrFeeManager() internal view virtual {
         require(
             msg.sender == feeManager || msg.sender == vaultManager,
             "!vault manager"
@@ -97,7 +97,7 @@ contract HealthCheckAccountant {
     }
 
     function _checkVaultIsAdded() internal view virtual {
-        require(vaults[msg.sender], "!authorized");
+        require(vaults[msg.sender], "vault not added");
     }
 
     /// @notice Constant defining the maximum basis points.
@@ -137,7 +137,7 @@ contract HealthCheckAccountant {
     mapping(address => mapping(address => Fee)) public customConfig;
 
     /// @notice Mapping vault => strategy => flag to use a custom config.
-    mapping(address => mapping(address => uint256)) internal _custom;
+    mapping(address => mapping(address => uint256)) internal _useCustomConfig;
 
     constructor(
         address _feeManager,
@@ -199,7 +199,7 @@ contract HealthCheckAccountant {
         Fee memory fee;
 
         // Check if there is a custom config to use.
-        if (_custom[msg.sender][strategy] != 0) {
+        if (_useCustomConfig[msg.sender][strategy] != 0) {
             fee = customConfig[msg.sender][strategy];
         } else {
             // Otherwise use the default.
@@ -275,7 +275,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external virtual onlyVaultManagers {
+    function addVault(address vault) external virtual onlyVaultOrFeeManagers {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -288,7 +288,9 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(address vault) external virtual onlyVaultManagers {
+    function removeVault(
+        address vault
+    ) external virtual onlyVaultOrFeeManagers {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
 
@@ -304,7 +306,8 @@ contract HealthCheckAccountant {
     }
 
     /**
-     * @notice Function to update the default fee configuration used for all strategies.
+     * @notice Function to update the default fee configuration used for 
+        all strategies that don't have a custom config set.
      * @param defaultManagement Default annual management fee to charge.
      * @param defaultPerformance Default performance fee to charge.
      * @param defaultRefund Default refund ratio to give back on losses.
@@ -389,7 +392,7 @@ contract HealthCheckAccountant {
         });
 
         // Set the custom flag.
-        _custom[vault][strategy] = 1;
+        _useCustomConfig[vault][strategy] = 1;
 
         emit UpdateCustomFeeConfig(
             vault,
@@ -408,13 +411,13 @@ contract HealthCheckAccountant {
         address strategy
     ) external virtual onlyFeeManager {
         // Ensure custom fees are set for the specified vault and strategy.
-        require(_custom[vault][strategy] != 0, "No custom fees set");
+        require(_useCustomConfig[vault][strategy] != 0, "No custom fees set");
 
         // Set all the strategy's custom fees to 0.
         delete customConfig[vault][strategy];
 
         // Clear the custom flag.
-        _custom[vault][strategy] = 0;
+        _useCustomConfig[vault][strategy] = 0;
 
         // Emit relevant event.
         emit RemovedCustomFeeConfig(vault, strategy);
@@ -429,11 +432,11 @@ contract HealthCheckAccountant {
      * @param strategy Address of the strategy
      * @return If a custom fee config is set.
      */
-    function custom(
+    function useCustomConfig(
         address vault,
         address strategy
     ) external view virtual returns (bool) {
-        return _custom[vault][strategy] != 0;
+        return _useCustomConfig[vault][strategy] != 0;
     }
 
     /**
