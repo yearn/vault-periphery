@@ -64,7 +64,12 @@ contract RefundAccountant is HealthCheckAccountant {
         address strategy,
         uint256 gain,
         uint256 loss
-    ) public override returns (uint256 totalFees, uint256 totalRefunds) {
+    )
+        public
+        virtual
+        override
+        returns (uint256 totalFees, uint256 totalRefunds)
+    {
         (totalFees, totalRefunds) = super.report(strategy, gain, loss);
 
         Refund memory refundConfig = refund[msg.sender][strategy];
@@ -99,7 +104,7 @@ contract RefundAccountant is HealthCheckAccountant {
         address _strategy,
         bool _refund,
         uint256 _amount
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         require(vaults[_vault], "not added");
         require(
             IVault(_vault).strategies(_strategy).activation != 0,

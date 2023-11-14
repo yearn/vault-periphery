@@ -565,7 +565,7 @@ contract HealthCheckAccountant {
      * @dev This function provides the maximum performance fee that the accountant can charge.
      * @return The maximum performance fee.
      */
-    function performanceFeeThreshold() external view virtual returns (uint16) {
+    function performanceFeeThreshold() external pure virtual returns (uint16) {
         return PERFORMANCE_FEE_THRESHOLD;
     }
 
@@ -574,7 +574,7 @@ contract HealthCheckAccountant {
      * @dev This function provides the maximum management fee that the accountant can charge.
      * @return The maximum management fee.
      */
-    function managementFeeThreshold() external view virtual returns (uint16) {
+    function managementFeeThreshold() external pure virtual returns (uint16) {
         return MANAGEMENT_FEE_THRESHOLD;
     }
 }
