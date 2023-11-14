@@ -23,7 +23,7 @@ def test_setup(generic_debt_allocator_factory, user, strategy, vault):
         generic_debt_allocator.shouldUpdateDebt(strategy)
 
 
-def test_set_minimum(generic_debt_allocator, daddy, vault, strategy, user):
+def test_set_minimum_change(generic_debt_allocator, daddy, vault, strategy, user):
     assert generic_debt_allocator.configs(strategy) == (0, 0, 0)
     assert generic_debt_allocator.minimumChange() == 0
 
@@ -37,10 +37,47 @@ def test_set_minimum(generic_debt_allocator, daddy, vault, strategy, user):
 
     tx = generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdatedMinimumChange))[0]
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateMinimumChange))[0]
 
-    assert event.minimumChange == minimum
+    assert event.newMinimumChange == minimum
     assert generic_debt_allocator.minimumChange() == minimum
+
+
+def test_set_minimum_wait(generic_debt_allocator, daddy, vault, strategy, user):
+    assert generic_debt_allocator.configs(strategy) == (0, 0, 0)
+    assert generic_debt_allocator.minimumWait() == 0
+
+    minimum = int(1e17)
+
+    with ape.reverts("!governance"):
+        generic_debt_allocator.setMinimumWait(minimum, sender=user)
+
+    tx = generic_debt_allocator.setMinimumWait(minimum, sender=daddy)
+
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateMinimumWait))[0]
+
+    assert event.newMinimumWait == minimum
+    assert generic_debt_allocator.minimumWait() == minimum
+
+
+def test_set_max_debt_update_loss(generic_debt_allocator, daddy, vault, strategy, user):
+    assert generic_debt_allocator.configs(strategy) == (0, 0, 0)
+    assert generic_debt_allocator.maxDebtUpdateLoss() == 1
+
+    max = int(69)
+
+    with ape.reverts("!governance"):
+        generic_debt_allocator.setMaxDebtUpdateLoss(max, sender=user)
+
+    with ape.reverts("higher than max"):
+        generic_debt_allocator.setMaxDebtUpdateLoss(10_001, sender=daddy)
+
+    tx = generic_debt_allocator.setMaxDebtUpdateLoss(max, sender=daddy)
+
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateMaxDebtUpdateLoss))[0]
+
+    assert event.newMaxDebtUpdateLoss == max
+    assert generic_debt_allocator.maxDebtUpdateLoss() == max
 
 
 def test_set_ratios(
@@ -83,11 +120,11 @@ def test_set_ratios(
         strategy, target, max, sender=daddy
     )
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdatedStrategyDebtRatios))[0]
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatios))[0]
 
-    assert event.targetRatio == target
-    assert event.maxRatio == max
-    assert event.totalDebtRatio == target
+    assert event.newTargetRatio == target
+    assert event.newMaxRatio == max
+    assert event.newTotalDebtRatio == target
     assert generic_debt_allocator.debtRatio() == target
     assert generic_debt_allocator.configs(strategy) == (target, max, 0)
 

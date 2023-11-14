@@ -29,22 +29,25 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
  *  more than its `maxRatio`.
  */
 contract GenericDebtAllocator is Governance {
-    /// @notice An event emitted when a strategies debt ratios are updated.
-    event UpdatedStrategyDebtRatios(
+    /// @notice An event emitted when a strategies debt ratios are Updated.
+    event UpdateStrategyDebtRatios(
         address indexed strategy,
-        uint256 targetRatio,
-        uint256 maxRatio,
-        uint256 totalDebtRatio
+        uint256 newTargetRatio,
+        uint256 newMaxRatio,
+        uint256 newTotalDebtRatio
     );
 
-    /// @notice An event emitted when the minimum change is updated.
-    event UpdatedMinimumChange(uint256 minimumChange);
+    /// @notice An event emitted when the minimum change is Updated.
+    event UpdateMinimumChange(uint256 newMinimumChange);
 
-    /// @notice An event emitted when the max base fee is updated.
-    event UpdatedMaxAcceptableBaseFee(uint256 maxAcceptableBaseFee);
+    /// @notice An event emitted when the max base fee is Updated.
+    event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
 
-    /// @notice An event emitted when the minimum time to wait is updated.
-    event UpdatedMinimumWait(uint256 newMinimumWait);
+    /// @notice An event emitted when the max debt update loss is Updated.
+    event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
+
+    /// @notice An event emitted when the minimum time to wait is Updated.
+    event UpdateMinimumWait(uint256 newMinimumWait);
 
     /// @notice Struct for each strategies info.
     struct Config {
@@ -80,6 +83,9 @@ contract GenericDebtAllocator is Governance {
     /// @notice Time to wait between debt updates.
     uint256 public minimumWait;
 
+    /// @notice Max loss to accept on debt updates in basis points.
+    uint256 public maxDebtUpdateLoss;
+
     /// @notice Max the chains base fee can be during debt update.
     // Will default to max uint256 and need to be set to be used.
     uint256 public maxAcceptableBaseFee;
@@ -110,6 +116,8 @@ contract GenericDebtAllocator is Governance {
         minimumChange = _minimumChange;
         // Default max base fee to uint256 max
         maxAcceptableBaseFee = type(uint256).max;
+        // Default max loss on debt updates to 1 BP.
+        maxDebtUpdateLoss = 1;
     }
 
     /**
@@ -122,6 +130,10 @@ contract GenericDebtAllocator is Governance {
      *
      *   The function signature matches the vault so no update to the
      *   call data is required.
+     *
+     *   This will also run checks on losses realized during debt
+     *   updates to assure decreases did not realize profits outside
+     *   of the allowed range.
      */
     function update_debt(
         address _strategy,
@@ -129,10 +141,22 @@ contract GenericDebtAllocator is Governance {
     ) external virtual {
         IVault _vault = IVault(vault);
         require(
-            (IVault(_vault).roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
+            (_vault.roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
             "not allowed"
         );
-        IVault(_vault).update_debt(_strategy, _targetDebt);
+        uint256 initialAssets = _vault.totalAssets();
+        _vault.update_debt(_strategy, _targetDebt);
+        uint256 afterAssets = _vault.totalAssets();
+
+        // If a loss was realized.
+        if (afterAssets < initialAssets) {
+            // Make sure its within the range.
+            require(
+                initialAssets - afterAssets <=
+                    (initialAssets * maxDebtUpdateLoss) / MAX_BPS,
+                "too much loss"
+            );
+        }
         configs[_strategy].lastUpdate = block.timestamp;
     }
 
@@ -291,7 +315,7 @@ contract GenericDebtAllocator is Governance {
 
         debtRatio = newDebtRatio;
 
-        emit UpdatedStrategyDebtRatios(
+        emit UpdateStrategyDebtRatios(
             _strategy,
             _targetRatio,
             _maxRatio,
@@ -313,7 +337,22 @@ contract GenericDebtAllocator is Governance {
         // Set the new minimum.
         minimumChange = _minimumChange;
 
-        emit UpdatedMinimumChange(_minimumChange);
+        emit UpdateMinimumChange(_minimumChange);
+    }
+
+    /**
+     * @notice Set the max loss in Basis points to allow on debt updates.
+     * @dev Withdrawing during debt updates use {redeem} which allows for 100% loss.
+     *      This can be used to assure a loss is not realized on redeem outside the tolerance.
+     * @param _maxDebtUpdateLoss The max loss to accept on debt updates.
+     */
+    function setMaxDebtUpdateLoss(
+        uint256 _maxDebtUpdateLoss
+    ) external virtual onlyGovernance {
+        require(_maxDebtUpdateLoss <= MAX_BPS, "higher than max");
+        maxDebtUpdateLoss = _maxDebtUpdateLoss;
+
+        emit UpdateMaxDebtUpdateLoss(_maxDebtUpdateLoss);
     }
 
     /**
@@ -326,7 +365,7 @@ contract GenericDebtAllocator is Governance {
     ) external virtual onlyGovernance {
         minimumWait = _minimumWait;
 
-        emit UpdatedMinimumWait(_minimumWait);
+        emit UpdateMinimumWait(_minimumWait);
     }
 
     /**
@@ -343,6 +382,6 @@ contract GenericDebtAllocator is Governance {
     ) external virtual onlyGovernance {
         maxAcceptableBaseFee = _maxAcceptableBaseFee;
 
-        emit UpdatedMaxAcceptableBaseFee(_maxAcceptableBaseFee);
+        emit UpdateMaxAcceptableBaseFee(_maxAcceptableBaseFee);
     }
 }
