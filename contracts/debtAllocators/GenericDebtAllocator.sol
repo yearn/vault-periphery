@@ -37,16 +37,16 @@ contract GenericDebtAllocator is Governance {
         uint256 newTotalDebtRatio
     );
 
-    /// @notice An event emitted when the minimum change is Updated.
+    /// @notice An event emitted when the minimum change is updated.
     event UpdateMinimumChange(uint256 newMinimumChange);
 
-    /// @notice An event emitted when the max base fee is Updated.
+    /// @notice An event emitted when the max base fee is updated.
     event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
 
-    /// @notice An event emitted when the max debt update loss is Updated.
+    /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
 
-    /// @notice An event emitted when the minimum time to wait is Updated.
+    /// @notice An event emitted when the minimum time to wait is updated.
     event UpdateMinimumWait(uint256 newMinimumWait);
 
     /// @notice Struct for each strategies info.
@@ -123,7 +123,7 @@ contract GenericDebtAllocator is Governance {
     /**
      * @notice Debt update wrapper for the vault.
      * @dev This can be used if a minimum time between debt updates
-     *   is desired to be enforced.
+     *   is desired to be enforced and to enforce a max loss.
      *
      *   This contract and the msg.sender must have the DEBT_MANAGER
      *   role assigned to them.
@@ -144,6 +144,9 @@ contract GenericDebtAllocator is Governance {
             (_vault.roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
             "not allowed"
         );
+
+        // Cache initial values in case of loss.
+        uint256 initialDebt = _vault.strategies(_strategy).current_debt;
         uint256 initialAssets = _vault.totalAssets();
         _vault.update_debt(_strategy, _targetDebt);
         uint256 afterAssets = _vault.totalAssets();
@@ -153,10 +156,12 @@ contract GenericDebtAllocator is Governance {
             // Make sure its within the range.
             require(
                 initialAssets - afterAssets <=
-                    (initialAssets * maxDebtUpdateLoss) / MAX_BPS,
+                    (initialDebt * maxDebtUpdateLoss) / MAX_BPS,
                 "too much loss"
             );
         }
+
+        // Update the last time the strategies debt was updated.
         configs[_strategy].lastUpdate = block.timestamp;
     }
 
@@ -192,7 +197,7 @@ contract GenericDebtAllocator is Governance {
         require(config.targetRatio != 0, "no targetRatio");
 
         if (block.timestamp - config.lastUpdate <= minimumWait) {
-            return (false, "min wait");
+            return (false, bytes("min wait"));
         }
 
         uint256 vaultAssets = _vault.totalAssets();
@@ -242,13 +247,16 @@ contract GenericDebtAllocator is Governance {
                     )
                 );
             }
-            // If target debt is lower than the current.
+            // If current debt is greater than our max.
         } else if (maxDebt < params.current_debt) {
-            // Find out by how much.
+            // Find out by how much. Aim for the target.
             uint256 toPull = Math.min(
                 params.current_debt - targetDebt,
                 // Account for the current liquidity constraints.
-                IVault(_strategy).maxWithdraw(address(_vault))
+                // Use max redeem to match vault logic.
+                IVault(_strategy).convertToAssets(
+                    IVault(_strategy).maxRedeem(address(_vault))
+                )
             );
 
             // Check if it's over the threshold.
@@ -258,7 +266,7 @@ contract GenericDebtAllocator is Governance {
                     _vault.assess_share_of_unrealised_losses(
                         _strategy,
                         params.current_debt
-                    ) > 0
+                    ) != 0
                 ) {
                     return (false, bytes("unrealised loss"));
                 }

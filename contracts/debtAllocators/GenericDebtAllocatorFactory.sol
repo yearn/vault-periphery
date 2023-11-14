@@ -2,6 +2,7 @@
 pragma solidity 0.8.18;
 
 import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
+import {Clonable} from "@periphery/utils/Clonable.sol";
 
 /**
  * @title YearnV3 Generic Debt Allocator Factory
@@ -10,11 +11,8 @@ import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
  *  Factory for anyone to easily deploy their own generic
  *  debt allocator for a Yearn V3 Vault.
  */
-contract GenericDebtAllocatorFactory {
+contract GenericDebtAllocatorFactory is Clonable {
     event NewDebtAllocator(address indexed allocator, address indexed vault);
-
-    // Original allocator to use for cloning.
-    address public immutable original;
 
     constructor() {
         original = address(new GenericDebtAllocator(address(1), address(2), 0));
@@ -60,22 +58,7 @@ contract GenericDebtAllocatorFactory {
         address _governance,
         uint256 _minimumChange
     ) public virtual returns (address newAllocator) {
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(original);
-        assembly {
-            // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(
-                clone_code,
-                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(
-                add(clone_code, 0x28),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
-            newAllocator := create(0, clone_code, 0x37)
-        }
+        newAllocator = _clone();
 
         GenericDebtAllocator(newAllocator).initialize(
             _vault,
