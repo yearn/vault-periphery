@@ -57,16 +57,16 @@ contract RoleManager is Governance, VaultConstants {
     mapping(bytes32 => Roles) public roles;
     /// @notice Mapping of vault addresses to their configurations.
     mapping(address => VaultConfig) public vaultConfig;
+
     /// @notice Array storing addresses of all managed vaults.
     address[] public vaults;
-
     /// @notice Address of the accountant.
     address public accountant;
     /// @notice Address of the registry contract.
     address public registry;
     /// @notice Address of the allocator factory contract.
     address public allocatorFactory;
-
+    
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 10 days;
     /// @notice Maximum acceptable base fee for debt allocators.

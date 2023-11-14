@@ -14,5 +14,25 @@ contract StrategyManager is Governance, VaultConstants {
         uint256 maxRatio;
     }
 
+    mapping (address => StrategyInfo) public strategyInfo;
+
+    address[] public strategies;
+
     constructor(address _governance) Governance(_governance) {}
+
+    function addStrategy(address _vault, address _strategy, uint256 _maxDebt) external onlyGovernance {
+        
+    }
+
+    function updateStrategyMaxDebt(address _vault, address _strategy, uint256 _maxDebt) external onlyGovernance {
+        IVault(_vault).update_max_debt_for_strategy(_strategy, _maxDebt);
+    }
+
+    function removeStrategy(address _vault, address _strategy) external onlyGovernance {
+        IVault(_vault).revoke_strategy(_strategy);
+    }
+
+    function getStrategies() external view returns (address[] memory) {
+        return strategies;
+    }
 }
