@@ -29,6 +29,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
  *  more than its `maxRatio`.
  */
 contract GenericDebtAllocator is Governance {
+    /// @notice An event emitted when a strategies debt ratios are updated.
     event UpdatedStrategyDebtRatios(
         address indexed strategy,
         uint256 targetRatio,
@@ -36,13 +37,16 @@ contract GenericDebtAllocator is Governance {
         uint256 totalDebtRatio
     );
 
+    /// @notice An event emitted when the minimum change is updated.
     event UpdatedMinimumChange(uint256 minimumChange);
 
+    /// @notice An event emitted when the max base fee is updated.
     event UpdatedMaxAcceptableBaseFee(uint256 maxAcceptableBaseFee);
 
+    /// @notice An event emitted when the minimum time to wait is updated.
     event UpdatedMinimumWait(uint256 newMinimumWait);
 
-    // Struct for each strategies info.
+    /// @notice Struct for each strategies info.
     struct Config {
         // The ideal percent in Basis Points the strategy should have.
         uint256 targetRatio;
@@ -56,27 +60,27 @@ contract GenericDebtAllocator is Governance {
 
     uint256 internal constant MAX_BPS = 10_000;
 
-    // Vaults DEBT_MANAGER enumerator.
+    /// @notice Vaults DEBT_MANAGER enumerator.
     uint256 internal constant DEBT_MANAGER = 64;
 
-    // Mapping of strategy => its config.
+    /// @notice Mapping of strategy => its config.
     mapping(address => Config) public configs;
 
-    // Address of the vault this serves as allocator for.
+    /// @notice Address of the vault this serves as allocator for.
     address public vault;
 
-    // Total debt ratio currently allocated in basis points.
+    /// @notice Total debt ratio currently allocated in basis points.
     // Can't be more than 10_000.
     uint256 public debtRatio;
 
-    // The minimum amount denominated in asset that will
+    /// @notice The minimum amount denominated in asset that will
     // need to be moved to trigger a debt update.
     uint256 public minimumChange;
 
-    // Time to wait between debt updates.
+    /// @notice Time to wait between debt updates.
     uint256 public minimumWait;
 
-    // Max the chains base fee can be during debt update.
+    /// @notice Max the chains base fee can be during debt update.
     // Will default to max uint256 and need to be set to be used.
     uint256 public maxAcceptableBaseFee;
 
