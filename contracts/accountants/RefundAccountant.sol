@@ -68,17 +68,19 @@ contract RefundAccountant is HealthCheckAccountant {
         (totalFees, totalRefunds) = super.report(strategy, gain, loss);
 
         Refund memory refundConfig = refund[msg.sender][strategy];
-        // If the strategy is a reward refunder.
+        // Check if the strategy is being given a refund.
         if (refundConfig.refund) {
+            // Add it to the existing refunds.
             totalRefunds += uint256(refundConfig.amount);
 
-            // Make sure the vault is approved.
+            // Make sure the vault is approved correctly.
             _checkAllowance(
                 msg.sender,
                 IVault(msg.sender).asset(),
                 totalRefunds
             );
 
+            // Always reset the refund amount so it can't be reused.
             delete refund[msg.sender][strategy];
         }
     }

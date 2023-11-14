@@ -159,7 +159,6 @@ contract HealthCheckAccountant {
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(defaultMaxFee <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         feeManager = _feeManager;
@@ -330,7 +329,6 @@ contract HealthCheckAccountant {
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(defaultMaxFee <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         // Update the default fee configuration.
@@ -378,7 +376,6 @@ contract HealthCheckAccountant {
             customPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(customMaxFee <= MAX_BPS, "too high");
         require(customMaxLoss <= MAX_BPS, "too high");
 
         // Set the strategy's custom config.
