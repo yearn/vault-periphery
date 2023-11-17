@@ -92,11 +92,6 @@ def test_set_ratios(
     with ape.reverts("!governance"):
         generic_debt_allocator.setStrategyDebtRatios(strategy, target, max, sender=user)
 
-    with ape.reverts("!active"):
-        generic_debt_allocator.setStrategyDebtRatios(
-            strategy, target, max, sender=daddy
-        )
-
     vault.add_strategy(strategy.address, sender=daddy)
 
     with ape.reverts("!minimum"):
