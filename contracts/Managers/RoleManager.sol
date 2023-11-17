@@ -11,6 +11,8 @@ import {Registry} from "../registry/Registry.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
+// Setting the accountant which needs to have the role.
+
 /// @title Yearn V3 vault Role Manager.
 contract RoleManager is Governance2Step, VaultConstants {
     /// @notice Emitted when a new address is set for a position.
@@ -40,7 +42,6 @@ contract RoleManager is Governance2Step, VaultConstants {
     // Encoded name so that it can be held as a constant.
     bytes32 internal constant _name_ =
         bytes32(abi.encodePacked("Yearn V3 Vault Role Manager"));
-
     /// @notice Hash of the role name "daddy".
     bytes32 public constant DADDY = keccak256("daddy");
     /// @notice Hash of the role name "brain".
