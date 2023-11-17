@@ -147,19 +147,7 @@ def create_vault(project, daddy, vault_factory):
 
         vault.set_role(
             daddy.address,
-            ROLES.ADD_STRATEGY_MANAGER
-            | ROLES.REVOKE_STRATEGY_MANAGER
-            | ROLES.FORCE_REVOKE_MANAGER
-            | ROLES.ACCOUNTANT_MANAGER
-            | ROLES.QUEUE_MANAGER
-            | ROLES.REPORTING_MANAGER
-            | ROLES.DEBT_MANAGER
-            | ROLES.MAX_DEBT_MANAGER
-            | ROLES.DEPOSIT_LIMIT_MANAGER
-            | ROLES.WITHDRAW_LIMIT_MANAGER
-            | ROLES.MINIMUM_IDLE_MANAGER
-            | ROLES.PROFIT_UNLOCK_MANAGER
-            | ROLES.EMERGENCY_MANAGER,
+            ROLES.ALL,
             sender=daddy,
         )
 

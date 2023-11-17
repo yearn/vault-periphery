@@ -22,6 +22,7 @@ jobs:
 
       - name: install vyper
         run: pip install git+https://github.com/vyperlang/vyper
+        
       - run: ape compile --force --size
       - run: npm install hardhat
       
