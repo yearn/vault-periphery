@@ -47,7 +47,9 @@ def deploy_allocator_factory():
 
     address = event[0].addr
 
+    print("------------------")
     print(f"Deployed the Factory to {address}")
+    print("------------------")
 
 
 def main():

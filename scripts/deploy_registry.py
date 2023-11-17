@@ -80,9 +80,10 @@ def deploy_release_and_factory():
 
     deployed_factory = factory.at(factory_event[0].addr)
 
+    print("------------------")
     print(f"Deployed Registry Factory to {deployed_factory.address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()}")
+    print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()[2:]}")
 
 
 def main():
