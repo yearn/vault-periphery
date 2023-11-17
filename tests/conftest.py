@@ -31,6 +31,11 @@ def user(accounts):
 
 
 @pytest.fixture(scope="session")
+def vault_manager(accounts):
+    return accounts[7]
+
+
+@pytest.fixture(scope="session")
 def create_token(project, daddy, user, amount):
     def create_token(
         name="Test Token", symbol="yTest", initialUser=user, initialAmount=amount
@@ -266,6 +271,35 @@ def deploy_healthcheck_accountant(project, daddy, fee_recipient):
 
 
 @pytest.fixture(scope="session")
+def deploy_refund_accountant(project, daddy, fee_recipient):
+    def deploy_refund_accountant(
+        manager=daddy,
+        fee_recipient=fee_recipient,
+        management_fee=100,
+        performance_fee=1_000,
+        refund_ratio=0,
+        max_fee=0,
+        max_gain=10_000,
+        max_loss=0,
+    ):
+        accountant = daddy.deploy(
+            project.RefundAccountant,
+            manager,
+            fee_recipient,
+            management_fee,
+            performance_fee,
+            refund_ratio,
+            max_fee,
+            max_gain,
+            max_loss,
+        )
+
+        return accountant
+
+    yield deploy_refund_accountant
+
+
+@pytest.fixture(scope="session")
 def generic_accountant(deploy_generic_accountant):
     generic_accountant = deploy_generic_accountant()
 
@@ -277,6 +311,13 @@ def healthcheck_accountant(deploy_healthcheck_accountant):
     healthcheck_accountant = deploy_healthcheck_accountant()
 
     yield healthcheck_accountant
+
+
+@pytest.fixture(scope="session")
+def refund_accountant(deploy_refund_accountant):
+    refund_accountant = deploy_refund_accountant()
+
+    yield refund_accountant
 
 
 @pytest.fixture(scope="session")

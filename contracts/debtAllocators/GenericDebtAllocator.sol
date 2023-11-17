@@ -300,8 +300,6 @@ contract GenericDebtAllocator is Governance {
         uint256 _targetRatio,
         uint256 _maxRatio
     ) external virtual onlyGovernance {
-        // Make sure the strategy is added to the vault.
-        require(IVault(vault).strategies(_strategy).activation != 0, "!active");
         // Make sure a minimumChange has been set.
         require(minimumChange != 0, "!minimum");
         // Cannot be more than 100%.

@@ -52,9 +52,10 @@ def deploy_address_provider():
 
     address = event[0].addr
 
+    print("------------------")
     print(f"Deployed the address provider to {address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verifaction {constructor.hex()}")
+    print(f"Encoded Constructor to use for verifaction {constructor.hex()[2:]}")
 
 
 def main():

@@ -34,12 +34,11 @@ def deploy_accountant():
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
 
-    if (
-        input(
-            "Would you like to deploy a Generic Accountant or a HealthCheck Accountant? g/h "
-        ).lower()
-        == "g"
-    ):
+    version = input(
+        "Would you like to deploy a Generic Accountant, HealthCheck Accountant or a Refund Accountant? g/h/r "
+    ).lower()
+
+    if version == "g":
         print("Deploying a Generic accountant.")
         print("Enter the default amounts to use in Base Points. (100% == 10_000)")
 
@@ -65,10 +64,15 @@ def deploy_accountant():
         )
 
     else:
-        print("Deploying a HealthCheck accountant.")
-        print("Enter the default amounts to use in Base Points. (100% == 10_000)")
+        if version == "h":
+            print("Deploying a HealthCheck accountant.")
+            accountant = project.HealthCheckAccountant
 
-        accountant = project.HealthCheckAccountant
+        else:
+            print("Deploying a Refund accountant.")
+            accountant = project.RefundAccountant
+
+        print("Enter the default amounts to use in Base Points. (100% == 10_000)")
 
         management_fee = input("Default management fee? ")
         assert int(management_fee) <= 200
@@ -112,9 +116,10 @@ def deploy_accountant():
 
     address = event[0].addr
 
+    print("------------------")
     print(f"Deployed the Accountant to {address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verifaction {constructor.hex()}")
+    print(f"Encoded Constructor to use for verifaction {constructor.hex()[2:]}")
 
 
 def main():

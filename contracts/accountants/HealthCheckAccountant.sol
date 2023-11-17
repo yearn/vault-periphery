@@ -7,6 +7,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
+/// @title Health Check Accountant.
+/// @dev Will charge fees, issue refunds, and run health check on any reported
+///     gains or losses during a strategy's report.
 contract HealthCheckAccountant {
     using SafeERC20 for ERC20;
 
@@ -17,18 +20,24 @@ contract HealthCheckAccountant {
     event UpdateDefaultFeeConfig(Fee defaultFeeConfig);
 
     /// @notice An event emitted when the future fee manager is set.
-    event SetFutureFeeManager(address futureFeeManager);
+    event SetFutureFeeManager(address indexed futureFeeManager);
 
     /// @notice An event emitted when a new fee manager is accepted.
-    event NewFeeManager(address feeManager);
+    event NewFeeManager(address indexed feeManager);
+
+    /// @notice An event emitted when a new vault manager is set.
+    event UpdateVaultManager(address indexed newVaultManager);
 
     /// @notice An event emitted when the fee recipient is updated.
-    event UpdateFeeRecipient(address oldFeeRecipient, address newFeeRecipient);
+    event UpdateFeeRecipient(
+        address indexed oldFeeRecipient,
+        address indexed newFeeRecipient
+    );
 
     /// @notice An event emitted when a custom fee configuration is updated.
     event UpdateCustomFeeConfig(
-        address vault,
-        address strategy,
+        address indexed vault,
+        address indexed strategy,
         Fee custom_config
     );
 
@@ -42,7 +51,7 @@ contract HealthCheckAccountant {
     event UpdateMaxLoss(uint256 maxLoss);
 
     /// @notice An event emitted when rewards are distributed.
-    event DistributeRewards(address token, uint256 rewards);
+    event DistributeRewards(address indexed token, uint256 rewards);
 
     /// @notice Enum defining change types (added or removed).
     enum ChangeType {
@@ -66,8 +75,29 @@ contract HealthCheckAccountant {
         _;
     }
 
+    modifier onlyVaultOrFeeManagers() {
+        _checkVaultOrFeeManager();
+        _;
+    }
+
+    modifier onlyAddedVaults() {
+        _checkVaultIsAdded();
+        _;
+    }
+
     function _checkFeeManager() internal view virtual {
-        require(feeManager == msg.sender, "!fee manager");
+        require(msg.sender == feeManager, "!fee manager");
+    }
+
+    function _checkVaultOrFeeManager() internal view virtual {
+        require(
+            msg.sender == feeManager || msg.sender == vaultManager,
+            "!vault manager"
+        );
+    }
+
+    function _checkVaultIsAdded() internal view virtual {
+        require(vaults[msg.sender], "vault not added");
     }
 
     /// @notice Constant defining the maximum basis points.
@@ -91,7 +121,11 @@ contract HealthCheckAccountant {
     /// @notice The address of the fee recipient.
     address public feeRecipient;
 
+    /// @notice The amount of max loss to use when redeeming from vaults.
     uint256 public maxLoss;
+
+    /// @notice An address that can add or remove vaults.
+    address public vaultManager;
 
     /// @notice Mapping to track added vaults.
     mapping(address => bool) public vaults;
@@ -103,7 +137,7 @@ contract HealthCheckAccountant {
     mapping(address => mapping(address => Fee)) public customConfig;
 
     /// @notice Mapping vault => strategy => flag to use a custom config.
-    mapping(address => mapping(address => uint256)) internal _custom;
+    mapping(address => mapping(address => uint256)) internal _useCustomConfig;
 
     constructor(
         address _feeManager,
@@ -125,8 +159,6 @@ contract HealthCheckAccountant {
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(defaultMaxFee <= MAX_BPS, "too high");
-        require(defaultMaxGain <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         feeManager = _feeManager;
@@ -157,15 +189,17 @@ contract HealthCheckAccountant {
         address strategy,
         uint256 gain,
         uint256 loss
-    ) external returns (uint256 totalFees, uint256 totalRefunds) {
-        // Make sure this is a valid vault.
-        require(vaults[msg.sender], "!authorized");
-
+    )
+        public
+        virtual
+        onlyAddedVaults
+        returns (uint256 totalFees, uint256 totalRefunds)
+    {
         // Declare the config to use
         Fee memory fee;
 
         // Check if there is a custom config to use.
-        if (_custom[msg.sender][strategy] != 0) {
+        if (_useCustomConfig[msg.sender][strategy] != 0) {
             fee = customConfig[msg.sender][strategy];
         } else {
             // Otherwise use the default.
@@ -190,12 +224,18 @@ contract HealthCheckAccountant {
 
         // Only charge performance fees if there is a gain.
         if (gain > 0) {
-            require(
-                gain <= (strategyParams.current_debt * (fee.maxGain)) / MAX_BPS,
-                "too much gain"
-            );
+            // Setting `maxGain` to 0 will disable the healthcheck on profits.
+            if (fee.maxGain > 0) {
+                require(
+                    gain <=
+                        (strategyParams.current_debt * (fee.maxGain)) / MAX_BPS,
+                    "too much gain"
+                );
+            }
+
             totalFees += (gain * (fee.performanceFee)) / MAX_BPS;
         } else {
+            // Setting `maxLoss` to 10_000 will disable the healthcheck on losses.
             if (fee.maxLoss < MAX_BPS) {
                 require(
                     loss <=
@@ -216,7 +256,7 @@ contract HealthCheckAccountant {
 
                 if (totalRefunds > 0) {
                     // Approve the vault to pull the underlying asset.
-                    ERC20(asset).safeApprove(msg.sender, totalRefunds);
+                    _checkAllowance(msg.sender, asset, totalRefunds);
                 }
             }
         }
@@ -235,7 +275,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external onlyFeeManager {
+    function addVault(address vault) external virtual onlyVaultOrFeeManagers {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -248,9 +288,17 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(address vault) external onlyFeeManager {
+    function removeVault(
+        address vault
+    ) external virtual onlyVaultOrFeeManagers {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
+
+        address asset = IVault(vault).asset();
+        // Remove any allowances left.
+        if (ERC20(asset).allowance(address(this), vault) != 0) {
+            ERC20(asset).safeApprove(vault, 0);
+        }
 
         vaults[vault] = false;
 
@@ -258,7 +306,8 @@ contract HealthCheckAccountant {
     }
 
     /**
-     * @notice Function to update the default fee configuration used for all strategies.
+     * @notice Function to update the default fee configuration used for 
+        all strategies that don't have a custom config set.
      * @param defaultManagement Default annual management fee to charge.
      * @param defaultPerformance Default performance fee to charge.
      * @param defaultRefund Default refund ratio to give back on losses.
@@ -273,7 +322,7 @@ contract HealthCheckAccountant {
         uint16 defaultMaxFee,
         uint16 defaultMaxGain,
         uint16 defaultMaxLoss
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Check for threshold and limit conditions.
         require(
             defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
@@ -283,8 +332,6 @@ contract HealthCheckAccountant {
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(defaultMaxFee <= MAX_BPS, "too high");
-        require(defaultMaxGain <= MAX_BPS, "too high");
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
         // Update the default fee configuration.
@@ -320,7 +367,7 @@ contract HealthCheckAccountant {
         uint16 customMaxFee,
         uint16 customMaxGain,
         uint16 customMaxLoss
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure the vault has been added.
         require(vaults[vault], "vault not added");
         // Check for threshold and limit conditions.
@@ -332,8 +379,6 @@ contract HealthCheckAccountant {
             customPerformance <= PERFORMANCE_FEE_THRESHOLD,
             "exceeds performance fee threshold"
         );
-        require(customMaxFee <= MAX_BPS, "too high");
-        require(customMaxGain <= MAX_BPS, "too high");
         require(customMaxLoss <= MAX_BPS, "too high");
 
         // Set the strategy's custom config.
@@ -347,7 +392,7 @@ contract HealthCheckAccountant {
         });
 
         // Set the custom flag.
-        _custom[vault][strategy] = 1;
+        _useCustomConfig[vault][strategy] = 1;
 
         emit UpdateCustomFeeConfig(
             vault,
@@ -364,15 +409,15 @@ contract HealthCheckAccountant {
     function removeCustomConfig(
         address vault,
         address strategy
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure custom fees are set for the specified vault and strategy.
-        require(_custom[vault][strategy] != 0, "No custom fees set");
+        require(_useCustomConfig[vault][strategy] != 0, "No custom fees set");
 
         // Set all the strategy's custom fees to 0.
         delete customConfig[vault][strategy];
 
         // Clear the custom flag.
-        _custom[vault][strategy] = 0;
+        _useCustomConfig[vault][strategy] = 0;
 
         // Emit relevant event.
         emit RemovedCustomFeeConfig(vault, strategy);
@@ -387,11 +432,11 @@ contract HealthCheckAccountant {
      * @param strategy Address of the strategy
      * @return If a custom fee config is set.
      */
-    function custom(
+    function useCustomConfig(
         address vault,
         address strategy
-    ) external view returns (bool) {
-        return _custom[vault][strategy] != 0;
+    ) external view virtual returns (bool) {
+        return _useCustomConfig[vault][strategy] != 0;
     }
 
     /**
@@ -402,7 +447,7 @@ contract HealthCheckAccountant {
     function withdrawUnderlying(
         address vault,
         uint256 amount
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         IVault(vault).withdraw(amount, address(this), address(this), maxLoss);
     }
 
@@ -410,7 +455,7 @@ contract HealthCheckAccountant {
      * @notice Sets the `maxLoss` parameter to be used on withdraws.
      * @param _maxLoss The amount in basis points to set as the maximum loss.
      */
-    function setMaxLoss(uint256 _maxLoss) external onlyFeeManager {
+    function setMaxLoss(uint256 _maxLoss) external virtual onlyFeeManager {
         // Ensure that the provided `maxLoss` does not exceed 100% (in basis points).
         require(_maxLoss <= MAX_BPS, "higher than 100%");
 
@@ -424,7 +469,7 @@ contract HealthCheckAccountant {
      * @notice Function to distribute all accumulated fees to the designated recipient.
      * @param token The token to distribute.
      */
-    function distribute(address token) external {
+    function distribute(address token) external virtual {
         distribute(token, ERC20(token).balanceOf(address(this)));
     }
 
@@ -433,7 +478,10 @@ contract HealthCheckAccountant {
      * @param token The token to distribute.
      * @param amount amount of token to distribute.
      */
-    function distribute(address token, uint256 amount) public onlyFeeManager {
+    function distribute(
+        address token,
+        uint256 amount
+    ) public virtual onlyFeeManager {
         ERC20(token).safeTransfer(feeRecipient, amount);
 
         emit DistributeRewards(token, amount);
@@ -445,7 +493,7 @@ contract HealthCheckAccountant {
      */
     function setFutureFeeManager(
         address _futureFeeManager
-    ) external onlyFeeManager {
+    ) external virtual onlyFeeManager {
         // Ensure the futureFeeManager is not a zero address.
         require(_futureFeeManager != address(0), "ZERO ADDRESS");
         futureFeeManager = _futureFeeManager;
@@ -457,7 +505,7 @@ contract HealthCheckAccountant {
      * @notice Function to accept the role change and become the new fee manager.
      * @dev This function allows the future fee manager to accept the role change and become the new fee manager.
      */
-    function acceptFeeManager() external {
+    function acceptFeeManager() external virtual {
         // Make sure the sender is the future fee manager.
         require(msg.sender == futureFeeManager, "not future fee manager");
         feeManager = futureFeeManager;
@@ -467,10 +515,24 @@ contract HealthCheckAccountant {
     }
 
     /**
+     * @notice Function to set a new vault manager.
+     * @param newVaultManager Address to add or remove vaults.
+     */
+    function setVaultManager(
+        address newVaultManager
+    ) external virtual onlyFeeManager {
+        vaultManager = newVaultManager;
+
+        emit UpdateVaultManager(newVaultManager);
+    }
+
+    /**
      * @notice Function to set a new address to receive distributed rewards.
      * @param newFeeRecipient Address to receive distributed fees.
      */
-    function setFeeRecipient(address newFeeRecipient) external onlyFeeManager {
+    function setFeeRecipient(
+        address newFeeRecipient
+    ) external virtual onlyFeeManager {
         // Ensure the newFeeRecipient is not a zero address.
         require(newFeeRecipient != address(0), "ZERO ADDRESS");
         address oldRecipient = feeRecipient;
@@ -480,11 +542,30 @@ contract HealthCheckAccountant {
     }
 
     /**
+     * @dev Internal safe function to make sure the contract you want to
+     * interact with has enough allowance to pull the desired tokens.
+     *
+     * @param _contract The address of the contract that will move the token.
+     * @param _token The ERC-20 token that will be getting spent.
+     * @param _amount The amount of `_token` to be spent.
+     */
+    function _checkAllowance(
+        address _contract,
+        address _token,
+        uint256 _amount
+    ) internal {
+        if (ERC20(_token).allowance(address(this), _contract) < _amount) {
+            ERC20(_token).approve(_contract, 0);
+            ERC20(_token).approve(_contract, _amount);
+        }
+    }
+
+    /**
      * @notice View function to get the max a performance fee can be.
      * @dev This function provides the maximum performance fee that the accountant can charge.
      * @return The maximum performance fee.
      */
-    function performanceFeeThreshold() external view returns (uint16) {
+    function performanceFeeThreshold() external pure virtual returns (uint16) {
         return PERFORMANCE_FEE_THRESHOLD;
     }
 
@@ -493,7 +574,7 @@ contract HealthCheckAccountant {
      * @dev This function provides the maximum management fee that the accountant can charge.
      * @return The maximum management fee.
      */
-    function managementFeeThreshold() external view returns (uint16) {
+    function managementFeeThreshold() external pure virtual returns (uint16) {
         return MANAGEMENT_FEE_THRESHOLD;
     }
 }
