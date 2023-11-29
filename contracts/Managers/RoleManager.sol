@@ -12,6 +12,9 @@ import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
 // add a strategy manager position to give add_strategy_manager
+// Let others add vaults?
+// Let others remove vaults?
+// Delegate call the registry for new vaults ?
 
 /// @title Yearn V3 vault Role Manager.
 contract RoleManager is Governance2Step, VaultConstants {
@@ -39,6 +42,20 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint96 roles;
     }
 
+    /// @notice Checks the msg sender is allowed to endorse vaults.
+    modifier onlyEndorser() {
+        _isRegistryEndorser();
+        _;
+    }
+
+    function _isRegistryEndorser() internal view {
+        require(
+            msg.sender == governance ||
+                Registry(registry).endorsers(msg.sender),
+            "!endorser"
+        );
+    }
+
     // Encoded name so that it can be held as a constant.
     bytes32 internal constant _name_ =
         bytes32(abi.encodePacked("Yearn V3 Vault Role Manager"));
@@ -51,38 +68,41 @@ contract RoleManager is Governance2Step, VaultConstants {
     bytes32 public constant SECURITY = keccak256("Security");
     /// @notice Hash of the role name "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
+    /// @notice Hash of the position ID for Strategy manager.
+    bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
+
+    /// @notice Mapping of a numerical rating to its string equivalent.
+    mapping(uint256 => string) public ratingToString;
+    /// @notice Mapping of role hashes to role information.
+    mapping(bytes32 => Position) internal _positions;
+    /// @notice Mapping of vault addresses to their configurations.
+    mapping(address => VaultConfig) public vaultConfig;
 
     /// @notice Immutable address that the RoleManager position
     // will be transferred to when a vault is removed.
     address public immutable chad;
 
-    /// @notice Mapping of role hashes to role information.
-    mapping(bytes32 => Position) internal _positions;
-    /// @notice Mapping of vault addresses to their configurations.
-    mapping(address => VaultConfig) public vaultConfig;
-    /// @notice Mapping of a numerical rating to its string equivalent.
-    mapping(uint256 => string) public ratingToString;
-
-    /// @notice Array storing addresses of all managed vaults.
-    address[] public vaults;
     /// @notice Address of the accountant.
     address public accountant;
     /// @notice Address of the registry contract.
     address public registry;
     /// @notice Address of the allocator factory contract.
     address public allocatorFactory;
-
-    /// @notice Default time until profits are fully unlocked for new vaults.
-    uint256 public defaultProfitMaxUnlock = 10 days;
     /// @notice Maximum acceptable base fee for debt allocators.
     uint256 public maxAcceptableBaseFee = 100e9;
+    /// @notice Default time until profits are fully unlocked for new vaults.
+    uint256 public defaultProfitMaxUnlock = 10 days;
+
+    /// @notice Array storing addresses of all managed vaults.
+    address[] public vaults;
 
     constructor(
         address _governance,
         address _daddy,
         address _brain,
         address _keeper,
-        address _security
+        address _security,
+        address _strategyManager
     ) Governance2Step(_governance) {
         // Set the immutable address that will take over role manager
         // if a vault is removed.
@@ -109,6 +129,12 @@ contract RoleManager is Governance2Step, VaultConstants {
         _positions[KEEPER] = Position({
             holder: _keeper,
             roles: uint96(REPORTING_MANAGER | DEBT_MANAGER)
+        });
+
+        // The strategy manager can add and remove strategies.
+        _positions[STRATEGY_MANAGER] = Position({
+            holder: _strategyManager,
+            roles: uint96(ADD_STRATEGY_MANAGER | REVOKE_STRATEGY_MANAGER)
         });
 
         // Set up the ratingToString mapping.
@@ -146,7 +172,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _asset,
         uint256 _rating,
         uint256 _depositLimit
-    ) external virtual onlyGovernance returns (address) {
+    ) external virtual onlyEndorser returns (address) {
         return
             _newVault(_asset, _rating, _depositLimit, defaultProfitMaxUnlock);
     }
@@ -164,7 +190,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _rating,
         uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
-    ) external virtual onlyGovernance returns (address) {
+    ) external virtual onlyEndorser returns (address) {
         return _newVault(_asset, _rating, _depositLimit, _profitMaxUnlockTime);
     }
 
@@ -184,7 +210,7 @@ contract RoleManager is Governance2Step, VaultConstants {
     ) internal virtual returns (address _vault) {
         require(_rating > 0 && _rating < 6, "rating out of range");
 
-        // Create the name and string to be standardized based on rating.
+        // Create the name and symbol to be standardized based on rating.
         string memory ratingString = ratingToString[_rating];
         // Name is "{SYMBOL} yVault-{RATING}"
         string memory _name = string(
@@ -293,6 +319,13 @@ contract RoleManager is Governance2Step, VaultConstants {
             uint256(positionInfo.roles)
         );
 
+        // Set the roles for the Strategy Manager.
+        positionInfo = _positions[STRATEGY_MANAGER];
+        IVault(_vault).set_role(
+            positionInfo.holder,
+            uint256(positionInfo.roles)
+        );
+
         // Let the debt allocator manage debt.
         IVault(_vault).set_role(_debtAllocator, DEBT_MANAGER);
     }
@@ -348,10 +381,7 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @param _vault Address of the vault to be added.
      * @param _rating Rating associated with the vault.
      */
-    function addNewVault(
-        address _vault,
-        uint256 _rating
-    ) external virtual onlyGovernance {
+    function addNewVault(address _vault, uint256 _rating) external virtual {
         addNewVault(_vault, _rating, address(0));
     }
 
@@ -373,9 +403,8 @@ contract RoleManager is Governance2Step, VaultConstants {
             IVault(_vault).accept_role_manager();
         }
 
-        // Check if the vault has been endorsed yet in the registry,
-        (address _asset, , , , ) = Registry(registry).vaultInfo(_vault);
-        if (_asset != address(0)) {
+        // Check if the vault has been endorsed yet in the registry.
+        if (!Registry(registry).isEndorsed(_vault)) {
             // If not endorse it.
             Registry(registry).endorseMultiStrategyVault(_vault);
         }
@@ -428,7 +457,14 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _vault,
         address _debtAllocator
     ) public virtual onlyGovernance {
+        // Make sure the vault has been added to the vault.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
+
+        // Remove the role from the old allocator if applicable.
+        address currentAllocator = vaultConfig[_vault].debtAllocator;
+        if (currentAllocator != address(0)) {
+            IVault(_vault).remove_role(currentAllocator, DEBT_MANAGER);
+        }
 
         // Give the new debt allocator the debt manager role.
         IVault(_vault).add_role(_debtAllocator, DEBT_MANAGER);
@@ -563,6 +599,45 @@ contract RoleManager is Governance2Step, VaultConstants {
     }
 
     /**
+     * @notice Check if a vault is managed by this contract.
+     * @dev This will check if the `asset` variable in the struct has been
+     *   set for an easy external view check.
+     *
+     *   Does not check the vaults `role_manager` position since that can be set
+     *   by anyone for a random vault.
+     *
+     * @param _vault Address of the vault to check.
+     * @return . The vaults role manager status.
+     */
+    function isVaultRoleManager(
+        address _vault
+    ) external view virtual returns (bool) {
+        return vaultConfig[_vault].asset != address(0);
+    }
+
+    /**
+     * @notice Get the debt allocator for a specific vault.
+     * @dev Will return address(0) if the vault is not managed by this contract.
+     * @param _vault Address of the vault.
+     * @return . Address of the debt allocator if any.
+     */
+    function getDebtAllocator(
+        address _vault
+    ) external view virtual returns (address) {
+        return vaultConfig[_vault].debtAllocator;
+    }
+
+    /**
+     * @notice Get the rating for a specific vault.
+     * @dev Will return 0 if the vault is not managed by this contract.
+     * @param _vault Address of the vault.
+     * @return . The rating of the vault if any.
+     */
+    function getRating(address _vault) external view virtual returns (uint256) {
+        return vaultConfig[_vault].rating;
+    }
+
+    /**
      * @notice Get the address and roles given to a specific position.
      * @param _positionId The position identifier.
      * @return The address that holds that position.
@@ -630,6 +705,14 @@ contract RoleManager is Governance2Step, VaultConstants {
     }
 
     /**
+     * @notice Get the address assigned to the strategy manager.
+     * @return The address assigned to the strategy manager.
+     */
+    function getStrategyManager() external view virtual returns (address) {
+        return getPositionHolder(STRATEGY_MANAGER);
+    }
+
+    /**
      * @notice Get the roles given to the Daddy position.
      * @return The roles given to the Daddy position.
      */
@@ -659,6 +742,14 @@ contract RoleManager is Governance2Step, VaultConstants {
      */
     function getKeeperRoles() external view virtual returns (uint256) {
         return getCurrentRoles(KEEPER);
+    }
+
+    /**
+     * @notice Get the roles given to the strategy manager.
+     * @return The roles given to the strategy manager.
+     */
+    function getStrategyManagerRoles() external view virtual returns (uint256) {
+        return getCurrentRoles(STRATEGY_MANAGER);
     }
 
     // This fallback will forward any undefined function calls to the Registry.

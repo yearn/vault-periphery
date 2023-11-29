@@ -165,6 +165,17 @@ contract Registry is Governance {
     }
 
     /**
+     * @notice Check if a vault is endorsed in this registry.
+     * @dev This will check if the `asset` variable in the struct has been
+     *   set for an easy external view check.
+     * @param _vault Address of the vault to check.
+     * @return . The vaults endorsement status.
+     */
+    function isEndorsed(address _vault) external view virtual returns (bool) {
+        return vaultInfo[_vault].asset != address(0);
+    }
+
+    /**
      * @notice
      *    Create and endorse a new multi strategy "Allocator"
      *      vault and endorse it in this registry.
