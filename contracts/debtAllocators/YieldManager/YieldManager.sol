@@ -16,6 +16,9 @@ import {StrategyManager, IStrategy} from "./StrategyManager.sol";
  *  a Yearn V3 vault to allocate funds to the optimal strategy.
  */
 contract YieldDebtAllocator is Governance {
+    /// @notice An event emitted when the max debt update loss is updated.
+    event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
+
     // Struct that contains the address of the strategy and its best allocation.
     struct Allocation {
         // Address of the strategy.
@@ -34,6 +37,8 @@ contract YieldDebtAllocator is Governance {
         require(allocators[msg.sender] || open, "!allocator or open");
     }
 
+    uint256 internal constant MAX_BPS = 10_000;
+
     // Contract that holds the logic and oracles for each strategy.
     AprOracle internal constant aprOracle =
         AprOracle(0x02b0210fC1575b38147B232b40D7188eF14C04f2);
@@ -41,6 +46,9 @@ contract YieldDebtAllocator is Governance {
     mapping(address => bool) public allocators;
 
     bool public open;
+
+    /// @notice Max loss to accept on debt updates in basis points.
+    uint256 public maxDebtUpdateLoss;
 
     address public immutable strategyManager;
 
@@ -140,35 +148,7 @@ contract YieldDebtAllocator is Governance {
 
             if (_currentDebt > _newDebt) {
                 // We need to report profits and have them immediately unlock to not loose out on locked profit.
-                // NOTE: Should this all be put in the strategy manager
-
-                // Get the current unlock rate.
-                uint256 profitUnlock = IStrategy(_strategy)
-                    .profitMaxUnlockTime();
-
-                // Create array fo call data for the strategy manager to use
-                bytes[] memory _calldataArray = new bytes[](3);
-                
-                // Set profit unlock to 0.
-                _calldataArray[0] = abi.encodeCall(
-                    IStrategy(_strategy).setProfitMaxUnlockTime,
-                    0
-                );
-                // Report profits.
-                _calldataArray[1] = abi.encodeWithSelector(
-                    IStrategy(_strategy).report.selector
-                );
-                // Set profit unlock back to original.
-                _calldataArray[2] = abi.encodeCall(
-                    IStrategy(_strategy).setProfitMaxUnlockTime,
-                    profitUnlock
-                );
-
-                // Forward all calls to strategy.
-                StrategyManager(strategyManager).forwardCalls(
-                    _strategy,
-                    _calldataArray
-                );
+                StrategyManager(strategyManager).reportFullProfit(_strategy);
 
                 // If we are pulling all debt from a strategy OR we are decreasing
                 // debt and the strategy has any unrealised losses we first need to
@@ -185,9 +165,23 @@ contract YieldDebtAllocator is Governance {
                 }
             }
 
-            // TODO: validate losses based on ending totalAssets
             // Allocate the new debt.
             IVault(_vault).update_debt(_strategy, _newDebt);
+
+            // Validate losses based on ending totalAssets
+            if (_currentDebt > _newDebt) {
+                uint256 afterAssets = IVault(_vault).totalAssets();
+
+                // If a loss was realized.
+                if (afterAssets < _totalAssets) {
+                    // Make sure its within the range.
+                    require(
+                        _totalAssets - afterAssets <=
+                            (_currentDebt * maxDebtUpdateLoss) / MAX_BPS,
+                        "too much loss"
+                    );
+                }
+            }
 
             // Get the new APR
             _newApr += aprOracle.getStrategyApr(_strategy, 0) * _newDebt;
@@ -338,5 +332,20 @@ contract YieldDebtAllocator is Governance {
 
     function setOpen(bool _open) external onlyGovernance {
         open = _open;
+    }
+
+    /**
+     * @notice Set the max loss in Basis points to allow on debt updates.
+     * @dev Withdrawing during debt updates use {redeem} which allows for 100% loss.
+     *      This can be used to assure a loss is not realized on redeem outside the tolerance.
+     * @param _maxDebtUpdateLoss The max loss to accept on debt updates.
+     */
+    function setMaxDebtUpdateLoss(
+        uint256 _maxDebtUpdateLoss
+    ) external virtual onlyGovernance {
+        require(_maxDebtUpdateLoss <= MAX_BPS, "higher than max");
+        maxDebtUpdateLoss = _maxDebtUpdateLoss;
+
+        emit UpdateMaxDebtUpdateLoss(_maxDebtUpdateLoss);
     }
 }

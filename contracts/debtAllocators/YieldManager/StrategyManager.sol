@@ -81,6 +81,36 @@ contract StrategyManager {
         IStrategy(_strategy).setPendingManagement(_newManager);
     }
 
+    function reportFullProfit(address _strategy) external {
+        // Get the current unlock rate.
+        uint256 profitUnlock = IStrategy(_strategy).profitMaxUnlockTime();
+
+        if (profitUnlock != 0) {
+            // Set profit unlock to 0.
+            forwardCall(
+                _strategy,
+                abi.encodeCall(IStrategy(_strategy).setProfitMaxUnlockTime, 0)
+            );
+        }
+
+        // Report profits.
+        forwardCall(
+            _strategy,
+            abi.encodeWithSelector(IStrategy(_strategy).report.selector)
+        );
+
+        if (profitUnlock != 0) {
+            // Set profit unlock back to original.
+            forwardCall(
+                _strategy,
+                abi.encodeCall(
+                    IStrategy(_strategy).setProfitMaxUnlockTime,
+                    profitUnlock
+                )
+            );
+        }
+    }
+
     function forwardCalls(
         address _strategy,
         bytes[] memory _calldataArray
