@@ -9,7 +9,7 @@ import {Governance} from "@periphery/utils/Governance.sol";
 import {StrategyManager, IStrategy} from "./StrategyManager.sol";
 
 /**
- * @title YearnV3 Yield Debt Allocator
+ * @title YearnV3 Yield Yield Based Debt Allocator
  * @author yearn.finance
  * @notice
  *  This Debt Allocator is meant to be used alongside
@@ -111,7 +111,7 @@ contract YieldDebtAllocator is Governance {
     )
         external
         onlyAllocatorsOrOpen
-        returns (uint256 _currentApr, uint256 _newApr)
+        returns (uint256 _currentYield, uint256 _afterYield)
     {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
@@ -137,19 +137,20 @@ contract YieldDebtAllocator is Governance {
                 _currentDebt);
 
             // Add to the amount currently being earned.
-            _currentApr += _strategyApr;
+            _currentYield += _strategyApr;
 
             // If no change move to the next strategy.
             if (_newDebt == _currentDebt) {
                 // We assume the new apr will be the same as current.
-                _newApr += _strategyApr;
+                _afterYield += _strategyApr;
                 continue;
             }
 
             if (_currentDebt > _newDebt) {
-                // We need to report profits and have them immediately unlock to not loose out on locked profit.
+                // We need to report profits and have them immediately unlock to not lose out on locked profit.
                 StrategyManager(strategyManager).reportFullProfit(_strategy);
 
+                uint256 loss;
                 // If we are pulling all debt from a strategy OR we are decreasing
                 // debt and the strategy has any unrealised losses we first need to
                 // report the strategy.
@@ -161,19 +162,18 @@ contract YieldDebtAllocator is Governance {
                     ) !=
                     0
                 ) {
-                    IVault(_vault).process_report(_strategy);
+                    (, loss) = IVault(_vault).process_report(_strategy);
                 }
-            }
 
-            // Allocate the new debt.
-            IVault(_vault).update_debt(_strategy, _newDebt);
+                // Allocate the new debt.
+                IVault(_vault).update_debt(_strategy, _newDebt);
 
-            // Validate losses based on ending totalAssets
-            if (_currentDebt > _newDebt) {
+                // Validate losses based on ending totalAssets
                 uint256 afterAssets = IVault(_vault).totalAssets();
 
-                // If a loss was realized.
-                if (afterAssets < _totalAssets) {
+                // NOTE: doesn't count for previous losses
+                // If a loss was realized on just the debt update.
+                if (afterAssets + loss < _totalAssets) {
                     // Make sure its within the range.
                     require(
                         _totalAssets - afterAssets <=
@@ -181,20 +181,22 @@ contract YieldDebtAllocator is Governance {
                         "too much loss"
                     );
                 }
+            } else {
+                // Just Allocate the new debt.
+                IVault(_vault).update_debt(_strategy, _newDebt);
             }
 
             // Get the new APR
-            _newApr += aprOracle.getStrategyApr(_strategy, 0) * _newDebt;
+            if (_newDebt != 0) {
+                _afterYield +=
+                    aprOracle.getStrategyApr(_strategy, 0) *
+                    _newDebt;
+            }
         }
 
         // Make sure the ending amounts are the same otherwise rates could be wrong.
         require(_totalAssets == _accountedFor, "cheater");
-
-        // Adjust both rates based on the total assets to get the weighted APR.
-        _currentApr /= _totalAssets;
-        _newApr /= _totalAssets;
-
-        require(_newApr > _currentApr, "fail");
+        require(_afterYield > _currentYield, "fail");
     }
 
     /**
@@ -236,10 +238,10 @@ contract YieldDebtAllocator is Governance {
      * @param _vault The address of the vault to propose an allocation for.
      * @param _newAllocations Array of strategies and their new proposed allocation.
      */
-    function getCurrentAndExpectedApr(
+    function getCurrentAndExpectedYield(
         address _vault,
         Allocation[] memory _newAllocations
-    ) external view returns (uint256 _currentApr, uint256 _expectedApr) {
+    ) external view returns (uint256 _currentYield, uint256 _expectedYield) {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
 
@@ -259,24 +261,20 @@ contract YieldDebtAllocator is Governance {
                 _currentDebt);
 
             // Add to the amount currently being earned.
-            _currentApr += _strategyApr;
+            _currentYield += _strategyApr;
 
             // If the strategies debt is not changing.
             if (_currentDebt == _newDebt) {
                 // No need to call the APR oracle again.
-                _expectedApr += _strategyApr;
+                _expectedYield += _strategyApr;
             } else {
                 // We add what its expected to yield and its new expected debt
-                _expectedApr += (aprOracle.getStrategyApr(
+                _expectedYield += (aprOracle.getStrategyApr(
                     _strategy,
                     int256(_newDebt) - int256(_currentDebt)
                 ) * _newDebt);
             }
         }
-
-        // Adjust both based on the total assets to get the weighted APR.
-        _currentApr /= _totalAssets;
-        _expectedApr /= _totalAssets;
     }
 
     /**

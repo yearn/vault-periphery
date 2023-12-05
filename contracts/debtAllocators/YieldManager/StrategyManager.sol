@@ -17,6 +17,11 @@ contract StrategyManager {
         _;
     }
 
+    modifier onlyStrategyOwnerOrDebtManager(address _strategy) {
+        _checkStrategyDebtManager(_strategy);
+        _;
+    }
+
     /// @notice Checks if the msg sender is the governance.
     function _checkStrategyManager(address _strategy) internal view virtual {
         require(strategyInfo[_strategy].owner == msg.sender, "!governance");
@@ -81,33 +86,23 @@ contract StrategyManager {
         IStrategy(_strategy).setPendingManagement(_newManager);
     }
 
-    function reportFullProfit(address _strategy) external {
+    function reportFullProfit(
+        address _strategy
+    ) external onlyStrategyOwnerOrDebtManager(_strategy) {
         // Get the current unlock rate.
         uint256 profitUnlock = IStrategy(_strategy).profitMaxUnlockTime();
 
         if (profitUnlock != 0) {
             // Set profit unlock to 0.
-            forwardCall(
-                _strategy,
-                abi.encodeCall(IStrategy(_strategy).setProfitMaxUnlockTime, 0)
-            );
+            IStrategy(_strategy).setProfitMaxUnlockTime(0);
         }
 
         // Report profits.
-        forwardCall(
-            _strategy,
-            abi.encodeWithSelector(IStrategy(_strategy).report.selector)
-        );
+        IStrategy(_strategy).report();
 
         if (profitUnlock != 0) {
             // Set profit unlock back to original.
-            forwardCall(
-                _strategy,
-                abi.encodeCall(
-                    IStrategy(_strategy).setProfitMaxUnlockTime,
-                    profitUnlock
-                )
-            );
+            IStrategy(_strategy).setProfitMaxUnlockTime(profitUnlock);
         }
     }
 
