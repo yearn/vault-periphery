@@ -243,20 +243,20 @@ def test_deploy_new_vault(
 
     rating = int(1)
     deposit_limit = int(100e18)
-    profit_unlcok = int(695)
+    profit_unlock = int(695)
 
     with ape.reverts("rating out of range"):
-        role_manager.newVault(asset, 0, deposit_limit, profit_unlcok, sender=daddy)
+        role_manager.newVault(asset, 0, deposit_limit, profit_unlock, sender=daddy)
 
     with ape.reverts("rating out of range"):
-        role_manager.newVault(asset, int(6), deposit_limit, profit_unlcok, sender=daddy)
+        role_manager.newVault(asset, int(6), deposit_limit, profit_unlock, sender=daddy)
 
     with ape.reverts("!endorser"):
-        role_manager.newVault(asset, rating, deposit_limit, profit_unlcok, sender=user)
+        role_manager.newVault(asset, rating, deposit_limit, profit_unlock, sender=user)
 
     # Now the registry will revert
     with ape.reverts("!endorse"):
-        role_manager.newVault(asset, rating, deposit_limit, profit_unlcok, sender=daddy)
+        role_manager.newVault(asset, rating, deposit_limit, profit_unlock, sender=daddy)
 
     # ADd the role manager as an endorser
     registry.setEndorser(role_manager, True, sender=daddy)
@@ -264,12 +264,12 @@ def test_deploy_new_vault(
 
     # Haven't set the role manager as the vault manager.
     with ape.reverts("!vault manager"):
-        role_manager.newVault(asset, rating, deposit_limit, profit_unlcok, sender=daddy)
+        role_manager.newVault(asset, rating, deposit_limit, profit_unlock, sender=daddy)
 
     healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
 
     tx = role_manager.newVault(
-        asset, rating, deposit_limit, profit_unlcok, sender=daddy
+        asset, rating, deposit_limit, profit_unlock, sender=daddy
     )
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
@@ -306,6 +306,7 @@ def test_deploy_new_vault(
     assert vault.roles(keeper) == keeper_roles
     assert vault.roles(debt_allocator) == debt_allocator_roles
     assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == profit_unlock
 
     # Check accountant
     assert vault.accountant() == healthcheck_accountant
@@ -313,3 +314,886 @@ def test_deploy_new_vault(
 
     # Check deposit limit
     assert vault.maxDeposit(user) == deposit_limit
+
+    symbol = asset.symbol()
+    assert vault.symbol() == f"yv{symbol}-A"
+    assert vault.name() == f"{symbol} yVault-A"
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+
+def test_deploy_new_vault__default_values(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    release_registry.newRelease(vault_factory.address, sender=daddy)
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(2)
+
+    with ape.reverts("rating out of range"):
+        role_manager.newVault(asset, 0, sender=user)
+
+    with ape.reverts("rating out of range"):
+        role_manager.newVault(asset, int(6), sender=user)
+
+    # Now the registry will revert
+    with ape.reverts("!endorse"):
+        role_manager.newVault(asset, rating, sender=user)
+
+    # ADd the role manager as an endorser
+    registry.setEndorser(role_manager, True, sender=daddy)
+    assert registry.endorsers(role_manager)
+
+    # Haven't set the role manager as the vault manager.
+    with ape.reverts("!vault manager"):
+        role_manager.newVault(asset, rating, sender=user)
+
+    healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
+
+    # User can now deploy
+    tx = role_manager.newVault(asset, rating, sender=user)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+
+    assert event.vault == vault
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+    # Check accountant
+    assert vault.accountant() == healthcheck_accountant
+    assert healthcheck_accountant.vaults(vault) == True
+
+    # Check deposit limit
+    assert vault.maxDeposit(user) == 0
+
+    symbol = asset.symbol()
+    assert vault.symbol() == f"yv{symbol}-B"
+    assert vault.name() == f"{symbol} yVault-B"
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+
+def setup_role_manager(
+    role_manager, release_registry, registry, vault_factory, accountant, daddy
+):
+    release_registry.newRelease(vault_factory.address, sender=daddy)
+    # ADd the role manager as an endorser
+    registry.setEndorser(role_manager, True, sender=daddy)
+    assert registry.endorsers(role_manager)
+    accountant.setVaultManager(role_manager, sender=daddy)
+
+
+def test_add_new_vault__endorsed(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    name = " ksjdfl"
+    symbol = "sdfa"
+    tx = registry.newEndorsedVault(asset, name, symbol, daddy, 100, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    rating = int(1)
+
+    with ape.reverts("!governance"):
+        role_manager.addNewVault(vault, rating, sender=user)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 0, sender=daddy)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 6, sender=daddy)
+
+    # Is not pending role manager
+    with ape.reverts():
+        role_manager.addNewVault(vault, rating, sender=user)
+
+    vault.transfer_role_manager(role_manager, sender=daddy)
+
+    tx = role_manager.addNewVault(vault, rating, sender=daddy)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+
+    assert event.vault == vault
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == 100
+
+    # Check accountant
+    assert vault.accountant() == healthcheck_accountant
+    assert healthcheck_accountant.vaults(vault) == True
+
+    # Check deposit limit
+    assert vault.maxDeposit(user) == 0
+
+    assert vault.symbol() == symbol
+    assert vault.name() == name
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+
+def test_add_new_vault__not_endorsed(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    name = " ksjdfl"
+    symbol = "sdfa"
+    tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
+
+    event = list(tx.decode_logs(vault_factory.NewVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+        event.vault_address
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(1)
+
+    with ape.reverts("!governance"):
+        role_manager.addNewVault(vault, rating, sender=user)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 0, sender=daddy)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 6, sender=daddy)
+
+    # Is not pending role manager
+    with ape.reverts():
+        role_manager.addNewVault(vault, rating, sender=user)
+
+    vault.transfer_role_manager(role_manager, sender=daddy)
+
+    tx = role_manager.addNewVault(vault, rating, sender=daddy)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+
+    assert event.vault == vault
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == 100
+
+    # Check accountant
+    assert vault.accountant() == healthcheck_accountant
+    assert healthcheck_accountant.vaults(vault) == True
+
+    # Check deposit limit
+    assert vault.maxDeposit(user) == 0
+
+    assert vault.symbol() == symbol
+    assert vault.name() == name
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+
+def test_add_new_vault__with_debt_allocator(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    name = " ksjdfl"
+    symbol = "sdfa"
+    tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
+
+    event = list(tx.decode_logs(vault_factory.NewVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+        event.vault_address
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(1)
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    assert event.vault == vault
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    with ape.reverts("!governance"):
+        role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 0, debt_allocator, sender=daddy)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 6, debt_allocator, sender=daddy)
+
+    # Is not pending role manager
+    with ape.reverts():
+        role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
+
+    vault.transfer_role_manager(role_manager, sender=daddy)
+
+    tx = role_manager.addNewVault(vault, rating, debt_allocator, sender=daddy)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == 100
+
+    # Check accountant
+    assert vault.accountant() == healthcheck_accountant
+    assert healthcheck_accountant.vaults(vault) == True
+
+    # Check deposit limit
+    assert vault.maxDeposit(user) == 0
+
+    assert vault.symbol() == symbol
+    assert vault.name() == name
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == daddy
+    assert debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
+
+
+def test_add_new_vault__with_accountant(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    name = " ksjdfl"
+    symbol = "sdfa"
+    tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
+
+    event = list(tx.decode_logs(vault_factory.NewVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+        event.vault_address
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(1)
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    assert event.vault == vault
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    vault.add_role(daddy, ROLES.ACCOUNTANT_MANAGER, sender=daddy)
+    vault.set_accountant(user, sender=daddy)
+    vault.remove_role(daddy, ROLES.ACCOUNTANT_MANAGER, sender=daddy)
+
+    with ape.reverts("!governance"):
+        role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 0, debt_allocator, sender=daddy)
+
+    with ape.reverts("rating out of range"):
+        role_manager.addNewVault(vault, 6, debt_allocator, sender=daddy)
+
+    # Is not pending role manager
+    with ape.reverts():
+        role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
+
+    vault.transfer_role_manager(role_manager, sender=daddy)
+
+    tx = role_manager.addNewVault(vault, rating, debt_allocator, sender=daddy)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == 100
+
+    # Check accountant
+    assert vault.accountant() == user
+    assert healthcheck_accountant.vaults(vault) == False
+
+    # Check deposit limit
+    assert vault.maxDeposit(user) == 0
+
+    assert vault.symbol() == symbol
+    assert vault.name() == name
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == daddy
+    assert debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
+
+
+def test_new_debt_allocator__deploys_one(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(2)
+
+    # Deploy a vault
+    tx = role_manager.newVault(asset, rating, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+    # Update to a new debt allocator
+    with ape.reverts("!governance"):
+        role_manager.updateDebtAllocator(vault, sender=user)
+
+    with ape.reverts("vault not added"):
+        role_manager.updateDebtAllocator(user, sender=daddy)
+
+    tx = role_manager.updateDebtAllocator(vault, sender=daddy)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    new_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    assert new_debt_allocator != debt_allocator
+    assert new_debt_allocator.vault() == vault
+    assert new_debt_allocator.governance() == brain
+    assert new_debt_allocator.maxAcceptableBaseFee() == 100e9
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == new_debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == new_debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == 0
+    assert vault.roles(new_debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+
+def test_new_debt_allocator__already_deployed(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(2)
+
+    # Deploy a vault
+    tx = role_manager.newVault(asset, rating, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    new_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    # Update to a new debt allocator
+    with ape.reverts("!governance"):
+        role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=user)
+
+    with ape.reverts("vault not added"):
+        role_manager.updateDebtAllocator(user, new_debt_allocator, sender=daddy)
+
+    tx = role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=daddy)
+
+    assert new_debt_allocator != debt_allocator
+    assert new_debt_allocator.vault() == vault
+    assert new_debt_allocator.governance() == daddy
+    assert new_debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == new_debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == new_debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == 0
+    assert vault.roles(new_debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+
+def test_remove_vault(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    generic_debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    rating = int(2)
+
+    # Deploy a vault
+    tx = role_manager.newVault(asset, rating, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+    # Check debt allocator
+    assert debt_allocator.vault() == vault
+    assert debt_allocator.governance() == brain
+    assert debt_allocator.maxAcceptableBaseFee() == 100e9
+
+    # Remove the vault
+    with ape.reverts("!governance"):
+        role_manager.removeVault(vault, sender=user)
+
+    with ape.reverts("vault not added"):
+        role_manager.removeVault(user, sender=daddy)
+
+    tx = role_manager.removeVault(vault, sender=daddy)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == ZERO_ADDRESS
+    assert vault_rating == 0
+    assert vault_debt_allocator == ZERO_ADDRESS
+    assert index == 0
+    assert role_manager.getAllVaults() == []
+    assert role_manager.isVaultsRoleManager(vault) == False
+    assert role_manager.getDebtAllocator(vault) == ZERO_ADDRESS
+    assert role_manager.getRating(vault) == 0
+    # Still endorsed through the registry
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles didnt chance
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+    assert vault.future_role_manager() == daddy
+    assert vault.role_manager() == role_manager
+
+    vault.accept_role_manager(sender=daddy)
+
+    assert vault.role_manager() == daddy

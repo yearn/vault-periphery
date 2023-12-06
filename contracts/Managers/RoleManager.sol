@@ -13,7 +13,6 @@ import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocato
 
 // Let others add vaults?
 // Let others remove vaults?
-// Delegate call the registry for new vaults ?
 
 /// @title Yearn V3 vault Role Manager.
 contract RoleManager is Governance2Step, VaultConstants {
@@ -59,6 +58,10 @@ contract RoleManager is Governance2Step, VaultConstants {
     bytes32 internal constant _name_ =
         bytes32(abi.encodePacked("Yearn V3 Vault Role Manager"));
 
+    /*//////////////////////////////////////////////////////////////
+                           POSITION ID'S
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Hash of the role name "daddy".
     bytes32 public constant DADDY = keccak256("Daddy");
     /// @notice Hash of the role name "brain".
@@ -79,16 +82,20 @@ contract RoleManager is Governance2Step, VaultConstants {
     /// @notice Hash of the position ID for the Allocator Factory.
     bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
 
+    /// @notice Immutable address that the RoleManager position
+    // will be transferred to when a vault is removed.
+    address public immutable chad;
+
+    /*//////////////////////////////////////////////////////////////
+                           STORAGE
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Mapping of a numerical rating to its string equivalent.
     mapping(uint256 => string) public ratingToString;
     /// @notice Mapping of role hashes to role information.
     mapping(bytes32 => Position) internal _positions;
     /// @notice Mapping of vault addresses to their configurations.
     mapping(address => VaultConfig) public vaultConfig;
-
-    /// @notice Immutable address that the RoleManager position
-    // will be transferred to when a vault is removed.
-    address public immutable chad;
 
     /// @notice Maximum acceptable base fee for debt allocators.
     uint256 public maxAcceptableBaseFee = 100e9;
@@ -151,6 +158,10 @@ contract RoleManager is Governance2Step, VaultConstants {
         ratingToString[4] = "D";
         ratingToString[5] = "F";
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           VAULT CREATION
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Creates a new endorsed vault with default profit max
@@ -409,6 +420,8 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _rating,
         address _debtAllocator
     ) public virtual onlyGovernance {
+        require(_rating > 0 && _rating < 6, "rating out of range");
+
         // If not the current role manager.
         if (IVault(_vault).role_manager() != address(this)) {
             // Accept the position of role manager.
@@ -472,7 +485,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _vault,
         address _debtAllocator
     ) public virtual onlyGovernance {
-        // Make sure the vault has been added to the vault.
+        // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
         // Remove the role from the old allocator if applicable.
@@ -497,6 +510,9 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @param _vault Address of the vault to be removed.
      */
     function removeVault(address _vault) external virtual onlyGovernance {
+        // Make sure the vault has been added to the role manager.
+        require(vaultConfig[_vault].asset != address(0), "vault not added");
+
         // Transfer the role manager position.
         IVault(_vault).transfer_role_manager(chad);
 
@@ -530,6 +546,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _newRoles
     ) external onlyGovernance {
         _positions[_position].roles = uint96(_newRoles);
+
         emit UpdateRoles(_position, _newRoles);
     }
 
@@ -543,6 +560,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _newAddress
     ) external onlyGovernance {
         _positions[_position].holder = _newAddress;
+
         emit UpdateAddress(_position, _newAddress);
     }
 
@@ -554,6 +572,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _newDefaultProfitMaxUnlock
     ) external onlyGovernance {
         defaultProfitMaxUnlock = _newDefaultProfitMaxUnlock;
+
         emit UpdateDefaultProfitMaxUnlock(_newDefaultProfitMaxUnlock);
     }
 
@@ -565,6 +584,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _newMaxAcceptableBaseFee
     ) external onlyGovernance {
         maxAcceptableBaseFee = _newMaxAcceptableBaseFee;
+
         emit UpdateMaxAcceptableBaseFee(_newMaxAcceptableBaseFee);
     }
 
