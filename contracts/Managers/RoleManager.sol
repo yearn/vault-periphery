@@ -11,7 +11,6 @@ import {Registry} from "../registry/Registry.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
-// add a strategy manager position to give add_strategy_manager
 // Let others add vaults?
 // Let others remove vaults?
 // Delegate call the registry for new vaults ?
@@ -19,10 +18,10 @@ import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocato
 /// @title Yearn V3 vault Role Manager.
 contract RoleManager is Governance2Step, VaultConstants {
     /// @notice Emitted when a new address is set for a position.
-    event UpdateAddress(bytes32 position, address indexed newAddress);
+    event UpdateAddress(bytes32 indexed position, address indexed newAddress);
 
     /// @notice Emitted when a new set of roles is set for a position
-    event UpdateRole(bytes32 position, uint256 newRoles);
+    event UpdateRoles(bytes32 indexed position, uint256 newRoles);
 
     /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
@@ -51,7 +50,7 @@ contract RoleManager is Governance2Step, VaultConstants {
     function _isRegistryEndorser() internal view {
         require(
             msg.sender == governance ||
-                Registry(registry).endorsers(msg.sender),
+                Registry(getPositionHolder(REGISTRY)).endorsers(msg.sender),
             "!endorser"
         );
     }
@@ -68,8 +67,17 @@ contract RoleManager is Governance2Step, VaultConstants {
     bytes32 public constant SECURITY = keccak256("Security");
     /// @notice Hash of the role name "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
+    /// @notice Hash of the position ID for Debt Allocator
+    bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
     /// @notice Hash of the position ID for Strategy manager.
     bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
+
+    /// @notice Hash of the position ID for the Registry.
+    bytes32 public constant REGISTRY = keccak256("Registry");
+    /// @notice Hash of the position ID for the Accountant.
+    bytes32 public constant ACCOUNTANT = keccak256("Accountant");
+    /// @notice Hash of the position ID for the Allocator Factory.
+    bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
 
     /// @notice Mapping of a numerical rating to its string equivalent.
     mapping(uint256 => string) public ratingToString;
@@ -82,12 +90,6 @@ contract RoleManager is Governance2Step, VaultConstants {
     // will be transferred to when a vault is removed.
     address public immutable chad;
 
-    /// @notice Address of the accountant.
-    address public accountant;
-    /// @notice Address of the registry contract.
-    address public registry;
-    /// @notice Address of the allocator factory contract.
-    address public allocatorFactory;
     /// @notice Maximum acceptable base fee for debt allocators.
     uint256 public maxAcceptableBaseFee = 100e9;
     /// @notice Default time until profits are fully unlocked for new vaults.
@@ -100,8 +102,8 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _governance,
         address _daddy,
         address _brain,
-        address _keeper,
         address _security,
+        address _keeper,
         address _strategyManager
     ) Governance2Step(_governance) {
         // Set the immutable address that will take over role manager
@@ -130,6 +132,11 @@ contract RoleManager is Governance2Step, VaultConstants {
             holder: _keeper,
             roles: uint96(REPORTING_MANAGER | DEBT_MANAGER)
         });
+
+        // Set just the roles for a debt allocator.
+        _positions[DEBT_ALLOCATOR].roles = uint96(
+            REPORTING_MANAGER | DEBT_MANAGER
+        );
 
         // The strategy manager can add and remove strategies.
         _positions[STRATEGY_MANAGER] = Position({
@@ -222,7 +229,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         );
 
         // Deploy through the registry so it is automatically endorsed.
-        _vault = Registry(registry).newEndorsedVault(
+        _vault = Registry(getPositionHolder(REGISTRY)).newEndorsedVault(
             _asset,
             _name,
             _symbol,
@@ -264,8 +271,9 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _vault
     ) internal virtual returns (address _debtAllocator) {
         // Deploy a new debt allocator for the vault.
-        _debtAllocator = GenericDebtAllocatorFactory(allocatorFactory)
-            .newGenericDebtAllocator(_vault);
+        _debtAllocator = GenericDebtAllocatorFactory(
+            getPositionHolder(ALLOCATOR_FACTORY)
+        ).newGenericDebtAllocator(_vault);
 
         // Set the default max base fee.
         GenericDebtAllocator(_debtAllocator).setMaxAcceptableBaseFee(
@@ -326,8 +334,9 @@ contract RoleManager is Governance2Step, VaultConstants {
             uint256(positionInfo.roles)
         );
 
-        // Let the debt allocator manage debt.
-        IVault(_vault).set_role(_debtAllocator, DEBT_MANAGER);
+        // Give the specific debt allocator its roles.
+        positionInfo = _positions[DEBT_ALLOCATOR];
+        IVault(_vault).set_role(_debtAllocator, uint256(positionInfo.roles));
     }
 
     /**
@@ -338,6 +347,9 @@ contract RoleManager is Governance2Step, VaultConstants {
     function _setAccountant(address _vault) internal virtual {
         // Temporarily give this contract the ability to set the accountant.
         IVault(_vault).add_role(address(this), ACCOUNTANT_MANAGER);
+
+        // Get the current accountant.
+        address accountant = getPositionHolder(ACCOUNTANT);
 
         // Set the account on the vault.
         IVault(_vault).set_accountant(accountant);
@@ -403,6 +415,9 @@ contract RoleManager is Governance2Step, VaultConstants {
             IVault(_vault).accept_role_manager();
         }
 
+        // Get the current registry.
+        address registry = getPositionHolder(REGISTRY);
+
         // Check if the vault has been endorsed yet in the registry.
         if (!Registry(registry).isEndorsed(_vault)) {
             // If not endorse it.
@@ -463,11 +478,14 @@ contract RoleManager is Governance2Step, VaultConstants {
         // Remove the role from the old allocator if applicable.
         address currentAllocator = vaultConfig[_vault].debtAllocator;
         if (currentAllocator != address(0)) {
-            IVault(_vault).remove_role(currentAllocator, DEBT_MANAGER);
+            IVault(_vault).set_role(currentAllocator, 0);
         }
 
         // Give the new debt allocator the debt manager role.
-        IVault(_vault).add_role(_debtAllocator, DEBT_MANAGER);
+        IVault(_vault).set_role(
+            _debtAllocator,
+            getCurrentRoles(DEBT_ALLOCATOR)
+        );
 
         // Update the vaults config.
         vaultConfig[_vault].debtAllocator = _debtAllocator;
@@ -512,7 +530,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _newRoles
     ) external onlyGovernance {
         _positions[_position].roles = uint96(_newRoles);
-        emit UpdateRole(_position, _newRoles);
+        emit UpdateRoles(_position, _newRoles);
     }
 
     /**
@@ -526,35 +544,6 @@ contract RoleManager is Governance2Step, VaultConstants {
     ) external onlyGovernance {
         _positions[_position].holder = _newAddress;
         emit UpdateAddress(_position, _newAddress);
-    }
-
-    /**
-     * @notice Setter function for updating the accountant address.
-     * @param _newAccountant New address for accountant.
-     */
-    function setAccountant(address _newAccountant) external onlyGovernance {
-        accountant = _newAccountant;
-        emit UpdateAddress(keccak256("Accountant"), _newAccountant);
-    }
-
-    /**
-     * @notice Setter function for updating the registry address.
-     * @param _newRegistry New address for registry.
-     */
-    function setRegistry(address _newRegistry) external onlyGovernance {
-        registry = _newRegistry;
-        emit UpdateAddress(keccak256("Registry"), _newRegistry);
-    }
-
-    /**
-     * @notice Setter function for updating the allocatorFactory address.
-     * @param _newAllocatorFactory New address for allocatorFactory.
-     */
-    function setAllocatorFactory(
-        address _newAllocatorFactory
-    ) external onlyGovernance {
-        allocatorFactory = _newAllocatorFactory;
-        emit UpdateAddress(keccak256("AllocatorFactory"), _newAllocatorFactory);
     }
 
     /**
@@ -609,7 +598,7 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @param _vault Address of the vault to check.
      * @return . The vaults role manager status.
      */
-    function isVaultRoleManager(
+    function isVaultsRoleManager(
         address _vault
     ) external view virtual returns (bool) {
         return vaultConfig[_vault].asset != address(0);
@@ -713,6 +702,30 @@ contract RoleManager is Governance2Step, VaultConstants {
     }
 
     /**
+     * @notice Get the address assigned to the accountant.
+     * @return The address assigned to the accountant.
+     */
+    function getAccountant() external view virtual returns (address) {
+        return getPositionHolder(ACCOUNTANT);
+    }
+
+    /**
+     * @notice Get the address assigned to the Registry.
+     * @return The address assigned to the Registry.
+     */
+    function getRegistry() external view virtual returns (address) {
+        return getPositionHolder(REGISTRY);
+    }
+
+    /**
+     * @notice Get the address assigned to the allocator.
+     * @return The address assigned to the allocator factory.
+     */
+    function getAllocatorFactory() external view virtual returns (address) {
+        return getPositionHolder(ALLOCATOR_FACTORY);
+    }
+
+    /**
      * @notice Get the roles given to the Daddy position.
      * @return The roles given to the Daddy position.
      */
@@ -745,43 +758,18 @@ contract RoleManager is Governance2Step, VaultConstants {
     }
 
     /**
+     * @notice Get the roles given to the debt allocators.
+     * @return The roles given to the debt allocators.
+     */
+    function getDebtAllocatorRoles() external view virtual returns (uint256) {
+        return getCurrentRoles(DEBT_ALLOCATOR);
+    }
+
+    /**
      * @notice Get the roles given to the strategy manager.
      * @return The roles given to the strategy manager.
      */
     function getStrategyManagerRoles() external view virtual returns (uint256) {
         return getCurrentRoles(STRATEGY_MANAGER);
-    }
-
-    // This fallback will forward any undefined function calls to the Registry.
-    // This allows for both read and write functions to only need to interact
-    // with one address.
-    // NOTE: Both contracts share the `governance` contract functions and {name}.
-    fallback() external {
-        // load our target address
-        address _registry = registry;
-        // Execute external function using delegatecall and return any value.
-        assembly {
-            // Copy function selector and any arguments.
-            calldatacopy(0, 0, calldatasize())
-            // Execute function delegatecall.
-            let result := delegatecall(
-                gas(),
-                _registry,
-                0,
-                calldatasize(),
-                0,
-                0
-            )
-            // Get any return value
-            returndatacopy(0, 0, returndatasize())
-            // Return any return value or error back to the caller
-            switch result
-            case 0 {
-                revert(0, returndatasize())
-            }
-            default {
-                return(0, returndatasize())
-            }
-        }
     }
 }

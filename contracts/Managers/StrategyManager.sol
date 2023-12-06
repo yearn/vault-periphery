@@ -12,14 +12,7 @@ contract StrategyManager is Governance2Step {
     address public roleManager;
     address public riskScore;
 
-    constructor(
-        address _governance,
-        address _roleManager,
-        address _riskScore
-    ) Governance2Step(_governance) {
-        roleManager = _roleManager;
-        riskScore = _riskScore;
-    }
+    constructor(address _governance) Governance2Step(_governance) {}
 
     function addStrategyToVault(
         address _strategy,
@@ -38,7 +31,7 @@ contract StrategyManager is Governance2Step {
         address _vault
     ) external virtual onlyGovernance {
         require(
-            RoleManager(roleManager).isVaultRoleManager(_vault),
+            RoleManager(roleManager).isVaultsRoleManager(_vault),
             "not role manager"
         );
         IVault(_vault).revoke_strategy(_strategy);
