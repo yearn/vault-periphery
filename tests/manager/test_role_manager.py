@@ -117,7 +117,7 @@ def test__positions(
     assert role_manager.getCurrentRoles(id) == 0
 
     with ape.reverts("!governance"):
-        role_manager.setPosition(id, user, sender=user)
+        role_manager.setPositionHolder(id, user, sender=user)
 
     positions = {
         "Daddy": (daddy, daddy_roles),
@@ -139,18 +139,18 @@ def test__positions(
         assert role_manager.getPositionHolder(id) == position[0]
         assert role_manager.getCurrentRoles(id) == position[1]
 
-        tx = role_manager.setPosition(id, user, sender=daddy)
+        tx = role_manager.setPositionHolder(id, user, sender=daddy)
 
-        event = list(tx.decode_logs(role_manager.UpdateAddress))[0]
+        event = list(tx.decode_logs(role_manager.UpdatePositionHolder))[0]
 
         assert event.position == id
         assert event.newAddress == user
 
         assert role_manager.getPositionHolder(id) == user
 
-        tx = role_manager.adjustRole(id, new_role, sender=daddy)
+        tx = role_manager.setPositionRoles(id, new_role, sender=daddy)
 
-        event = list(tx.decode_logs(role_manager.UpdateRoles))[0]
+        event = list(tx.decode_logs(role_manager.UpdatePositionRoles))[0]
 
         assert event.position == id
         assert event.newRoles == new_role
@@ -251,11 +251,11 @@ def test_deploy_new_vault(
     with ape.reverts("rating out of range"):
         role_manager.newVault(asset, int(6), deposit_limit, profit_unlock, sender=daddy)
 
-    with ape.reverts("!endorser"):
+    with ape.reverts("!allowed"):
         role_manager.newVault(asset, rating, deposit_limit, profit_unlock, sender=user)
 
     # Now the registry will revert
-    with ape.reverts("!endorse"):
+    with ape.reverts("!endorser"):
         role_manager.newVault(asset, rating, deposit_limit, profit_unlock, sender=daddy)
 
     # ADd the role manager as an endorser
@@ -275,6 +275,11 @@ def test_deploy_new_vault(
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
     vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -348,14 +353,17 @@ def test_deploy_new_vault__default_values(
     rating = int(2)
 
     with ape.reverts("rating out of range"):
-        role_manager.newVault(asset, 0, sender=user)
+        role_manager.newVault(asset, 0, sender=daddy)
 
     with ape.reverts("rating out of range"):
-        role_manager.newVault(asset, int(6), sender=user)
+        role_manager.newVault(asset, int(6), sender=daddy)
+
+    with ape.reverts("!allowed"):
+        role_manager.newVault(asset, rating, sender=user)
 
     # Now the registry will revert
-    with ape.reverts("!endorse"):
-        role_manager.newVault(asset, rating, sender=user)
+    with ape.reverts("!endorser"):
+        role_manager.newVault(asset, rating, sender=daddy)
 
     # ADd the role manager as an endorser
     registry.setEndorser(role_manager, True, sender=daddy)
@@ -363,16 +371,21 @@ def test_deploy_new_vault__default_values(
 
     # Haven't set the role manager as the vault manager.
     with ape.reverts("!vault manager"):
-        role_manager.newVault(asset, rating, sender=user)
+        role_manager.newVault(asset, rating, sender=daddy)
 
     healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
 
     # User can now deploy
-    tx = role_manager.newVault(asset, rating, sender=user)
+    tx = role_manager.newVault(asset, rating, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
     vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -474,7 +487,7 @@ def test_add_new_vault__endorsed(
 
     rating = int(1)
 
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.addNewVault(vault, rating, sender=user)
 
     with ape.reverts("rating out of range"):
@@ -490,6 +503,11 @@ def test_add_new_vault__endorsed(
     vault.transfer_role_manager(role_manager, sender=daddy)
 
     tx = role_manager.addNewVault(vault, rating, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -575,7 +593,7 @@ def test_add_new_vault__not_endorsed(
 
     rating = int(1)
 
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.addNewVault(vault, rating, sender=user)
 
     with ape.reverts("rating out of range"):
@@ -591,6 +609,11 @@ def test_add_new_vault__not_endorsed(
     vault.transfer_role_manager(role_manager, sender=daddy)
 
     tx = role_manager.addNewVault(vault, rating, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -683,7 +706,7 @@ def test_add_new_vault__with_debt_allocator(
     assert event.vault == vault
     debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
 
     with ape.reverts("rating out of range"):
@@ -699,6 +722,11 @@ def test_add_new_vault__with_debt_allocator(
     vault.transfer_role_manager(role_manager, sender=daddy)
 
     tx = role_manager.addNewVault(vault, rating, debt_allocator, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -790,7 +818,7 @@ def test_add_new_vault__with_accountant(
     vault.set_accountant(user, sender=daddy)
     vault.remove_role(daddy, ROLES.ACCOUNTANT_MANAGER, sender=daddy)
 
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.addNewVault(vault, rating, debt_allocator, sender=user)
 
     with ape.reverts("rating out of range"):
@@ -806,6 +834,11 @@ def test_add_new_vault__with_accountant(
     vault.transfer_role_manager(role_manager, sender=daddy)
 
     tx = role_manager.addNewVault(vault, rating, debt_allocator, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
+
+    assert event.vault == vault
+    assert event.rating == rating
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -922,7 +955,7 @@ def test_new_debt_allocator__deploys_one(
     assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
     # Update to a new debt allocator
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.updateDebtAllocator(vault, sender=user)
 
     with ape.reverts("vault not added"):
@@ -1043,7 +1076,7 @@ def test_new_debt_allocator__already_deployed(
     new_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
     # Update to a new debt allocator
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=user)
 
     with ape.reverts("vault not added"):
@@ -1157,13 +1190,16 @@ def test_remove_vault(
     assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
     # Remove the vault
-    with ape.reverts("!governance"):
+    with ape.reverts("!allowed"):
         role_manager.removeVault(vault, sender=user)
 
     with ape.reverts("vault not added"):
         role_manager.removeVault(user, sender=daddy)
 
     tx = role_manager.removeVault(vault, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.RemovedVault))[0]
+    assert event.vault == vault
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault

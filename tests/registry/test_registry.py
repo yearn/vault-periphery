@@ -807,7 +807,7 @@ def test__access(
     symbol = "yvTest"
 
     # Cant deploy a vault through registry
-    with ape.reverts("!governance"):
+    with ape.reverts("!endorser"):
         registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=user)
 
     # Deploy a new vault
@@ -819,25 +819,70 @@ def test__access(
     )
 
     # Cant endorse a vault
-    with ape.reverts("!governance"):
+    with ape.reverts("!endorser"):
         registry.endorseVault(new_vault, 0, 1, 0, sender=user)
 
     # cant endorse vault with default values
-    with ape.reverts("!governance"):
+    with ape.reverts("!endorser"):
         registry.endorseMultiStrategyVault(new_vault, sender=user)
 
     # cant endorse strategy with default values
-    with ape.reverts("!governance"):
+    with ape.reverts("!endorser"):
         registry.endorseSingleStrategyVault(strategy, sender=user)
 
-    with ape.reverts("!governance"):
-        registry.tagVault(strategy, "tag", sender=user)
-
-    with ape.reverts("!governance"):
+    # cant remove vault or asset
+    with ape.reverts("!endorser"):
         registry.removeVault(new_vault.address, 0, sender=user)
 
-    with ape.reverts("!governance"):
+    with ape.reverts("!endorser"):
         registry.removeAsset(asset.address, 0, sender=user)
+
+    # Make user a endorser
+    with ape.reverts("!governance"):
+        registry.setEndorser(user, True, sender=user)
+
+    tx = registry.setEndorser(user, True, sender=daddy)
+
+    event = list(tx.decode_logs(registry.UpdateEndorser))[0]
+
+    assert event.account == user
+    assert event.status == True
+    assert registry.endorsers(user) == True
+
+    registry.endorseVault(new_vault, 0, 1, 0, sender=user)
+
+    assert registry.isEndorsed(new_vault)
+
+    with ape.reverts("!tagger"):
+        registry.tagVault(strategy, "tag", sender=user)
+
+    # Make user a tagger
+    with ape.reverts("!governance"):
+        registry.setTagger(user, True, sender=user)
+
+    tx = registry.setTagger(user, True, sender=daddy)
+
+    event = list(tx.decode_logs(registry.UpdateTagger))[0]
+
+    assert event.account == user
+    assert event.status == True
+    assert registry.taggers(user) == True
+
+    # Tag the vault.
+    registry.tagVault(new_vault, "tag", sender=user)
+
+    assert registry.vaultInfo(new_vault).tag == "tag"
+
+    # User should be able to remove vaults and assets now too.
+    registry.removeVault(new_vault, 0, sender=user)
+
+    assert registry.isEndorsed(new_vault) == False
+
+    assert registry.numAssets() == 1
+
+    registry.removeAsset(asset, 0, sender=user)
+
+    assert registry.numAssets() == 0
 
     # cant transfer governance
     with ape.reverts("!governance"):

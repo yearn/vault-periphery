@@ -35,13 +35,26 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
+    event UpdateEndorser(address indexed account, bool status);
+
+    event UpdateTagger(address indexed account, bool status);
+
     modifier onlyEndorsers() {
         _isEndorser();
         _;
     }
 
+    modifier onlyTaggers() {
+        _isTagger();
+        _;
+    }
+
     function _isEndorser() internal view {
-        require(msg.sender == governance || endorsers[msg.sender], "!endorse");
+        require(msg.sender == governance || endorsers[msg.sender], "!endorser");
+    }
+
+    function _isTagger() internal view {
+        require(msg.sender == governance || taggers[msg.sender], "!tagger");
     }
 
     // Struct stored for every endorsed vault or strategy for
@@ -65,17 +78,20 @@ contract Registry is Governance {
     // Default type used for Single "Tokenized" Strategy vaults.
     uint256 public constant SINGLE_STRATEGY_TYPE = 2;
 
+    // Address used to get the specific versions from.
+    address public immutable releaseRegistry;
+
     // Custom name for this Registry.
     string public name;
+
+    // Mapping for any address that is allowed to tag a vault.
+    mapping(address => bool) public taggers;
 
     // Mapping for any address that is allowed to deploy or endorse.
     mapping(address => bool) public endorsers;
 
-    // Address used to get the specific versions from.
-    address public immutable releaseRegistry;
-
-    // Array of all tokens used as the underlying.
-    address[] public assets;
+    // vault/strategy address => Info struct.
+    mapping(address => Info) public vaultInfo;
 
     // Mapping to check if a specific `asset` has a vault.
     mapping(address => bool) public assetIsUsed;
@@ -83,8 +99,8 @@ contract Registry is Governance {
     // asset => array of all endorsed vaults.
     mapping(address => address[]) internal _endorsedVaults;
 
-    // vault/strategy address => Info struct.
-    mapping(address => Info) public vaultInfo;
+    // Array of all tokens used as the underlying.
+    address[] public assets;
 
     /**
      * @param _governance Address to set as owner of the Registry.
@@ -231,7 +247,7 @@ contract Registry is Governance {
         address _roleManager,
         uint256 _profitMaxUnlockTime,
         uint256 _releaseDelta
-    ) public onlyEndorsers returns (address _vault) {
+    ) public virtual onlyEndorsers returns (address _vault) {
         // Get the target release based on the delta given.
         uint256 _releaseTarget = ReleaseRegistry(releaseRegistry)
             .numReleases() -
@@ -305,7 +321,7 @@ contract Registry is Governance {
         uint256 _releaseDelta,
         uint256 _vaultType,
         uint256 _deploymentTimestamp
-    ) public onlyEndorsers {
+    ) public virtual onlyEndorsers {
         // Cannot endorse twice.
         require(vaultInfo[_vault].asset == address(0), "endorsed");
         require(_vaultType != 0, "no 0 type");
@@ -379,7 +395,7 @@ contract Registry is Governance {
     function tagVault(
         address _vault,
         string memory _tag
-    ) external virtual onlyGovernance {
+    ) external virtual onlyTaggers {
         require(vaultInfo[_vault].asset != address(0), "!Endorsed");
         vaultInfo[_vault].tag = _tag;
     }
@@ -398,7 +414,7 @@ contract Registry is Governance {
     function removeVault(
         address _vault,
         uint256 _index
-    ) external virtual onlyGovernance {
+    ) external virtual onlyEndorsers {
         require(vaultInfo[_vault].asset != address(0), "!endorsed");
 
         // Get the asset the vault is using.
@@ -441,7 +457,7 @@ contract Registry is Governance {
     function removeAsset(
         address _asset,
         uint256 _index
-    ) external virtual onlyGovernance {
+    ) external virtual onlyEndorsers {
         require(assetIsUsed[_asset], "!in use");
         require(_endorsedVaults[_asset].length == 0, "still in use");
         require(assets[_index] == _asset, "wrong asset");
@@ -464,7 +480,23 @@ contract Registry is Governance {
     function setEndorser(
         address _account,
         bool _canEndorse
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         endorsers[_account] = _canEndorse;
+
+        emit UpdateEndorser(_account, _canEndorse);
+    }
+
+    /**
+     * @notice Set a new address to be able to tag a vault.
+     * @param _account The address to set.
+     * @param _canTag Bool if the `_account` can or cannot tag.
+     */
+    function setTagger(
+        address _account,
+        bool _canTag
+    ) external virtual onlyGovernance {
+        taggers[_account] = _canTag;
+
+        emit UpdateTagger(_account, _canTag);
     }
 }

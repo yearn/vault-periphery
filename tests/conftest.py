@@ -445,11 +445,11 @@ def role_manager(
 ):
     role_manager = deploy_role_manager()
 
-    role_manager.setPosition(
+    role_manager.setPositionHolder(
         role_manager.ACCOUNTANT(), healthcheck_accountant, sender=daddy
     )
-    role_manager.setPosition(role_manager.REGISTRY(), registry, sender=daddy)
-    role_manager.setPosition(
+    role_manager.setPositionHolder(role_manager.REGISTRY(), registry, sender=daddy)
+    role_manager.setPositionHolder(
         role_manager.ALLOCATOR_FACTORY(), generic_debt_allocator_factory, sender=daddy
     )
 

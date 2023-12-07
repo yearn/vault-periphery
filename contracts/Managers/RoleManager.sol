@@ -7,20 +7,21 @@ import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {VaultConstants} from "@yearn-vaults/interfaces/VaultConstants.sol";
 
+import {Roles} from "../libraries/Roles.sol";
 import {Registry} from "../registry/Registry.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
-// Let others add vaults?
-// Let others remove vaults?
-
-/// @title Yearn V3 vault Role Manager.
-contract RoleManager is Governance2Step, VaultConstants {
+/// @title Yearn V3 Vault Role Manager.
+contract RoleManager is Governance2Step {
     /// @notice Emitted when a new address is set for a position.
-    event UpdateAddress(bytes32 indexed position, address indexed newAddress);
+    event UpdatePositionHolder(
+        bytes32 indexed position,
+        address indexed newAddress
+    );
 
     /// @notice Emitted when a new set of roles is set for a position
-    event UpdateRoles(bytes32 indexed position, uint256 newRoles);
+    event UpdatePositionRoles(bytes32 indexed position, uint256 newRoles);
 
     /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
@@ -28,6 +29,13 @@ contract RoleManager is Governance2Step, VaultConstants {
     /// @notice Emitted when the maxAcceptableBaseFee variable is updated.
     event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
 
+    /// @notice Emitted when a new vault has been deployed or added.
+    event AddedNewVault(address indexed vault, uint256 rating);
+
+    /// @notice Emitted when a vault is removed.
+    event RemovedVault(address indexed vault);
+
+    /// @notice Config that holds all vault info.
     struct VaultConfig {
         address asset;
         uint256 rating;
@@ -35,22 +43,24 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 index;
     }
 
+    /// @notice Position struct
     struct Position {
         address holder;
         uint96 roles;
     }
 
-    /// @notice Checks the msg sender is allowed to endorse vaults.
-    modifier onlyEndorser() {
-        _isRegistryEndorser();
+    /// @notice Only allow either governance or the position holder to call.
+    modifier onlyPositionHolder(bytes32 _positionId) {
+        _isPositionHolder(_positionId);
         _;
     }
 
-    function _isRegistryEndorser() internal view {
+    /// @notice Check if the msg sender is governance or the specified position holder.
+    function _isPositionHolder(bytes32 _positionId) internal view {
         require(
             msg.sender == governance ||
-                Registry(getPositionHolder(REGISTRY)).endorsers(msg.sender),
-            "!endorser"
+                msg.sender == getPositionHolder(_positionId),
+            "!allowed"
         );
     }
 
@@ -62,24 +72,24 @@ contract RoleManager is Governance2Step, VaultConstants {
                            POSITION ID'S
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Hash of the role name "daddy".
+    /// @notice Position ID for "daddy".
     bytes32 public constant DADDY = keccak256("Daddy");
-    /// @notice Hash of the role name "brain".
+    /// @notice Position ID for "brain".
     bytes32 public constant BRAIN = keccak256("Brain");
-    /// @notice Hash of the role name "security".
+    /// @notice Position ID for "security".
     bytes32 public constant SECURITY = keccak256("Security");
-    /// @notice Hash of the role name "keeper".
+    /// @notice Position ID for "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Hash of the position ID for Debt Allocator
+    /// @notice Position ID for Debt Allocator
     bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
-    /// @notice Hash of the position ID for Strategy manager.
+    /// @notice Position ID for Strategy manager.
     bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
 
-    /// @notice Hash of the position ID for the Registry.
+    /// @notice Position ID for the Registry.
     bytes32 public constant REGISTRY = keccak256("Registry");
-    /// @notice Hash of the position ID for the Accountant.
+    /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
-    /// @notice Hash of the position ID for the Allocator Factory.
+    /// @notice Position ID for the Allocator Factory.
     bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
 
     /// @notice Immutable address that the RoleManager position
@@ -90,14 +100,14 @@ contract RoleManager is Governance2Step, VaultConstants {
                            STORAGE
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Mapping of position ID to position information.
+    mapping(bytes32 => Position) internal _positions;
     /// @notice Mapping of a numerical rating to its string equivalent.
     mapping(uint256 => string) public ratingToString;
-    /// @notice Mapping of role hashes to role information.
-    mapping(bytes32 => Position) internal _positions;
-    /// @notice Mapping of vault addresses to their configurations.
+    /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
 
-    /// @notice Maximum acceptable base fee for debt allocators.
+    /// @notice Default maximum acceptable base fee for debt allocators.
     uint256 public maxAcceptableBaseFee = 100e9;
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 10 days;
@@ -120,35 +130,44 @@ contract RoleManager is Governance2Step, VaultConstants {
         // Set up the initial role configs for each position.
 
         // Daddy is given all of the roles.
-        _positions[DADDY] = Position({holder: _daddy, roles: uint96(ALL)});
+        _positions[DADDY] = Position({
+            holder: _daddy,
+            roles: uint96(Roles.ALL)
+        });
 
         // Brain can process reports, update debt and adjust the queue.
         _positions[BRAIN] = Position({
             holder: _brain,
-            roles: uint96(REPORTING_MANAGER | DEBT_MANAGER | QUEUE_MANAGER)
+            roles: uint96(
+                Roles.REPORTING_MANAGER |
+                    Roles.DEBT_MANAGER |
+                    Roles.QUEUE_MANAGER
+            )
         });
 
         // Security cna set the max debt for strategies to have.
         _positions[SECURITY] = Position({
             holder: _security,
-            roles: uint96(MAX_DEBT_MANAGER)
+            roles: uint96(Roles.MAX_DEBT_MANAGER)
         });
 
         // The keeper can process reports and update debt.
         _positions[KEEPER] = Position({
             holder: _keeper,
-            roles: uint96(REPORTING_MANAGER | DEBT_MANAGER)
+            roles: uint96(Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER)
         });
 
         // Set just the roles for a debt allocator.
         _positions[DEBT_ALLOCATOR].roles = uint96(
-            REPORTING_MANAGER | DEBT_MANAGER
+            Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER
         );
 
         // The strategy manager can add and remove strategies.
         _positions[STRATEGY_MANAGER] = Position({
             holder: _strategyManager,
-            roles: uint96(ADD_STRATEGY_MANAGER | REVOKE_STRATEGY_MANAGER)
+            roles: uint96(
+                Roles.ADD_STRATEGY_MANAGER | Roles.REVOKE_STRATEGY_MANAGER
+            )
         });
 
         // Set up the ratingToString mapping.
@@ -175,7 +194,7 @@ contract RoleManager is Governance2Step, VaultConstants {
     function newVault(
         address _asset,
         uint256 _rating
-    ) external virtual returns (address) {
+    ) external virtual onlyPositionHolder(DADDY) returns (address) {
         return _newVault(_asset, _rating, 0, defaultProfitMaxUnlock);
     }
 
@@ -190,7 +209,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _asset,
         uint256 _rating,
         uint256 _depositLimit
-    ) external virtual onlyEndorser returns (address) {
+    ) external virtual onlyPositionHolder(DADDY) returns (address) {
         return
             _newVault(_asset, _rating, _depositLimit, defaultProfitMaxUnlock);
     }
@@ -208,7 +227,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _rating,
         uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
-    ) external virtual onlyEndorser returns (address) {
+    ) external virtual onlyPositionHolder(DADDY) returns (address) {
         return _newVault(_asset, _rating, _depositLimit, _profitMaxUnlockTime);
     }
 
@@ -271,6 +290,8 @@ contract RoleManager is Governance2Step, VaultConstants {
 
         // Add the vault to the array.
         vaults.push(_vault);
+
+        emit AddedNewVault(_vault, _rating);
     }
 
     /**
@@ -357,7 +378,7 @@ contract RoleManager is Governance2Step, VaultConstants {
      */
     function _setAccountant(address _vault) internal virtual {
         // Temporarily give this contract the ability to set the accountant.
-        IVault(_vault).add_role(address(this), ACCOUNTANT_MANAGER);
+        IVault(_vault).add_role(address(this), Roles.ACCOUNTANT_MANAGER);
 
         // Get the current accountant.
         address accountant = getPositionHolder(ACCOUNTANT);
@@ -366,7 +387,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         IVault(_vault).set_accountant(accountant);
 
         // Take away the role.
-        IVault(_vault).remove_role(address(this), ACCOUNTANT_MANAGER);
+        IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
 
         // Whitelist the vault in the accountant.
         HealthCheckAccountant(accountant).addVault(_vault);
@@ -384,13 +405,13 @@ contract RoleManager is Governance2Step, VaultConstants {
         uint256 _depositLimit
     ) internal virtual {
         // Temporarily give this contract the ability to set the deposit limit.
-        IVault(_vault).add_role(address(this), DEPOSIT_LIMIT_MANAGER);
+        IVault(_vault).add_role(address(this), Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set the initial deposit limit on the vault.
         IVault(_vault).set_deposit_limit(_depositLimit);
 
         // Take away the role.
-        IVault(_vault).remove_role(address(this), DEPOSIT_LIMIT_MANAGER);
+        IVault(_vault).remove_role(address(this), Roles.DEPOSIT_LIMIT_MANAGER);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -405,7 +426,8 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @param _rating Rating associated with the vault.
      */
     function addNewVault(address _vault, uint256 _rating) external virtual {
-        addNewVault(_vault, _rating, address(0));
+        address _debtAllocator = _deployAllocator(_vault);
+        addNewVault(_vault, _rating, _debtAllocator);
     }
 
     /**
@@ -419,7 +441,7 @@ contract RoleManager is Governance2Step, VaultConstants {
         address _vault,
         uint256 _rating,
         address _debtAllocator
-    ) public virtual onlyGovernance {
+    ) public virtual onlyPositionHolder(DADDY) {
         require(_rating > 0 && _rating < 6, "rating out of range");
 
         // If not the current role manager.
@@ -435,12 +457,6 @@ contract RoleManager is Governance2Step, VaultConstants {
         if (!Registry(registry).isEndorsed(_vault)) {
             // If not endorse it.
             Registry(registry).endorseMultiStrategyVault(_vault);
-        }
-
-        // If there is no existing debt allocator.
-        if (_debtAllocator == address(0)) {
-            // Deploy a new one.
-            _debtAllocator = _deployAllocator(_vault);
         }
 
         // Set the roles up.
@@ -461,6 +477,8 @@ contract RoleManager is Governance2Step, VaultConstants {
 
         // Add the vault to the array.
         vaults.push(_vault);
+
+        emit AddedNewVault(_vault, _rating);
     }
 
     /**
@@ -484,7 +502,7 @@ contract RoleManager is Governance2Step, VaultConstants {
     function updateDebtAllocator(
         address _vault,
         address _debtAllocator
-    ) public virtual onlyGovernance {
+    ) public virtual onlyPositionHolder(DADDY) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
@@ -509,7 +527,9 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @dev This will NOT un-endorse the vault.
      * @param _vault Address of the vault to be removed.
      */
-    function removeVault(address _vault) external virtual onlyGovernance {
+    function removeVault(
+        address _vault
+    ) external virtual onlyPositionHolder(DADDY) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
@@ -530,6 +550,8 @@ contract RoleManager is Governance2Step, VaultConstants {
 
         // Delete the config for `_vault`.
         delete vaultConfig[_vault];
+
+        emit RemovedVault(_vault);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -541,27 +563,27 @@ contract RoleManager is Governance2Step, VaultConstants {
      * @param _position Identifier for the position.
      * @param _newRoles New roles for the position.
      */
-    function adjustRole(
+    function setPositionRoles(
         bytes32 _position,
         uint256 _newRoles
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         _positions[_position].roles = uint96(_newRoles);
 
-        emit UpdateRoles(_position, _newRoles);
+        emit UpdatePositionRoles(_position, _newRoles);
     }
 
     /**
      * @notice Setter function for updating a positions address.
      * @param _position Identifier for the position.
-     * @param _newAddress New address for position.
+     * @param _newHolder New address for position.
      */
-    function setPosition(
+    function setPositionHolder(
         bytes32 _position,
-        address _newAddress
-    ) external onlyGovernance {
-        _positions[_position].holder = _newAddress;
+        address _newHolder
+    ) external virtual onlyGovernance {
+        _positions[_position].holder = _newHolder;
 
-        emit UpdateAddress(_position, _newAddress);
+        emit UpdatePositionHolder(_position, _newHolder);
     }
 
     /**
@@ -570,7 +592,7 @@ contract RoleManager is Governance2Step, VaultConstants {
      */
     function setDefaultProfitMaxUnlock(
         uint256 _newDefaultProfitMaxUnlock
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         defaultProfitMaxUnlock = _newDefaultProfitMaxUnlock;
 
         emit UpdateDefaultProfitMaxUnlock(_newDefaultProfitMaxUnlock);
@@ -582,7 +604,7 @@ contract RoleManager is Governance2Step, VaultConstants {
      */
     function setMaxAcceptableBaseFee(
         uint256 _newMaxAcceptableBaseFee
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         maxAcceptableBaseFee = _newMaxAcceptableBaseFee;
 
         emit UpdateMaxAcceptableBaseFee(_newMaxAcceptableBaseFee);
