@@ -98,23 +98,23 @@ def test__positions(
     assert role_manager.getKeeperRoles() == keeper_roles
     assert role_manager.getDebtAllocatorRoles() == debt_allocator_roles
     assert role_manager.getStrategyManagerRoles() == strategy_manager_roles
-    assert role_manager.getCurrentRoles(role_manager.DADDY()) == daddy_roles
-    assert role_manager.getCurrentRoles(role_manager.BRAIN()) == brain_roles
-    assert role_manager.getCurrentRoles(role_manager.SECURITY()) == security_roles
-    assert role_manager.getCurrentRoles(role_manager.KEEPER()) == keeper_roles
+    assert role_manager.getPositionRoles(role_manager.DADDY()) == daddy_roles
+    assert role_manager.getPositionRoles(role_manager.BRAIN()) == brain_roles
+    assert role_manager.getPositionRoles(role_manager.SECURITY()) == security_roles
+    assert role_manager.getPositionRoles(role_manager.KEEPER()) == keeper_roles
     assert (
-        role_manager.getCurrentRoles(role_manager.DEBT_ALLOCATOR())
+        role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR())
         == debt_allocator_roles
     )
     assert (
-        role_manager.getCurrentRoles(role_manager.STRATEGY_MANAGER())
+        role_manager.getPositionRoles(role_manager.STRATEGY_MANAGER())
         == strategy_manager_roles
     )
 
     id = to_bytes32("rando")
     assert role_manager.getPosition(id) == (ZERO_ADDRESS, 0)
     assert role_manager.getPositionHolder(id) == ZERO_ADDRESS
-    assert role_manager.getCurrentRoles(id) == 0
+    assert role_manager.getPositionRoles(id) == 0
 
     with ape.reverts("!governance"):
         role_manager.setPositionHolder(id, user, sender=user)
@@ -137,7 +137,7 @@ def test__positions(
         id = to_bytes32(name)
         assert role_manager.getPosition(id) == position
         assert role_manager.getPositionHolder(id) == position[0]
-        assert role_manager.getCurrentRoles(id) == position[1]
+        assert role_manager.getPositionRoles(id) == position[1]
 
         tx = role_manager.setPositionHolder(id, user, sender=daddy)
 

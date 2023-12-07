@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
-
-import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-import {VaultConstants} from "@yearn-vaults/interfaces/VaultConstants.sol";
-
 import {Roles} from "../libraries/Roles.sol";
 import {Registry} from "../registry/Registry.sol";
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
 import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
@@ -185,8 +182,6 @@ contract RoleManager is Governance2Step {
     /**
      * @notice Creates a new endorsed vault with default profit max
      *      unlock time and doesn't set the deposit limit.
-     * @dev This is a permissionless function for anyone to deploy a vault
-     *      that does not yet exist.
      * @param _asset Address of the underlying asset.
      * @param _rating Rating of the vault.
      * @return _vault Address of the newly created vault.
@@ -291,6 +286,7 @@ contract RoleManager is Governance2Step {
         // Add the vault to the array.
         vaults.push(_vault);
 
+        // Emit event for new vault.
         emit AddedNewVault(_vault, _rating);
     }
 
@@ -319,9 +315,11 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @dev Assigns roles to the newly created vault and performs additional configurations.
-     *      This will override any previously set roles for the addresses. But not effect
-     *      the roles held by other addresses.
+     * @dev Assigns roles to the newly added vault.
+     *
+     * This will override any previously set roles for the holders. But not effect
+     * the roles held by other addresses.
+     *
      * @param _vault Address of the vault to sanctify.
      * @param _debtAllocator Address of the debt allocator for the vault.
      */
@@ -478,6 +476,7 @@ contract RoleManager is Governance2Step {
         // Add the vault to the array.
         vaults.push(_vault);
 
+        // Emit event.
         emit AddedNewVault(_vault, _rating);
     }
 
@@ -512,10 +511,10 @@ contract RoleManager is Governance2Step {
             IVault(_vault).set_role(currentAllocator, 0);
         }
 
-        // Give the new debt allocator the debt manager role.
+        // Give the new debt allocator the relevant roles.
         IVault(_vault).set_role(
             _debtAllocator,
-            getCurrentRoles(DEBT_ALLOCATOR)
+            getPositionRoles(DEBT_ALLOCATOR)
         );
 
         // Update the vaults config.
@@ -524,7 +523,7 @@ contract RoleManager is Governance2Step {
 
     /**
      * @notice Removes a vault from the RoleManager.
-     * @dev This will NOT un-endorse the vault.
+     * @dev This will NOT un-endorse the vault from the registry.
      * @param _vault Address of the vault to be removed.
      */
     function removeVault(
@@ -573,7 +572,7 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Setter function for updating a positions address.
+     * @notice Setter function for updating a positions holder.
      * @param _position Identifier for the position.
      * @param _newHolder New address for position.
      */
@@ -697,7 +696,7 @@ contract RoleManager is Governance2Step {
      * @param _positionId The position identifier.
      * @return The current roles given to the specified position ID.
      */
-    function getCurrentRoles(
+    function getPositionRoles(
         bytes32 _positionId
     ) public view virtual returns (uint256) {
         return uint256(_positions[_positionId].roles);
@@ -772,7 +771,7 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the Daddy position.
      */
     function getDaddyRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(DADDY);
+        return getPositionRoles(DADDY);
     }
 
     /**
@@ -780,7 +779,7 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the Brain position.
      */
     function getBrainRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(BRAIN);
+        return getPositionRoles(BRAIN);
     }
 
     /**
@@ -788,7 +787,7 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the Security position.
      */
     function getSecurityRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(SECURITY);
+        return getPositionRoles(SECURITY);
     }
 
     /**
@@ -796,7 +795,7 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the Keeper position.
      */
     function getKeeperRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(KEEPER);
+        return getPositionRoles(KEEPER);
     }
 
     /**
@@ -804,7 +803,7 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the debt allocators.
      */
     function getDebtAllocatorRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(DEBT_ALLOCATOR);
+        return getPositionRoles(DEBT_ALLOCATOR);
     }
 
     /**
@@ -812,6 +811,6 @@ contract RoleManager is Governance2Step {
      * @return The roles given to the strategy manager.
      */
     function getStrategyManagerRoles() external view virtual returns (uint256) {
-        return getCurrentRoles(STRATEGY_MANAGER);
+        return getPositionRoles(STRATEGY_MANAGER);
     }
 }
