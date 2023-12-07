@@ -155,7 +155,7 @@ def test__positions(
         assert event.position == id
         assert event.newRoles == new_role
 
-        assert role_manager.getCurrentRoles(id) == new_role
+        assert role_manager.getPositionRoles(id) == new_role
         assert role_manager.getPosition(id) == (user, new_role)
 
     # All positions should be changed now.
@@ -182,12 +182,12 @@ def test__positions(
     assert role_manager.getKeeperRoles() == new_role
     assert role_manager.getDebtAllocatorRoles() == new_role
     assert role_manager.getStrategyManagerRoles() == new_role
-    assert role_manager.getCurrentRoles(role_manager.DADDY()) == new_role
-    assert role_manager.getCurrentRoles(role_manager.BRAIN()) == new_role
-    assert role_manager.getCurrentRoles(role_manager.SECURITY()) == new_role
-    assert role_manager.getCurrentRoles(role_manager.KEEPER()) == new_role
-    assert role_manager.getCurrentRoles(role_manager.DEBT_ALLOCATOR()) == new_role
-    assert role_manager.getCurrentRoles(role_manager.STRATEGY_MANAGER()) == new_role
+    assert role_manager.getPositionRoles(role_manager.DADDY()) == new_role
+    assert role_manager.getPositionRoles(role_manager.BRAIN()) == new_role
+    assert role_manager.getPositionRoles(role_manager.SECURITY()) == new_role
+    assert role_manager.getPositionRoles(role_manager.KEEPER()) == new_role
+    assert role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR()) == new_role
+    assert role_manager.getPositionRoles(role_manager.STRATEGY_MANAGER()) == new_role
 
 
 def test_setters(role_manager, daddy, user):

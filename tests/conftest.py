@@ -51,6 +51,11 @@ def vault_manager(accounts):
 
 
 @pytest.fixture(scope="session")
+def strategy_manager(accounts):
+    return accounts[8]
+
+
+@pytest.fixture(scope="session")
 def create_token(project, daddy, user, amount):
     def create_token(
         name="Test Token", symbol="yTest", initialUser=user, initialAmount=amount
@@ -399,22 +404,6 @@ def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy
     generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
     yield generic_debt_allocator
-
-
-@pytest.fixture(scope="session")
-def deploy_strategy_manager(project, daddy):
-    def deploy_strategy_manager():
-        strategy_manager = daddy.deploy(project.StrategyManager, daddy)
-
-        return strategy_manager
-
-    yield deploy_strategy_manager
-
-
-@pytest.fixture(scope="session")
-def strategy_manager(deploy_strategy_manager):
-    strategy_manager = deploy_strategy_manager()
-    return strategy_manager
 
 
 @pytest.fixture(scope="session")
