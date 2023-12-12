@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GNU AGPLv3
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.18;
 
 import {Roles} from "../libraries/Roles.sol";
@@ -73,19 +73,18 @@ contract RoleManager is Governance2Step {
     bytes32 public constant DADDY = keccak256("Daddy");
     /// @notice Position ID for "brain".
     bytes32 public constant BRAIN = keccak256("Brain");
-    /// @notice Position ID for "security".
-    bytes32 public constant SECURITY = keccak256("Security");
     /// @notice Position ID for "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Position ID for Debt Allocator
-    bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
-    /// @notice Position ID for Strategy manager.
-    bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
-
+    /// @notice Position ID for "security".
+    bytes32 public constant SECURITY = keccak256("Security");
     /// @notice Position ID for the Registry.
     bytes32 public constant REGISTRY = keccak256("Registry");
     /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
+    /// @notice Position ID for Debt Allocator
+    bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
+    /// @notice Position ID for Strategy manager.
+    bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
     /// @notice Position ID for the Allocator Factory.
     bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
 
@@ -96,6 +95,9 @@ contract RoleManager is Governance2Step {
     /*//////////////////////////////////////////////////////////////
                            STORAGE
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Array storing addresses of all managed vaults.
+    address[] public vaults;
 
     /// @notice Mapping of position ID to position information.
     mapping(bytes32 => Position) internal _positions;
@@ -109,9 +111,6 @@ contract RoleManager is Governance2Step {
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 10 days;
 
-    /// @notice Array storing addresses of all managed vaults.
-    address[] public vaults;
-
     constructor(
         address _governance,
         address _daddy,
@@ -120,6 +119,7 @@ contract RoleManager is Governance2Step {
         address _keeper,
         address _strategyManager
     ) Governance2Step(_governance) {
+        require(_daddy != address(0), "ZERO ADDRESS");
         // Set the immutable address that will take over role manager
         // if a vault is removed.
         chad = _daddy;
@@ -298,20 +298,22 @@ contract RoleManager is Governance2Step {
     function _deployAllocator(
         address _vault
     ) internal virtual returns (address _debtAllocator) {
-        // Deploy a new debt allocator for the vault.
-        _debtAllocator = GenericDebtAllocatorFactory(
-            getPositionHolder(ALLOCATOR_FACTORY)
-        ).newGenericDebtAllocator(_vault);
+        address factory = getPositionHolder(ALLOCATOR_FACTORY);
 
-        // Set the default max base fee.
-        GenericDebtAllocator(_debtAllocator).setMaxAcceptableBaseFee(
-            maxAcceptableBaseFee
-        );
+        // If we have a factory set.
+        if (factory != address(0)) {
+            // Deploy a new debt allocator for the vault.
+            _debtAllocator = GenericDebtAllocatorFactory(factory)
+                .newGenericDebtAllocator(_vault);
 
-        // Give Brain control of the debt allocator.
-        GenericDebtAllocator(_debtAllocator).transferGovernance(
-            getPositionHolder(BRAIN)
-        );
+            // Give Brain control of the debt allocator.
+            GenericDebtAllocator(_debtAllocator).transferGovernance(
+                getPositionHolder(BRAIN)
+            );
+        } else {
+            // If no factory is set we should be using one central allocator.
+            _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
+        }
     }
 
     /**
@@ -505,11 +507,8 @@ contract RoleManager is Governance2Step {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
-        // Remove the role from the old allocator if applicable.
-        address currentAllocator = vaultConfig[_vault].debtAllocator;
-        if (currentAllocator != address(0)) {
-            IVault(_vault).set_role(currentAllocator, 0);
-        }
+        // Remove the roles from the old allocator.
+        IVault(_vault).set_role(vaultConfig[_vault].debtAllocator, 0);
 
         // Give the new debt allocator the relevant roles.
         IVault(_vault).set_role(
@@ -566,6 +565,8 @@ contract RoleManager is Governance2Step {
         bytes32 _position,
         uint256 _newRoles
     ) external virtual onlyGovernance {
+        // Cannot change the debt allocator roles since it can be updated
+        require(_position != DEBT_ALLOCATOR, "cannot update");
         _positions[_position].roles = uint96(_newRoles);
 
         emit UpdatePositionRoles(_position, _newRoles);

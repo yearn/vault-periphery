@@ -124,7 +124,6 @@ def test__positions(
         "Brain": (brain, brain_roles),
         "Security": (security, security_roles),
         "Keeper": (keeper, keeper_roles),
-        "Debt Allocator": (ZERO_ADDRESS, debt_allocator_roles),
         "Strategy Manager": (strategy_manager, strategy_manager_roles),
         "Registry": (registry, 0),
         "Accountant": (healthcheck_accountant, 0),
@@ -158,6 +157,19 @@ def test__positions(
         assert role_manager.getPositionRoles(id) == new_role
         assert role_manager.getPosition(id) == (user, new_role)
 
+    # Cannot update the debt allocator roles.
+    id = to_bytes32("Debt Allocator")
+    with ape.reverts("cannot update"):
+        role_manager.setPositionRoles(id, 1, sender=daddy)
+
+    # But can update the holder since it is not used
+    tx = role_manager.setPositionHolder(id, user, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.UpdatePositionHolder))[0]
+
+    assert event.position == id
+    assert event.newAddress == user
+
     # All positions should be changed now.
     assert role_manager.getDaddy() == user
     assert role_manager.getBrain() == user
@@ -180,13 +192,13 @@ def test__positions(
     assert role_manager.getBrainRoles() == new_role
     assert role_manager.getSecurityRoles() == new_role
     assert role_manager.getKeeperRoles() == new_role
-    assert role_manager.getDebtAllocatorRoles() == new_role
+    assert role_manager.getDebtAllocatorRoles() == debt_allocator_roles
     assert role_manager.getStrategyManagerRoles() == new_role
     assert role_manager.getPositionRoles(role_manager.DADDY()) == new_role
     assert role_manager.getPositionRoles(role_manager.BRAIN()) == new_role
     assert role_manager.getPositionRoles(role_manager.SECURITY()) == new_role
     assert role_manager.getPositionRoles(role_manager.KEEPER()) == new_role
-    assert role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR()) == new_role
+    assert role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR()) == debt_allocator_roles
     assert role_manager.getPositionRoles(role_manager.STRATEGY_MANAGER()) == new_role
 
 
@@ -219,6 +231,34 @@ def test_setters(role_manager, daddy, user):
 
     assert event.newMaxAcceptableBaseFee == new_max_base_fee
     assert role_manager.maxAcceptableBaseFee() == new_max_base_fee
+
+
+def test_setters_with_zeros(role_manager, daddy, asset, release_registry, registry, vault_factory, healthcheck_accountant):
+    id = to_bytes32("Security")
+    
+    role_manager.setPositionHolder(id, ZERO_ADDRESS, sender=daddy)
+    role_manager.setPositionRoles(id, 0, sender=daddy)
+
+    assert role_manager.getSecurity() == ZERO_ADDRESS
+    assert role_manager.getSecurityRoles() == 0
+
+    # Deploy a new vault
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    # Deploy a vault and doesnt revert
+    tx = role_manager.newVault(asset, int(1), sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    assert vault != ZERO_ADDRESS
 
 
 def test_deploy_new_vault(
