@@ -1,5 +1,5 @@
 import pytest
-from ape import accounts, project
+from ape import accounts, project, networks
 from utils.constants import MAX_INT, WEEK, ROLES
 from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
@@ -26,8 +26,13 @@ def security(accounts):
 
 
 @pytest.fixture(scope="session")
+<<<<<<< HEAD
 def management(accounts):
     yield accounts[3]
+=======
+def keeper(accounts):
+    yield accounts[4]
+>>>>>>> test: yield manager
 
 
 @pytest.fixture(scope="session")
@@ -204,6 +209,24 @@ def create_strategy(project, management, asset):
 def strategy(asset, create_strategy):
     strategy = create_strategy(asset)
     yield strategy
+
+
+@pytest.fixture(scope="session")
+def deploy_mock_tokenized(project, daddy, asset, management, keeper):
+    def deploy_mock_tokenized(name="name", apr=0):
+        mock_tokenized = daddy.deploy(
+            project.MockTokenized, asset, name, management, keeper, apr
+        )
+        return mock_tokenized
+
+    yield deploy_mock_tokenized
+
+
+@pytest.fixture(scope="session")
+def mock_tokenized(deploy_mock_tokenized):
+    mock_tokenized = deploy_mock_tokenized()
+
+    yield mock_tokenized
 
 
 @pytest.fixture(scope="function")
@@ -443,3 +466,44 @@ def role_manager(
     )
 
     return role_manager
+def deploy_strategy_manager(project, daddy):
+    def deploy_strategy_manager():
+        strategy_manager = daddy.deploy(
+            project.StrategyManager, ["0x2606a10b", "0xdf69b22a"]
+        )
+
+        return strategy_manager
+
+    yield deploy_strategy_manager
+
+
+@pytest.fixture(scope="session")
+def strategy_manager(deploy_strategy_manager):
+    strategy_manager = deploy_strategy_manager()
+
+    yield strategy_manager
+
+
+@pytest.fixture(scope="session")
+def deploy_yield_manager(project, daddy, strategy_manager):
+    def deploy_yield_manager():
+        yield_manager = daddy.deploy(project.YieldManager, daddy, strategy_manager)
+
+        return yield_manager
+
+    yield deploy_yield_manager
+
+
+@pytest.fixture(scope="session")
+def yield_manager(deploy_yield_manager):
+    yield_manager = deploy_yield_manager()
+
+    yield yield_manager
+
+
+@pytest.fixture(scope="session")
+def apr_oracle(project):
+    oracle = project.MockOracle
+    address = "0x02b0210fC1575b38147B232b40D7188eF14C04f2"
+    networks.provider.set_code(address, oracle.contract_type.runtime_bytecode.bytecode)
+    yield oracle.at(address)
