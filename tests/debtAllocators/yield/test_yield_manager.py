@@ -27,27 +27,41 @@ def test_setters(yield_manager, daddy, management):
     with ape.reverts("!governance"):
         yield_manager.setAllocator(management, True, sender=management)
 
-    yield_manager.setAllocator(management, True, sender=daddy)
+    tx = yield_manager.setAllocator(management, True, sender=daddy)
 
+    event = list(tx.decode_logs(yield_manager.UpdateAllocator))[0]
+
+    assert event.allocator == management
+    assert event.status == True
     assert yield_manager.allocators(management) == True
 
-    yield_manager.setAllocator(management, False, sender=daddy)
+    tx = yield_manager.setAllocator(management, False, sender=daddy)
 
+    event = list(tx.decode_logs(yield_manager.UpdateAllocator))[0]
+
+    assert event.allocator == management
+    assert event.status == False
     assert yield_manager.allocators(management) == False
 
     loss = int(8)
     with ape.reverts("!governance"):
         yield_manager.setMaxDebtUpdateLoss(loss, sender=management)
 
-    yield_manager.setMaxDebtUpdateLoss(loss, sender=daddy)
+    tx = yield_manager.setMaxDebtUpdateLoss(loss, sender=daddy)
 
+    event = list(tx.decode_logs(yield_manager.UpdateMaxDebtUpdateLoss))[0]
+
+    assert event.newMaxDebtUpdateLoss == loss
     assert yield_manager.maxDebtUpdateLoss() == loss
 
     with ape.reverts("!governance"):
         yield_manager.setOpen(True, sender=management)
 
-    yield_manager.setOpen(True, sender=daddy)
+    tx = yield_manager.setOpen(True, sender=daddy)
 
+    event = list(tx.decode_logs(yield_manager.UpdateOpen))[0]
+
+    assert event.status == True
     assert yield_manager.open()
 
 

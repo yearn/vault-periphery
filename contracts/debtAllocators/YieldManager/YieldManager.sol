@@ -16,6 +16,12 @@ import {StrategyManager} from "./StrategyManager.sol";
  *  a Yearn V3 vault to allocate funds to the optimal strategy.
  */
 contract YieldManager is Governance {
+    /// @notice Emitted when a allocators status is updated.
+    event UpdateAllocator(address indexed allocator, bool status);
+
+    /// @notice Emitted when the open flag is updated.
+    event UpdateOpen(bool status);
+
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
 
@@ -391,6 +397,8 @@ contract YieldManager is Governance {
         bool _allowed
     ) external onlyGovernance {
         allocators[_address] = _allowed;
+
+        emit UpdateAllocator(_address, _allowed);
     }
 
     /**
@@ -399,6 +407,8 @@ contract YieldManager is Governance {
      */
     function setOpen(bool _open) external onlyGovernance {
         open = _open;
+
+        emit UpdateOpen(_open);
     }
 
     /**
