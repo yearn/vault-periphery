@@ -233,32 +233,4 @@ contract StrategyManager {
         // Return the result.
         return result;
     }
-
-    /**
-     * @notice Calls any target contract as the manager of the strategy.
-     * @param _strategy The address of the strategy.
-     * @param _target The address of the target contract.
-     * @param _calldata The calldata for the call.
-     * @return result The return data from the call.
-     */
-    function genericCall(
-        address _strategy,
-        address _target,
-        bytes memory _calldata
-    ) external virtual onlyStrategyOwner(_strategy) returns (bytes memory) {
-        (bool success, bytes memory result) = _target.call(_calldata);
-
-        // If the call reverted. Return the error.
-        if (!success) {
-            assembly {
-                let ptr := mload(0x40)
-                let size := returndatasize()
-                returndatacopy(ptr, 0, size)
-                revert(ptr, size)
-            }
-        }
-
-        // Return the result.
-        return result;
-    }
 }
