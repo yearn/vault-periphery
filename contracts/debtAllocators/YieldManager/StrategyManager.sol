@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.18;
 
+import {Governance} from "@periphery/utils/Governance.sol";
 import {IStrategy} from "@tokenized-strategy/interfaces/IStrategy.sol";
 
 /// @notice Holds the `management` role of a V3 strategy so that a
 ///  debt allocator can call both reports and change the profit unlock time.
-contract StrategyManager {
+contract StrategyManager is Governance {
     /// @notice Emitted when a new strategy is added to the manager.
     event StrategyAdded(
         address indexed strategy,
@@ -61,14 +62,17 @@ contract StrategyManager {
      * @notice Add any of the allowed selectors for a debt manager to call
      *   to the mapping.
      */
-    constructor(bytes4[] memory _allowedSelectors) {
+    constructor(
+        address _governance,
+        bytes4[] memory _allowedSelectors
+    ) Governance(_governance) {
         for (uint256 i = 0; i < _allowedSelectors.length; ++i) {
             allowedSelectors[_allowedSelectors[i]] = true;
         }
     }
 
     /**
-     * @notice Manage a new strategy, setting the debt manager and marking it as active.
+     * @notice Add a new strategy, using the current `management` as the owner.
      * @param _strategy The address of the strategy.
      * @param _debtManager The address of the debt manager.
      */
@@ -76,9 +80,22 @@ contract StrategyManager {
         address _strategy,
         address _debtManager
     ) external {
-        require(!strategyInfo[_strategy].active, "already active");
-        // Cache the current strategy management.
         address currentManager = IStrategy(_strategy).management();
+        manageNewStrategy(_strategy, _debtManager, currentManager);
+    }
+
+    /**
+     * @notice Manage a new strategy, setting the debt manager and marking it as active.
+     * @param _strategy The address of the strategy.
+     * @param _debtManager The address of the debt manager.
+     * @param _owner The address in charge of the strategy now.
+     */
+    function manageNewStrategy(
+        address _strategy,
+        address _debtManager,
+        address _owner
+    ) public onlyGovernance {
+        require(!strategyInfo[_strategy].active, "already active");
 
         // Accept management of the strategy.
         IStrategy(_strategy).acceptManagement();
@@ -86,11 +103,11 @@ contract StrategyManager {
         // Store the owner of the strategy.
         strategyInfo[_strategy] = StrategyInfo({
             active: true,
-            owner: currentManager,
+            owner: _owner,
             debtManager: _debtManager
         });
 
-        emit StrategyAdded(_strategy, currentManager, _debtManager);
+        emit StrategyAdded(_strategy, _owner, _debtManager);
     }
 
     /**

@@ -469,7 +469,7 @@ def role_manager(
 def deploy_strategy_manager(project, daddy):
     def deploy_strategy_manager():
         strategy_manager = daddy.deploy(
-            project.StrategyManager, ["0x2606a10b", "0xdf69b22a"]
+            project.StrategyManager, daddy, ["0x2606a10b", "0xdf69b22a"]
         )
 
         return strategy_manager

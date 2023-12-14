@@ -15,21 +15,24 @@ def test_strategy_manager_setup(strategy_manager, mock_tokenized):
     assert strategy_manager.allowedSelectors("0x9bbefdb6") == False
 
 
-def test_add_new_strategy(strategy_manager, mock_tokenized, yield_manager, management):
+def test_add_new_strategy(
+    strategy_manager, mock_tokenized, daddy, yield_manager, management
+):
     assert strategy_manager.strategyInfo(mock_tokenized).active == False
     assert strategy_manager.strategyInfo(mock_tokenized).owner == ZERO_ADDRESS
     assert strategy_manager.strategyInfo(mock_tokenized).debtManager == ZERO_ADDRESS
 
-    with ape.reverts("!pending"):
+    with ape.reverts("!governance"):
         strategy_manager.manageNewStrategy(
             mock_tokenized, yield_manager, sender=management
         )
 
+    with ape.reverts("!pending"):
+        strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
+
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    tx = strategy_manager.manageNewStrategy(
-        mock_tokenized, yield_manager, sender=management
-    )
+    tx = strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.management() == strategy_manager
 
@@ -45,13 +48,11 @@ def test_add_new_strategy(strategy_manager, mock_tokenized, yield_manager, manag
 
     # cannot add it again
     with ape.reverts("already active"):
-        strategy_manager.manageNewStrategy(
-            mock_tokenized, yield_manager, sender=management
-        )
+        strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
 
 def test_remove_strategy(
-    strategy_manager, mock_tokenized, yield_manager, management, user
+    strategy_manager, mock_tokenized, yield_manager, management, user, daddy
 ):
     # Will revert on modifier if not yet added.
     with ape.reverts("!owner"):
@@ -59,7 +60,7 @@ def test_remove_strategy(
 
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.management() == strategy_manager
     assert strategy_manager.strategyInfo(mock_tokenized).active == True
@@ -105,14 +106,14 @@ def test_remove_strategy(
 
 
 def test_update_owner(
-    strategy_manager, mock_tokenized, yield_manager, management, user
+    strategy_manager, mock_tokenized, yield_manager, management, user, daddy
 ):
     with ape.reverts("!owner"):
         strategy_manager.updateStrategyOwner(mock_tokenized, user, sender=management)
 
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.management() == strategy_manager
     assert strategy_manager.strategyInfo(mock_tokenized).active == True
@@ -146,11 +147,11 @@ def test_update_owner(
 
 
 def test_update_debt_manager(
-    strategy_manager, mock_tokenized, yield_manager, management, user
+    strategy_manager, mock_tokenized, yield_manager, management, user, daddy
 ):
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.management() == strategy_manager
     assert strategy_manager.strategyInfo(mock_tokenized).active == True
@@ -169,12 +170,12 @@ def test_update_debt_manager(
 
 
 def test_record_full_profit(
-    strategy_manager, mock_tokenized, management, yield_manager, asset, user
+    strategy_manager, mock_tokenized, management, yield_manager, asset, user, daddy
 ):
     mock_tokenized.setProfitMaxUnlockTime(int(60 * 60 * 24), sender=management)
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.management() == strategy_manager
     assert strategy_manager.strategyInfo(mock_tokenized).active == True
@@ -213,11 +214,11 @@ def test_record_full_profit(
 
 
 def test_forward_call(
-    strategy_manager, mock_tokenized, management, yield_manager, asset, user
+    strategy_manager, mock_tokenized, management, yield_manager, asset, user, daddy
 ):
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.profitMaxUnlockTime() == 0
     assert mock_tokenized.performanceFee() == 0
@@ -269,11 +270,11 @@ def test_forward_call(
 
 
 def test_forward_calls(
-    strategy_manager, mock_tokenized, management, yield_manager, asset, user
+    strategy_manager, mock_tokenized, management, yield_manager, daddy, user
 ):
     mock_tokenized.setPendingManagement(strategy_manager, sender=management)
 
-    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=management)
+    strategy_manager.manageNewStrategy(mock_tokenized, yield_manager, sender=daddy)
 
     assert mock_tokenized.profitMaxUnlockTime() == 0
     assert mock_tokenized.performanceFee() == 0

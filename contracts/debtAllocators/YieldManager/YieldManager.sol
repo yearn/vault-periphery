@@ -4,9 +4,7 @@ pragma solidity 0.8.18;
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
 
-import {Governance} from "@periphery/utils/Governance.sol";
-
-import {StrategyManager} from "./StrategyManager.sol";
+import {StrategyManager, Governance} from "./StrategyManager.sol";
 
 /**
  * @title YearnV3 Yield Yield Based Debt Allocator
@@ -16,11 +14,14 @@ import {StrategyManager} from "./StrategyManager.sol";
  *  a Yearn V3 vault to allocate funds to the optimal strategy.
  */
 contract YieldManager is Governance {
-    /// @notice Emitted when a allocators status is updated.
-    event UpdateAllocator(address indexed allocator, bool status);
-
     /// @notice Emitted when the open flag is updated.
     event UpdateOpen(bool status);
+
+    /// @notice Emitted when a vaults status is updated.
+    event UpdateVault(address indexed vault, bool status);
+
+    /// @notice Emitted when a allocators status is updated.
+    event UpdateAllocator(address indexed allocator, bool status);
 
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
@@ -42,7 +43,7 @@ contract YieldManager is Governance {
 
     /// @notice Check if it has been opened or is an allocator.
     function _isAllocatorOrOpen() internal view {
-        require(allocators[msg.sender] || open, "!allocator or open");
+        require(open || allocators[msg.sender], "!allocator or open");
     }
 
     uint256 internal constant MAX_BPS = 10_000;
@@ -59,6 +60,9 @@ contract YieldManager is Governance {
 
     /// @notice Address that should hold the strategies `management` role.
     address public immutable strategyManager;
+
+    /// @notice Mapping for vaults that can be allocated for.
+    mapping(address => bool) public vaults;
 
     /// @notice Addresses that are allowed to propose allocations.
     mapping(address => bool) public allocators;
@@ -122,6 +126,7 @@ contract YieldManager is Governance {
         onlyAllocatorsOrOpen
         returns (uint256 _currentYield, uint256 _afterYield)
     {
+        require(vaults[_vault], "vault not added");
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
 
@@ -214,9 +219,8 @@ contract YieldManager is Governance {
 
             // Get the new APR
             if (_newDebt != 0) {
-                _afterYield +=
-                    aprOracle.getStrategyApr(_strategy, 0) *
-                    _newDebt;
+                _afterYield += (aprOracle.getStrategyApr(_strategy, 0) *
+                    _newDebt);
             }
         }
 
@@ -399,6 +403,17 @@ contract YieldManager is Governance {
         allocators[_address] = _allowed;
 
         emit UpdateAllocator(_address, _allowed);
+    }
+
+    /**
+     * @notice Sets the mapping of vaults allowed.
+     * @param _vault The address of the _vault.
+     * @param _allowed The permission to set for the _vault.
+     */
+    function setVault(address _vault, bool _allowed) external onlyGovernance {
+        vaults[_vault] = _allowed;
+
+        emit UpdateVault(_vault, _allowed);
     }
 
     /**
