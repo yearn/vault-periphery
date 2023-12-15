@@ -26,14 +26,8 @@ def security(accounts):
 
 
 @pytest.fixture(scope="session")
-<<<<<<< HEAD
 def management(accounts):
     yield accounts[3]
-=======
-def keeper(accounts):
-    yield accounts[4]
->>>>>>> test: yield manager
-
 
 @pytest.fixture(scope="session")
 def fee_recipient(accounts):
@@ -54,10 +48,10 @@ def user(accounts):
 def vault_manager(accounts):
     return accounts[7]
 
+ @pytest.fixture(scope="session")
+def keeper(accounts):
+    yield accounts[8]
 
-@pytest.fixture(scope="session")
-def strategy_manager(accounts):
-    return accounts[8]
 
 
 @pytest.fixture(scope="session")
@@ -466,28 +460,20 @@ def role_manager(
     )
 
     return role_manager
-def deploy_strategy_manager(project, daddy):
-    def deploy_strategy_manager():
-        strategy_manager = daddy.deploy(
-            project.StrategyManager, daddy, ["0x2606a10b", "0xdf69b22a"]
-        )
-
-        return strategy_manager
-
-    yield deploy_strategy_manager
 
 
-@pytest.fixture(scope="session")
-def strategy_manager(deploy_strategy_manager):
-    strategy_manager = deploy_strategy_manager()
+def strategy_manager(project, yield_manager):
+    strategy_manager = project.StrategyManager.at(yield_manager.strategyManager())
 
     yield strategy_manager
 
 
 @pytest.fixture(scope="session")
-def deploy_yield_manager(project, daddy, strategy_manager):
+def deploy_yield_manager(project, daddy):
     def deploy_yield_manager():
-        yield_manager = daddy.deploy(project.YieldManager, daddy, strategy_manager)
+        yield_manager = daddy.deploy(
+            project.YieldManager, daddy, ["0x2606a10b", "0xdf69b22a"]
+        )
 
         return yield_manager
 

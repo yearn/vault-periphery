@@ -69,9 +69,10 @@ contract YieldManager is Governance {
 
     constructor(
         address _governance,
-        address _strategyManager
+        bytes4[] memory _selectors
     ) Governance(_governance) {
-        strategyManager = _strategyManager;
+        // Deploy a new strategy manager
+        strategyManager = address(new StrategyManager(_governance, _selectors));
         // Default to 1 BP loss
         maxDebtUpdateLoss = 1;
     }
