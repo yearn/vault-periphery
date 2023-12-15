@@ -48,10 +48,10 @@ def user(accounts):
 def vault_manager(accounts):
     return accounts[7]
 
- @pytest.fixture(scope="session")
+
+@pytest.fixture(scope="session")
 def keeper(accounts):
     yield accounts[8]
-
 
 
 @pytest.fixture(scope="session")
