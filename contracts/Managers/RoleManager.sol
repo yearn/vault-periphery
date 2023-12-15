@@ -517,7 +517,7 @@ contract RoleManager is Governance2Step {
      */
     function removeVault(
         address _vault
-    ) external virtual onlyPositionHolder(DADDY) {
+    ) external virtual onlyPositionHolder(BRAIN) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
