@@ -23,9 +23,6 @@ contract RoleManager is Governance2Step {
     /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
 
-    /// @notice Emitted when the maxAcceptableBaseFee variable is updated.
-    event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
-
     /// @notice Emitted when a new vault has been deployed or added.
     event AddedNewVault(address indexed vault, uint256 rating);
 
@@ -53,7 +50,7 @@ contract RoleManager is Governance2Step {
     }
 
     /// @notice Check if the msg sender is governance or the specified position holder.
-    function _isPositionHolder(bytes32 _positionId) internal view {
+    function _isPositionHolder(bytes32 _positionId) internal view virtual {
         require(
             msg.sender == governance ||
                 msg.sender == getPositionHolder(_positionId),
@@ -99,17 +96,15 @@ contract RoleManager is Governance2Step {
     /// @notice Array storing addresses of all managed vaults.
     address[] public vaults;
 
-    /// @notice Mapping of position ID to position information.
-    mapping(bytes32 => Position) internal _positions;
-    /// @notice Mapping of a numerical rating to its string equivalent.
-    mapping(uint256 => string) public ratingToString;
-    /// @notice Mapping of vault addresses to its config.
-    mapping(address => VaultConfig) public vaultConfig;
-
-    /// @notice Default maximum acceptable base fee for debt allocators.
-    uint256 public maxAcceptableBaseFee = 100e9;
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 10 days;
+
+    /// @notice Mapping of a numerical rating to its string equivalent.
+    mapping(uint256 => string) public ratingToString;
+    /// @notice Mapping of position ID to position information.
+    mapping(bytes32 => Position) internal _positions;
+    /// @notice Mapping of vault addresses to its config.
+    mapping(address => VaultConfig) public vaultConfig;
 
     constructor(
         address _governance,
@@ -302,14 +297,9 @@ contract RoleManager is Governance2Step {
 
         // If we have a factory set.
         if (factory != address(0)) {
-            // Deploy a new debt allocator for the vault.
+            // Deploy a new debt allocator for the vault with Brain as the gov.
             _debtAllocator = GenericDebtAllocatorFactory(factory)
-                .newGenericDebtAllocator(_vault);
-
-            // Give Brain control of the debt allocator.
-            GenericDebtAllocator(_debtAllocator).transferGovernance(
-                getPositionHolder(BRAIN)
-            );
+                .newGenericDebtAllocator(_vault, getPositionHolder(BRAIN));
         } else {
             // If no factory is set we should be using one central allocator.
             _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
@@ -596,18 +586,6 @@ contract RoleManager is Governance2Step {
         defaultProfitMaxUnlock = _newDefaultProfitMaxUnlock;
 
         emit UpdateDefaultProfitMaxUnlock(_newDefaultProfitMaxUnlock);
-    }
-
-    /**
-     * @notice Sets the maximum acceptable base fee for debt allocators.
-     * @param _newMaxAcceptableBaseFee New value for maxAcceptableBaseFee.
-     */
-    function setMaxAcceptableBaseFee(
-        uint256 _newMaxAcceptableBaseFee
-    ) external virtual onlyGovernance {
-        maxAcceptableBaseFee = _newMaxAcceptableBaseFee;
-
-        emit UpdateMaxAcceptableBaseFee(_newMaxAcceptableBaseFee);
     }
 
     /*//////////////////////////////////////////////////////////////

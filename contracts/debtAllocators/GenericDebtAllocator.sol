@@ -37,17 +37,20 @@ contract GenericDebtAllocator is Governance {
         uint256 newTotalDebtRatio
     );
 
+    /// @notice An event emitted when the minimum time to wait is updated.
+    event UpdateMinimumWait(uint256 newMinimumWait);
+
     /// @notice An event emitted when the minimum change is updated.
     event UpdateMinimumChange(uint256 newMinimumChange);
 
-    /// @notice An event emitted when the max base fee is updated.
-    event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
+    /// @notice An event emitted when a keeper is added or removed.
+    event UpdateKeeper(address indexed keeper, bool allowed);
 
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
 
-    /// @notice An event emitted when the minimum time to wait is updated.
-    event UpdateMinimumWait(uint256 newMinimumWait);
+    /// @notice An event emitted when the max base fee is updated.
+    event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
 
     /// @notice Struct for each strategies info.
     struct Config {
@@ -61,13 +64,16 @@ contract GenericDebtAllocator is Governance {
         uint256 lastUpdate;
     }
 
+    modifier onlyKeepers() {
+        _isKeeper();
+        _;
+    }
+
+    function _isKeeper() internal view virtual {
+        require(keepers[msg.sender], "!keeper");
+    }
+
     uint256 internal constant MAX_BPS = 10_000;
-
-    /// @notice Vaults DEBT_MANAGER enumerator.
-    uint256 internal constant DEBT_MANAGER = 64;
-
-    /// @notice Mapping of strategy => its config.
-    mapping(address => Config) public configs;
 
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
@@ -89,6 +95,12 @@ contract GenericDebtAllocator is Governance {
     /// @notice Max the chains base fee can be during debt update.
     // Will default to max uint256 and need to be set to be used.
     uint256 public maxAcceptableBaseFee;
+
+    /// @notice Mapping of addresses that are allowed to update debt.
+    mapping(address => bool) public keepers;
+
+    /// @notice Mapping of strategy => its config.
+    mapping(address => Config) public configs;
 
     constructor(
         address _vault,
@@ -113,6 +125,9 @@ contract GenericDebtAllocator is Governance {
         require(address(vault) == address(0), "!initialized");
         vault = _vault;
         governance = _governance;
+        // Default to allow governance to be a keeper.
+        keepers[_governance] = true;
+
         minimumChange = _minimumChange;
         // Default max base fee to uint256 max
         maxAcceptableBaseFee = type(uint256).max;
@@ -138,12 +153,8 @@ contract GenericDebtAllocator is Governance {
     function update_debt(
         address _strategy,
         uint256 _targetDebt
-    ) external virtual {
+    ) external virtual onlyKeepers {
         IVault _vault = IVault(vault);
-        require(
-            (_vault.roles(msg.sender) & DEBT_MANAGER) == DEBT_MANAGER,
-            "not allowed"
-        );
 
         // Cache initial values in case of loss.
         uint256 initialDebt = _vault.strategies(_strategy).current_debt;
@@ -288,6 +299,21 @@ contract GenericDebtAllocator is Governance {
 
     /**
      * @notice Sets a new target debt ratio for a strategy.
+     * @dev This will default to a 10% increase for max debt.
+     *
+     * @param _strategy Address of the strategy to set.
+     * @param _targetRatio Amount in Basis points to allocate.
+     */
+    function setStrategyDebtRatios(
+        address _strategy,
+        uint256 _targetRatio
+    ) external virtual {
+        uint256 maxRatio = Math.min((_targetRatio * 11_000) / MAX_BPS, MAX_BPS);
+        setStrategyDebtRatios(_strategy, _targetRatio, maxRatio);
+    }
+
+    /**
+     * @notice Sets a new target debt ratio for a strategy.
      * @dev A `minimumChange` for that strategy must be set first.
      * This is to prevent debt from being updated too frequently.
      *
@@ -299,7 +325,7 @@ contract GenericDebtAllocator is Governance {
         address _strategy,
         uint256 _targetRatio,
         uint256 _maxRatio
-    ) external virtual onlyGovernance {
+    ) public virtual onlyGovernance {
         // Make sure a minimumChange has been set.
         require(minimumChange != 0, "!minimum");
         // Cannot be more than 100%.
@@ -327,6 +353,20 @@ contract GenericDebtAllocator is Governance {
             _maxRatio,
             newDebtRatio
         );
+    }
+
+    /**
+     * @notice Set if a keeper can update debt.
+     * @param _address The address to set mapping for.
+     * @param _allowed If the address can call {update_debt}.
+     */
+    function setKeepers(
+        address _address,
+        bool _allowed
+    ) external virtual onlyGovernance {
+        keepers[_address] = _allowed;
+
+        emit UpdateKeeper(_address, _allowed);
     }
 
     /**

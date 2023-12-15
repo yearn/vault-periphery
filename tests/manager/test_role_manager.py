@@ -1,6 +1,6 @@
 import ape
 from ape import project
-from utils.constants import ZERO_ADDRESS, ROLES
+from utils.constants import ZERO_ADDRESS, ROLES, MAX_INT
 import pytest
 from utils.helpers import to_bytes32
 
@@ -198,13 +198,15 @@ def test__positions(
     assert role_manager.getPositionRoles(role_manager.BRAIN()) == new_role
     assert role_manager.getPositionRoles(role_manager.SECURITY()) == new_role
     assert role_manager.getPositionRoles(role_manager.KEEPER()) == new_role
-    assert role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR()) == debt_allocator_roles
+    assert (
+        role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR())
+        == debt_allocator_roles
+    )
     assert role_manager.getPositionRoles(role_manager.STRATEGY_MANAGER()) == new_role
 
 
 def test_setters(role_manager, daddy, user):
     assert role_manager.defaultProfitMaxUnlock() == 10 * 24 * 60 * 60  # 10 days
-    assert role_manager.maxAcceptableBaseFee() == 100e9
 
     # New default unlock time
     new_default_unlock_time = int(69)
@@ -219,23 +221,18 @@ def test_setters(role_manager, daddy, user):
     assert event.newDefaultProfitMaxUnlock == new_default_unlock_time
     assert role_manager.defaultProfitMaxUnlock() == new_default_unlock_time
 
-    # New max base fee
-    new_max_base_fee = int(69_420)
 
-    with ape.reverts("!governance"):
-        role_manager.setMaxAcceptableBaseFee(new_max_base_fee, sender=user)
-
-    tx = role_manager.setMaxAcceptableBaseFee(new_max_base_fee, sender=daddy)
-
-    event = list(tx.decode_logs(role_manager.UpdateMaxAcceptableBaseFee))[0]
-
-    assert event.newMaxAcceptableBaseFee == new_max_base_fee
-    assert role_manager.maxAcceptableBaseFee() == new_max_base_fee
-
-
-def test_setters_with_zeros(role_manager, daddy, asset, release_registry, registry, vault_factory, healthcheck_accountant):
+def test_setters_with_zeros(
+    role_manager,
+    daddy,
+    asset,
+    release_registry,
+    registry,
+    vault_factory,
+    healthcheck_accountant,
+):
     id = to_bytes32("Security")
-    
+
     role_manager.setPositionHolder(id, ZERO_ADDRESS, sender=daddy)
     role_manager.setPositionRoles(id, 0, sender=daddy)
 
@@ -367,7 +364,6 @@ def test_deploy_new_vault(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
 
 def test_deploy_new_vault__default_values(
@@ -473,7 +469,6 @@ def test_deploy_new_vault__default_values(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
 
 def setup_role_manager(
@@ -591,7 +586,6 @@ def test_add_new_vault__endorsed(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
 
 def test_add_new_vault__not_endorsed(
@@ -700,7 +694,6 @@ def test_add_new_vault__not_endorsed(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
 
 def test_add_new_vault__with_debt_allocator(
@@ -808,7 +801,6 @@ def test_add_new_vault__with_debt_allocator(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == daddy
-    assert debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
 
 
 def test_add_new_vault__with_accountant(
@@ -920,7 +912,6 @@ def test_add_new_vault__with_accountant(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == daddy
-    assert debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
 
 
 def test_new_debt_allocator__deploys_one(
@@ -992,7 +983,6 @@ def test_new_debt_allocator__deploys_one(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
     # Update to a new debt allocator
     with ape.reverts("!allowed"):
@@ -1009,7 +999,7 @@ def test_new_debt_allocator__deploys_one(
     assert new_debt_allocator != debt_allocator
     assert new_debt_allocator.vault() == vault
     assert new_debt_allocator.governance() == brain
-    assert new_debt_allocator.maxAcceptableBaseFee() == 100e9
+    assert new_debt_allocator.maxAcceptableBaseFee() == MAX_INT
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -1109,7 +1099,6 @@ def test_new_debt_allocator__already_deployed(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
     tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
@@ -1127,7 +1116,7 @@ def test_new_debt_allocator__already_deployed(
     assert new_debt_allocator != debt_allocator
     assert new_debt_allocator.vault() == vault
     assert new_debt_allocator.governance() == daddy
-    assert new_debt_allocator.maxAcceptableBaseFee() == 2**256 - 1
+    assert new_debt_allocator.maxAcceptableBaseFee() == MAX_INT
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -1227,7 +1216,6 @@ def test_remove_vault(
     # Check debt allocator
     assert debt_allocator.vault() == vault
     assert debt_allocator.governance() == brain
-    assert debt_allocator.maxAcceptableBaseFee() == 100e9
 
     # Remove the vault
     with ape.reverts("!allowed"):
