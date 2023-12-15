@@ -5,8 +5,9 @@ import hashlib
 
 deployer = accounts.load("v3_deployer")
 
+
 def deploy_role_manager():
-    
+
     print("Deploying Role Manager on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
@@ -34,6 +35,7 @@ def deploy_role_manager():
     print(f"Deploying the Role Manager...")
     print("Enter the addresses to use on deployment.")
 
+    gov = input("Governance? ")
     daddy = input("Daddy? ")
     brain = input("Brain? ")
     security = input("Security? ")
@@ -41,12 +43,7 @@ def deploy_role_manager():
     strategy_manager = input("Strategy manager? ")
 
     constructor = role_manager.constructor.encode_input(
-        deployer.address,
-        daddy,
-        brain,
-        security,
-        keeper,
-        strategy_manager
+        gov, daddy, brain, security, keeper, strategy_manager
     )
 
     deploy_bytecode = HexBytes(

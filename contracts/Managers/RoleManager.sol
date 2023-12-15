@@ -7,7 +7,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
-import {GenericDebtAllocatorFactory, GenericDebtAllocator} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
+import {GenericDebtAllocatorFactory} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Governance2Step {
@@ -493,7 +493,7 @@ contract RoleManager is Governance2Step {
     function updateDebtAllocator(
         address _vault,
         address _debtAllocator
-    ) public virtual onlyPositionHolder(DADDY) {
+    ) public virtual onlyPositionHolder(BRAIN) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 

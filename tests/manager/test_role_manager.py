@@ -989,9 +989,9 @@ def test_new_debt_allocator__deploys_one(
         role_manager.updateDebtAllocator(vault, sender=user)
 
     with ape.reverts("vault not added"):
-        role_manager.updateDebtAllocator(user, sender=daddy)
+        role_manager.updateDebtAllocator(user, sender=brain)
 
-    tx = role_manager.updateDebtAllocator(vault, sender=daddy)
+    tx = role_manager.updateDebtAllocator(vault, sender=brain)
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
     new_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
@@ -1109,9 +1109,9 @@ def test_new_debt_allocator__already_deployed(
         role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=user)
 
     with ape.reverts("vault not added"):
-        role_manager.updateDebtAllocator(user, new_debt_allocator, sender=daddy)
+        role_manager.updateDebtAllocator(user, new_debt_allocator, sender=brain)
 
-    tx = role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=daddy)
+    tx = role_manager.updateDebtAllocator(vault, new_debt_allocator, sender=brain)
 
     assert new_debt_allocator != debt_allocator
     assert new_debt_allocator.vault() == vault

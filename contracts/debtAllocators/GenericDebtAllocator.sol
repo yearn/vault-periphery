@@ -204,8 +204,6 @@ contract GenericDebtAllocator is Governance {
 
         // Get the strategy specific debt config.
         Config memory config = configs[_strategy];
-        // Make sure we have a target debt.
-        require(config.targetRatio != 0, "no targetRatio");
 
         if (block.timestamp - config.lastUpdate <= minimumWait) {
             return (false, bytes("min wait"));
@@ -325,7 +323,7 @@ contract GenericDebtAllocator is Governance {
         address _strategy,
         uint256 _targetRatio,
         uint256 _maxRatio
-    ) public virtual onlyGovernance {
+    ) public virtual onlyKeepers {
         // Make sure a minimumChange has been set.
         require(minimumChange != 0, "!minimum");
         // Cannot be more than 100%.
