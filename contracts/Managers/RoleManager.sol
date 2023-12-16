@@ -26,8 +26,8 @@ contract RoleManager is Governance2Step {
     /// @notice Emitted when a new vault has been deployed or added.
     event AddedNewVault(
         address indexed vault,
-        uint256 rating,
-        address indexed debAllocator
+        address indexed debtAllocator,
+        uint256 rating
     );
 
     /// @notice Emitted when a vault is removed.
@@ -286,7 +286,7 @@ contract RoleManager is Governance2Step {
         vaults.push(_vault);
 
         // Emit event for new vault.
-        emit AddedNewVault(_vault, _rating, _debtAllocator);
+        emit AddedNewVault(_vault, _debtAllocator, _rating);
     }
 
     /**
@@ -473,7 +473,7 @@ contract RoleManager is Governance2Step {
         vaults.push(_vault);
 
         // Emit event.
-        emit AddedNewVault(_vault, _rating, _debtAllocator);
+        emit AddedNewVault(_vault, _debtAllocator, _rating);
     }
 
     /**
