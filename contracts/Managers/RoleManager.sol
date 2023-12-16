@@ -24,7 +24,11 @@ contract RoleManager is Governance2Step {
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
 
     /// @notice Emitted when a new vault has been deployed or added.
-    event AddedNewVault(address indexed vault, uint256 rating);
+    event AddedNewVault(
+        address indexed vault,
+        uint256 rating,
+        address indexed debAllocator
+    );
 
     /// @notice Emitted when a vault is removed.
     event RemovedVault(address indexed vault);
@@ -282,7 +286,7 @@ contract RoleManager is Governance2Step {
         vaults.push(_vault);
 
         // Emit event for new vault.
-        emit AddedNewVault(_vault, _rating);
+        emit AddedNewVault(_vault, _rating, _debtAllocator);
     }
 
     /**
@@ -469,7 +473,7 @@ contract RoleManager is Governance2Step {
         vaults.push(_vault);
 
         // Emit event.
-        emit AddedNewVault(_vault, _rating);
+        emit AddedNewVault(_vault, _rating, _debtAllocator);
     }
 
     /**

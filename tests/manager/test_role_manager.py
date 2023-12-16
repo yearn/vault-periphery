@@ -317,11 +317,13 @@ def test_deploy_new_vault(
 
     assert event.vault == vault
     assert event.rating == rating
+    allocator = event.debtAllocator
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
     assert event.vault == vault
     debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+    assert allocator == debt_allocator
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -760,6 +762,7 @@ def test_add_new_vault__with_debt_allocator(
 
     assert event.vault == vault
     assert event.rating == rating
+    assert event.debtAllocator == debt_allocator
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
@@ -871,6 +874,7 @@ def test_add_new_vault__with_accountant(
 
     assert event.vault == vault
     assert event.rating == rating
+    assert event.debtAllocator == debt_allocator
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
         vault
