@@ -16,23 +16,43 @@ def daddy(accounts):
 
 
 @pytest.fixture(scope="session")
-def management(accounts):
+def brain(accounts):
+    yield accounts[1]
+
+
+@pytest.fixture(scope="session")
+def security(accounts):
     yield accounts[2]
 
 
 @pytest.fixture(scope="session")
+def management(accounts):
+    yield accounts[3]
+
+
+@pytest.fixture(scope="session")
 def fee_recipient(accounts):
-    return accounts[3]
+    return accounts[4]
+
+
+@pytest.fixture(scope="session")
+def keeper(accounts):
+    yield accounts[5]
 
 
 @pytest.fixture(scope="session")
 def user(accounts):
-    return accounts[9]
+    return accounts[6]
 
 
 @pytest.fixture(scope="session")
 def vault_manager(accounts):
     return accounts[7]
+
+
+@pytest.fixture(scope="session")
+def strategy_manager(accounts):
+    return accounts[8]
 
 
 @pytest.fixture(scope="session")
@@ -384,3 +404,42 @@ def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy
     generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
     yield generic_debt_allocator
+
+
+@pytest.fixture(scope="session")
+def deploy_role_manager(project, daddy, brain, security, keeper, strategy_manager):
+    def deploy_role_manager(
+        gov=daddy,
+        sms=brain,
+        sec=security,
+        keep=keeper,
+        strategy_manage=strategy_manager,
+    ):
+        role_manager = daddy.deploy(
+            project.RoleManager, gov, daddy, sms, sec, keep, strategy_manage
+        )
+
+        return role_manager
+
+    yield deploy_role_manager
+
+
+@pytest.fixture(scope="session")
+def role_manager(
+    deploy_role_manager,
+    daddy,
+    healthcheck_accountant,
+    generic_debt_allocator_factory,
+    registry,
+):
+    role_manager = deploy_role_manager()
+
+    role_manager.setPositionHolder(
+        role_manager.ACCOUNTANT(), healthcheck_accountant, sender=daddy
+    )
+    role_manager.setPositionHolder(role_manager.REGISTRY(), registry, sender=daddy)
+    role_manager.setPositionHolder(
+        role_manager.ALLOCATOR_FACTORY(), generic_debt_allocator_factory, sender=daddy
+    )
+
+    return role_manager
