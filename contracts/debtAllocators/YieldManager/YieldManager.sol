@@ -6,6 +6,8 @@ import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
 
 import {StrategyManager, Governance} from "./StrategyManager.sol";
 
+import {GenericDebtAllocator} from "../GenericDebtAllocator.sol";
+
 /**
  * @title YearnV3 Yield Yield Based Debt Allocator
  * @author yearn.finance
@@ -18,10 +20,10 @@ contract YieldManager is Governance {
     event UpdateOpen(bool status);
 
     /// @notice Emitted when a vaults status is updated.
-    event UpdateVault(address indexed vault, bool status);
+    event UpdateVaultAllocator(address indexed vault, address allocator);
 
-    /// @notice Emitted when a allocators status is updated.
-    event UpdateAllocator(address indexed allocator, bool status);
+    /// @notice Emitted when a proposers status is updated.
+    event UpdateProposer(address indexed proposer, bool status);
 
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
@@ -36,14 +38,14 @@ contract YieldManager is Governance {
     }
 
     /// @notice Only allow the sender to be an allocator if not opened.
-    modifier onlyAllocatorsOrOpen() {
-        _isAllocatorOrOpen();
+    modifier onlyProposersOrOpen() {
+        _isProposerOrOpen();
         _;
     }
 
     /// @notice Check if it has been opened or is an allocator.
-    function _isAllocatorOrOpen() internal view {
-        require(open || allocators[msg.sender], "!allocator or open");
+    function _isProposerOrOpen() internal view {
+        require(open || proposers[msg.sender], "!allocator or open");
     }
 
     uint256 internal constant MAX_BPS = 10_000;
@@ -61,11 +63,11 @@ contract YieldManager is Governance {
     /// @notice Address that should hold the strategies `management` role.
     address public immutable strategyManager;
 
-    /// @notice Mapping for vaults that can be allocated for.
-    mapping(address => bool) public vaults;
+    /// @notice Mapping for vaults that can be allocated for => its debt allocator.
+    mapping(address => address) public vaultAllocator;
 
     /// @notice Addresses that are allowed to propose allocations.
-    mapping(address => bool) public allocators;
+    mapping(address => bool) public proposers;
 
     constructor(
         address _governance,
@@ -124,10 +126,12 @@ contract YieldManager is Governance {
         Allocation[] memory _newAllocations
     )
         external
-        onlyAllocatorsOrOpen
+        onlyProposersOrOpen
         returns (uint256 _currentYield, uint256 _afterYield)
     {
-        require(vaults[_vault], "vault not added");
+        address allocator = vaultAllocator[_vault];
+        require(allocator != address(0), "vault not added");
+
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
 
@@ -140,8 +144,6 @@ contract YieldManager is Governance {
         address _strategy;
         uint256 _currentDebt;
         uint256 _newDebt;
-        uint256 _loss;
-        uint256 _gain;
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
             _strategy = _newAllocations[i].strategy;
             _newDebt = uint256(_newAllocations[i].newDebt);
@@ -172,15 +174,6 @@ contract YieldManager is Governance {
                     StrategyManager(strategyManager).reportFullProfit(
                         _strategy
                     );
-
-                    // Report profits on the vault.
-                    (uint256 reportedProfit, uint256 reportedLoss) = IVault(
-                        _vault
-                    ).process_report(_strategy);
-
-                    // Track for debt reduction loss checks.
-                    _loss += reportedLoss;
-                    _gain += reportedProfit;
                 } else if (
                     // We cannot decrease debt if the strategy has any unrealised losses.
                     IVault(_vault).assess_share_of_unrealised_losses(
@@ -189,39 +182,23 @@ contract YieldManager is Governance {
                     ) != 0
                 ) {
                     // Realize the loss.
-                    (, uint256 reportedLoss) = IVault(_vault).process_report(
-                        _strategy
-                    );
-                    // Track for debt reduction loss checks.
-                    _loss += reportedLoss;
+                    IVault(_vault).process_report(_strategy);
                 }
-
-                // Allocate the new debt.
-                IVault(_vault).update_debt(_strategy, _newDebt);
-
-                // Validate losses based on ending totalAssets adjusted for any realized loss or gain.
-                uint256 afterAssets = IVault(_vault).totalAssets() +
-                    _loss -
-                    _gain;
-
-                // If a loss was realized on just the debt update.
-                if (afterAssets < _totalAssets) {
-                    // Make sure its within the range.
-                    require(
-                        _totalAssets - afterAssets <=
-                            (_currentDebt * maxDebtUpdateLoss) / MAX_BPS,
-                        "too much loss"
-                    );
-                }
-            } else {
-                // If adding just Allocate the new debt.
-                IVault(_vault).update_debt(_strategy, _newDebt);
             }
+
+            uint256 _targetRatio = (_newDebt * MAX_BPS) / _totalAssets;
+            // Update allocation.
+            GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                _strategy,
+                _targetRatio
+            );
 
             // Get the new APR
             if (_newDebt != 0) {
-                _afterYield += (aprOracle.getStrategyApr(_strategy, 0) *
-                    _newDebt);
+                _afterYield += (aprOracle.getStrategyApr(
+                    _strategy,
+                    int256(_newDebt) - int256(_currentDebt)
+                ) * _newDebt);
             }
         }
 
@@ -320,39 +297,31 @@ contract YieldManager is Governance {
         address _vault,
         Allocation[] memory _newAllocations
     ) internal {
+        address allocator = vaultAllocator[_vault];
+        require(allocator != address(0), "vault not added");
         address _strategy;
         uint256 _newDebt;
-        uint256 _loss;
-        uint256 _gain;
+        uint256 _currentDebt;
         uint256 _totalAssets = IVault(_vault).totalAssets();
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
             _strategy = _newAllocations[i].strategy;
             _newDebt = uint256(_newAllocations[i].newDebt);
-
-            // Get the current amount the strategy holds.
-            uint256 _currentDebt = IVault(_vault)
-                .strategies(_strategy)
-                .current_debt;
+            // Get the debt the strategy current has.
+            _currentDebt = IVault(_vault).strategies(_strategy).current_debt;
 
             // If no change move to the next strategy.
-            if (_newDebt == _currentDebt) continue;
+            if (_newDebt == _currentDebt) {
+                continue;
+            }
 
-            if (_newDebt < _currentDebt) {
+            // If we are withdrawing.
+            if (_currentDebt > _newDebt) {
                 // If we are pulling all debt from a strategy.
                 if (_newDebt == 0) {
                     // We need to report profits and have them immediately unlock to not lose out on locked profit.
                     StrategyManager(strategyManager).reportFullProfit(
                         _strategy
                     );
-
-                    // Report on the vault.
-                    (uint256 reportedProfit, uint256 reportedLoss) = IVault(
-                        _vault
-                    ).process_report(_strategy);
-
-                    // Track for debt reduction loss checks.
-                    _loss += reportedLoss;
-                    _gain += reportedProfit;
                 } else if (
                     // We cannot decrease debt if the strategy has any unrealised losses.
                     IVault(_vault).assess_share_of_unrealised_losses(
@@ -361,60 +330,45 @@ contract YieldManager is Governance {
                     ) != 0
                 ) {
                     // Realize the loss.
-                    (, uint256 reportedLoss) = IVault(_vault).process_report(
-                        _strategy
-                    );
-                    // Track for debt reduction loss checks.
-                    _loss += reportedLoss;
+                    IVault(_vault).process_report(_strategy);
                 }
-
-                // Allocate the new debt.
-                IVault(_vault).update_debt(_strategy, _newDebt);
-
-                // Validate losses based on ending totalAssets adjusted for any realized loss or gain.
-                uint256 afterAssets = IVault(_vault).totalAssets() +
-                    _loss -
-                    _gain;
-
-                // If a loss was realized on just the debt update.
-                if (afterAssets < _totalAssets) {
-                    // Make sure its within the range.
-                    require(
-                        _totalAssets - afterAssets <=
-                            (_currentDebt * maxDebtUpdateLoss) / MAX_BPS,
-                        "too much loss"
-                    );
-                }
-            } else {
-                // If adding just Allocate the new debt.
-                IVault(_vault).update_debt(_strategy, _newDebt);
             }
+
+            uint256 _targetRatio = (_newDebt * MAX_BPS) / _totalAssets;
+            // Update allocation.
+            GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                _strategy,
+                _targetRatio
+            );
         }
     }
 
     /**
-     * @notice Sets the permission for an allocator.
-     * @param _address The address of the allocator.
-     * @param _allowed The permission to set for the allocator.
+     * @notice Sets the permission for a proposer.
+     * @param _address The address of the proposer.
+     * @param _allowed The permission to set for the proposer.
      */
-    function setAllocator(
+    function setProposer(
         address _address,
         bool _allowed
     ) external onlyGovernance {
-        allocators[_address] = _allowed;
+        proposers[_address] = _allowed;
 
-        emit UpdateAllocator(_address, _allowed);
+        emit UpdateProposer(_address, _allowed);
     }
 
     /**
      * @notice Sets the mapping of vaults allowed.
      * @param _vault The address of the _vault.
-     * @param _allowed The permission to set for the _vault.
+     * @param _allocator The vault specific debt allocator.
      */
-    function setVault(address _vault, bool _allowed) external onlyGovernance {
-        vaults[_vault] = _allowed;
+    function setVaultAllocator(
+        address _vault,
+        address _allocator
+    ) external onlyGovernance {
+        vaultAllocator[_vault] = _allocator;
 
-        emit UpdateVault(_vault, _allowed);
+        emit UpdateVaultAllocator(_vault, _allocator);
     }
 
     /**

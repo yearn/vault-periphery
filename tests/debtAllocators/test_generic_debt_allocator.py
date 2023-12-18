@@ -29,9 +29,9 @@ def test_set_keepers(generic_debt_allocator, daddy, vault, strategy, user):
     assert generic_debt_allocator.keepers(user) == False
 
     with ape.reverts("!governance"):
-        generic_debt_allocator.setKeepers(user, True, sender=user)
+        generic_debt_allocator.setKeeper(user, True, sender=user)
 
-    tx = generic_debt_allocator.setKeepers(user, True, sender=daddy)
+    tx = generic_debt_allocator.setKeeper(user, True, sender=daddy)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateKeeper))[0]
 
@@ -39,7 +39,7 @@ def test_set_keepers(generic_debt_allocator, daddy, vault, strategy, user):
     assert event.allowed == True
     assert generic_debt_allocator.keepers(user) == True
 
-    tx = generic_debt_allocator.setKeepers(daddy, False, sender=daddy)
+    tx = generic_debt_allocator.setKeeper(daddy, False, sender=daddy)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateKeeper))[0]
 
@@ -306,7 +306,7 @@ def test_update_debt(
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount
 
-    generic_debt_allocator.setKeepers(user, True, sender=daddy)
+    generic_debt_allocator.setKeeper(user, True, sender=daddy)
 
     generic_debt_allocator.update_debt(strategy, 0, sender=user)
 

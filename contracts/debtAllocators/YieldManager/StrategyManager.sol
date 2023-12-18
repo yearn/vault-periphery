@@ -181,15 +181,15 @@ contract StrategyManager is Governance {
         // Get the current unlock rate.
         uint256 profitUnlock = IStrategy(_strategy).profitMaxUnlockTime();
 
-        if (profitUnlock != 0) {
+        if (profitUnlock != 1) {
             // Set profit unlock to 0.
-            IStrategy(_strategy).setProfitMaxUnlockTime(0);
+            IStrategy(_strategy).setProfitMaxUnlockTime(1);
         }
 
         // Report profits.
         IStrategy(_strategy).report();
 
-        if (profitUnlock != 0) {
+        if (profitUnlock != 1) {
             // Set profit unlock back to original.
             IStrategy(_strategy).setProfitMaxUnlockTime(profitUnlock);
         }

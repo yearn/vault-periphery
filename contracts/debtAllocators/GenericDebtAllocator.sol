@@ -6,6 +6,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
+// TODO: Getters
+
 /**
  * @title YearnV3 Generic Debt Allocator
  * @author yearn.finance
@@ -358,7 +360,7 @@ contract GenericDebtAllocator is Governance {
      * @param _address The address to set mapping for.
      * @param _allowed If the address can call {update_debt}.
      */
-    function setKeepers(
+    function setKeeper(
         address _address,
         bool _allowed
     ) external virtual onlyGovernance {
@@ -427,5 +429,17 @@ contract GenericDebtAllocator is Governance {
         maxAcceptableBaseFee = _maxAcceptableBaseFee;
 
         emit UpdateMaxAcceptableBaseFee(_maxAcceptableBaseFee);
+    }
+
+    function getStrategyTargetRatio(
+        address _strategy
+    ) external view virtual returns (uint256) {
+        return configs[_strategy].targetRatio;
+    }
+
+    function getStrategyMaxRatio(
+        address _strategy
+    ) external view virtual returns (uint256) {
+        return configs[_strategy].maxRatio;
     }
 }

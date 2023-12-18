@@ -1,6 +1,6 @@
 import ape
 from ape import chain, project, networks
-from utils.constants import ZERO_ADDRESS, MAX_INT, ROLES
+from utils.constants import ZERO_ADDRESS, MAX_INT, ROLES, MAX_BPS
 
 
 def setup_vault(vault, strategies, oracle, chad):
@@ -16,53 +16,47 @@ def test_yield_manager_setup(yield_manager, daddy, vault, management, strategy_m
     assert yield_manager.governance() == daddy
     assert yield_manager.open() == False
     assert yield_manager.maxDebtUpdateLoss() == 1
-    assert yield_manager.allocators(management) == False
-    assert yield_manager.vaults(vault) == False
+    assert yield_manager.proposers(management) == False
+    assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
 
 
-def test_setters(yield_manager, daddy, vault, management):
-    assert yield_manager.vaults(vault) == False
-    assert yield_manager.allocators(management) == False
+def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management):
+    assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
+    assert yield_manager.proposers(management) == False
     assert yield_manager.open() == False
     assert yield_manager.maxDebtUpdateLoss() == 1
 
     with ape.reverts("!governance"):
-        yield_manager.setVault(vault, True, sender=management)
+        yield_manager.setVaultAllocator(
+            vault, generic_debt_allocator, sender=management
+        )
 
-    tx = yield_manager.setVault(vault, True, sender=daddy)
+    tx = yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
 
-    event = list(tx.decode_logs(yield_manager.UpdateVault))[0]
-
-    assert event.vault == vault
-    assert event.status == True
-    assert yield_manager.vaults(vault) == True
-
-    tx = yield_manager.setVault(vault, False, sender=daddy)
-
-    event = list(tx.decode_logs(yield_manager.UpdateVault))[0]
+    event = list(tx.decode_logs(yield_manager.UpdateVaultAllocator))[0]
 
     assert event.vault == vault
-    assert event.status == False
-    assert yield_manager.vaults(management) == False
+    assert event.allocator == generic_debt_allocator
+    assert yield_manager.vaultAllocator(vault) == generic_debt_allocator
 
     with ape.reverts("!governance"):
-        yield_manager.setAllocator(management, True, sender=management)
+        yield_manager.setProposer(management, True, sender=management)
 
-    tx = yield_manager.setAllocator(management, True, sender=daddy)
+    tx = yield_manager.setProposer(management, True, sender=daddy)
 
-    event = list(tx.decode_logs(yield_manager.UpdateAllocator))[0]
+    event = list(tx.decode_logs(yield_manager.UpdateProposer))[0]
 
-    assert event.allocator == management
+    assert event.proposer == management
     assert event.status == True
-    assert yield_manager.allocators(management) == True
+    assert yield_manager.proposers(management) == True
 
-    tx = yield_manager.setAllocator(management, False, sender=daddy)
+    tx = yield_manager.setProposer(management, False, sender=daddy)
 
-    event = list(tx.decode_logs(yield_manager.UpdateAllocator))[0]
+    event = list(tx.decode_logs(yield_manager.UpdateProposer))[0]
 
-    assert event.allocator == management
+    assert event.proposer == management
     assert event.status == False
-    assert yield_manager.allocators(management) == False
+    assert yield_manager.proposers(management) == False
 
     loss = int(8)
     with ape.reverts("!governance"):
@@ -97,6 +91,7 @@ def test_update_allocation(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
@@ -112,26 +107,37 @@ def test_update_allocation(
     with ape.reverts("!allocator or open"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     with ape.reverts("vault not added"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    yield_manager.setVault(vault, True, sender=daddy)
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
 
-    # Must give allocator the debt role
-    with ape.reverts("not allowed"):
+    # Must give allocator the keeper role
+    with ape.reverts("!keeper"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    vault.set_role(
-        yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
-    )
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
+    vault.add_role(generic_debt_allocator, ROLES.DEBT_MANAGER, sender=daddy)
 
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
     (before, now) = tx.return_value
 
+    assert generic_debt_allocator.configs(strategy_two).targetRatio == MAX_BPS
+    assert generic_debt_allocator.configs(strategy_one).targetRatio == 0
+    assert generic_debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
+    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == True
+    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[
+        1
+    ] == vault.update_debt.encode_input(strategy_two.address, amount)
     assert before == 0
+
+    generic_debt_allocator.update_debt(strategy_two, amount, sender=daddy)
+    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+
     # assert now == int(1e17 * amount)
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount
@@ -142,7 +148,7 @@ def test_update_allocation(
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
     allocation = [(strategy_one, amount)]
-    with ape.reverts("no funds to deposit"):
+    with ape.reverts("ratio too high"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
     allocation = [(strategy_two, amount // 2)]
@@ -156,13 +162,36 @@ def test_update_allocation(
     to_move = amount // 2
     # will revert if in the wrong order
     allocation = [(strategy_one, to_move), (strategy_two, amount - to_move)]
-    with ape.reverts("no funds to deposit"):
+    with ape.reverts("ratio too high"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
     allocation = [(strategy_two, amount - to_move), (strategy_one, to_move)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert len(list(tx.decode_logs(vault.DebtUpdated))) == 2
+    assert generic_debt_allocator.configs(strategy_two).targetRatio != MAX_BPS
+    assert generic_debt_allocator.configs(strategy_one).targetRatio != 0
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert bool_one == False
+    assert bool_two == True
+    assert bytes_two == vault.update_debt.encode_input(
+        strategy_two.address, amount - to_move
+    )
+
+    generic_debt_allocator.update_debt(strategy_two, amount - to_move, sender=daddy)
+
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert bool_one == True
+    assert bytes_one == vault.update_debt.encode_input(strategy_one, to_move)
+
+    generic_debt_allocator.update_debt(strategy_one, to_move, sender=daddy)
+
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert bool_one == False
+    assert bool_two == False
+
+    # assert len(list(tx.decode_logs(vault.DebtUpdated))) == 2
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount
     assert vault.totalAssets() == amount
@@ -181,9 +210,30 @@ def test_update_allocation(
 
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert len(list(tx.decode_logs(vault.DebtUpdated))) == 2
     assert len(list(tx.decode_logs(strategy_two.UpdateProfitMaxUnlockTime))) == 2
-    assert len(list(tx.decode_logs(strategy_two.Reported))) == 1
+
+    assert generic_debt_allocator.configs(strategy_two).targetRatio == 0
+    assert generic_debt_allocator.configs(strategy_one).targetRatio == MAX_BPS
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert bool_one == False
+    assert bool_two == True
+    assert bytes_two == vault.update_debt.encode_input(strategy_two.address, 0)
+
+    generic_debt_allocator.update_debt(strategy_two, 0, sender=daddy)
+
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert bool_one == True
+    assert bytes_one == vault.update_debt.encode_input(strategy_one, amount)
+
+    generic_debt_allocator.update_debt(strategy_one, amount, sender=daddy)
+
+    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert bool_one == False
+    assert bool_two == False
+
+    # assert len(list(tx.decode_logs(strategy_two.Reported))) == 1
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount
     assert vault.totalAssets() == amount
@@ -207,19 +257,20 @@ def test_update_allocation_pending_profit(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVault(vault, True, sender=daddy)
-    vault.add_role(
-        yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
-    )
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
+    vault.add_role(yield_manager, ROLES.REPORTING_MANAGER, sender=daddy)
     strategy_one.setPendingManagement(strategy_manager, sender=management)
     strategy_one.setProfitMaxUnlockTime(int(200), sender=management)
     strategy_manager.manageNewStrategy(strategy_one, yield_manager, sender=daddy)
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     profit = amount // 10
     amount = amount - profit
@@ -261,19 +312,20 @@ def test_update_allocation_pending_loss(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVault(vault, True, sender=daddy)
-    vault.add_role(
-        yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
-    )
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
+    vault.add_role(yield_manager, ROLES.REPORTING_MANAGER, sender=daddy)
     strategy_one.setPendingManagement(strategy_manager, sender=management)
     strategy_one.setProfitMaxUnlockTime(int(200), sender=management)
     strategy_manager.manageNewStrategy(strategy_one, yield_manager, sender=daddy)
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     loss = amount // 10
 
@@ -313,19 +365,20 @@ def test_update_allocation_pending_loss_move_half(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVault(vault, True, sender=daddy)
-    vault.add_role(
-        yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
-    )
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
+    vault.add_role(yield_manager, ROLES.REPORTING_MANAGER, sender=daddy)
     strategy_one.setPendingManagement(strategy_manager, sender=management)
     strategy_one.setProfitMaxUnlockTime(int(200), sender=management)
     strategy_manager.manageNewStrategy(strategy_one, yield_manager, sender=daddy)
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     loss = amount // 10
 
@@ -356,6 +409,7 @@ def test_update_allocation_pending_loss_move_half(
     assert strategy_one.balanceOf(vault) != 0
 
 
+"""
 def test_update_allocation_loss_on_withdraw(
     apr_oracle,
     yield_manager,
@@ -368,19 +422,22 @@ def test_update_allocation_loss_on_withdraw(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVault(vault, True, sender=daddy)
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
     vault.add_role(
-        yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
+        yield_manager, ROLES.REPORTING_MANAGER, sender=daddy
     )
     strategy_one.setPendingManagement(strategy_manager, sender=management)
     strategy_one.setProfitMaxUnlockTime(int(200), sender=management)
     strategy_manager.manageNewStrategy(strategy_one, yield_manager, sender=daddy)
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     loss = amount // 10
 
@@ -411,15 +468,24 @@ def test_update_allocation_loss_on_withdraw(
     assert vault.totalDebt() == amount - loss + 1
     assert vault.strategies(strategy_one).current_debt == 1
     assert vault.strategies(strategy_two).current_debt == amount - loss
+"""
 
 
 def test_validate_allocation(
-    apr_oracle, yield_manager, vault, daddy, user, amount, asset, deploy_mock_tokenized
+    apr_oracle,
+    yield_manager,
+    vault,
+    daddy,
+    user,
+    amount,
+    asset,
+    deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     strategy_one = deploy_mock_tokenized("One")
     strategy_two = deploy_mock_tokenized("two")
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVault(vault, True, sender=daddy)
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
 
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
@@ -514,11 +580,15 @@ def test_update_allocation_permissioned(
     amount,
     asset,
     deploy_mock_tokenized,
+    generic_debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
+    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    generic_debt_allocator.setKeeper(yield_manager, True, sender=daddy)
+    generic_debt_allocator.setMinimumChange(1, sender=daddy)
     vault.set_role(
         yield_manager, ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER, sender=daddy
     )
@@ -532,7 +602,7 @@ def test_update_allocation_permissioned(
     with ape.reverts("!governance"):
         yield_manager.updateAllocationPermissioned(vault, allocation, sender=user)
 
-    yield_manager.setAllocator(user, True, sender=daddy)
+    yield_manager.setProposer(user, True, sender=daddy)
 
     # Still cant allocate even with allocator role
     with ape.reverts("!governance"):
