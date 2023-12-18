@@ -8,21 +8,10 @@ import {IStrategy} from "@tokenized-strategy/interfaces/IStrategy.sol";
 ///  debt allocator can call both reports and change the profit unlock time.
 contract StrategyManager is Governance {
     /// @notice Emitted when a new strategy is added to the manager.
-    event StrategyAdded(
-        address indexed strategy,
-        address indexed owner,
-        address indexed debtManager
-    );
+    event StrategyAdded(address indexed strategy, address indexed owner);
 
     /// @notice Emitted when a strategy is removed.
     event StrategyRemoved(address indexed strategy, address indexed newManager);
-
-    /// @notice holds info for a strategy that is managed.
-    struct StrategyInfo {
-        bool active;
-        address owner;
-        address debtManager;
-    }
 
     /// @notice Only the `_strategy` specific owner can call.
     modifier onlyStrategyOwner(address _strategy) {
@@ -30,84 +19,71 @@ contract StrategyManager is Governance {
         _;
     }
 
-    /// @notice Only the `_strategy` owner of its debt manager can call.
-    modifier onlyStrategyOwnerOrDebtManager(address _strategy) {
-        _checkStrategyDebtManager(_strategy);
+    /// @notice Strategy must be added and debt manager is calling.
+    modifier onlyStrategyAndDebtManager(address _strategy) {
+        _checkStrategyAndDebtManager(_strategy);
         _;
     }
 
     /// @notice Checks if the msg sender is the owner of the strategy.
     function _checkStrategyOwner(address _strategy) internal view virtual {
-        require(strategyInfo[_strategy].owner == msg.sender, "!owner");
+        require(strategyOwner[_strategy] == msg.sender, "!owner");
     }
 
-    /// @notice Checks if the msg sender is the debt manager or the strategy owner.
-    function _checkStrategyDebtManager(
+    /// @notice Checks if the msg sender is the debt manager and the strategy is added.
+    function _checkStrategyAndDebtManager(
         address _strategy
     ) internal view virtual {
         require(
-            strategyInfo[_strategy].debtManager == msg.sender ||
-                strategyInfo[_strategy].owner == msg.sender,
+            yieldManager == msg.sender &&
+                strategyOwner[_strategy] != address(0),
             "!debt manager"
         );
     }
 
+    /// @notice Debt manager contract that can call this manager.
+    address public immutable yieldManager;
+
     /// @notice strategy address => struct with info.
-    mapping(address => StrategyInfo) public strategyInfo;
+    mapping(address => address) public strategyOwner;
 
-    /// @notice function selector => bool if a debt manager can call that.
-    mapping(bytes4 => bool) public allowedSelectors;
-
-    /**
-     * @notice Add any of the allowed selectors for a debt manager to call
-     *   to the mapping.
-     */
-    constructor(
-        address _governance,
-        bytes4[] memory _allowedSelectors
-    ) Governance(_governance) {
-        for (uint256 i = 0; i < _allowedSelectors.length; ++i) {
-            allowedSelectors[_allowedSelectors[i]] = true;
-        }
+    constructor(address _governance) Governance(_governance) {
+        yieldManager = msg.sender;
     }
 
     /**
      * @notice Add a new strategy, using the current `management` as the owner.
      * @param _strategy The address of the strategy.
-     * @param _debtManager The address of the debt manager.
      */
-    function manageNewStrategy(
-        address _strategy,
-        address _debtManager
-    ) external {
+    function manageNewStrategy(address _strategy) external {
         address currentManager = IStrategy(_strategy).management();
-        manageNewStrategy(_strategy, _debtManager, currentManager);
+        manageNewStrategy(_strategy, currentManager);
     }
 
     /**
      * @notice Manage a new strategy, setting the debt manager and marking it as active.
      * @param _strategy The address of the strategy.
-     * @param _debtManager The address of the debt manager.
      * @param _owner The address in charge of the strategy now.
      */
     function manageNewStrategy(
         address _strategy,
-        address _debtManager,
         address _owner
     ) public onlyGovernance {
-        require(!strategyInfo[_strategy].active, "already active");
+        require(
+            _owner != address(0) &&
+                _owner != address(this) &&
+                _owner != _strategy,
+            "bad address"
+        );
+        require(strategyOwner[_strategy] == address(0), "already active");
 
         // Accept management of the strategy.
         IStrategy(_strategy).acceptManagement();
 
         // Store the owner of the strategy.
-        strategyInfo[_strategy] = StrategyInfo({
-            active: true,
-            owner: _owner,
-            debtManager: _debtManager
-        });
+        strategyOwner[_strategy] = _owner;
 
-        emit StrategyAdded(_strategy, _owner, _debtManager);
+        emit StrategyAdded(_strategy, _owner);
     }
 
     /**
@@ -125,19 +101,7 @@ contract StrategyManager is Governance {
                 _newOwner != _strategy,
             "bad address"
         );
-        strategyInfo[_strategy].owner = _newOwner;
-    }
-
-    /**
-     * @notice Updates the debt manager of a strategy.
-     * @param _strategy The address of the strategy.
-     * @param _newDebtManager The address of the new owner.
-     */
-    function updateDebtManager(
-        address _strategy,
-        address _newDebtManager
-    ) external onlyStrategyOwner(_strategy) {
-        strategyInfo[_strategy].debtManager = _newDebtManager;
+        strategyOwner[_strategy] = _newOwner;
     }
 
     /**
@@ -164,7 +128,7 @@ contract StrategyManager is Governance {
             "bad address"
         );
 
-        delete strategyInfo[_strategy];
+        delete strategyOwner[_strategy];
 
         IStrategy(_strategy).setPendingManagement(_newManager);
 
@@ -177,7 +141,7 @@ contract StrategyManager is Governance {
      */
     function reportFullProfit(
         address _strategy
-    ) external onlyStrategyOwnerOrDebtManager(_strategy) {
+    ) external onlyStrategyAndDebtManager(_strategy) {
         // Get the current unlock rate.
         uint256 profitUnlock = IStrategy(_strategy).profitMaxUnlockTime();
 
@@ -221,20 +185,7 @@ contract StrategyManager is Governance {
     function forwardCall(
         address _strategy,
         bytes memory _calldata
-    ) public returns (bytes memory) {
-        bytes4 selector;
-
-        assembly {
-            // Copy the first 4 bytes of the memory array to the selector variable
-            selector := mload(add(_calldata, 32))
-        }
-
-        if (allowedSelectors[selector]) {
-            _checkStrategyDebtManager(_strategy);
-        } else {
-            _checkStrategyOwner(_strategy);
-        }
-
+    ) public onlyStrategyOwner(_strategy) returns (bytes memory) {
         (bool success, bytes memory result) = _strategy.call(_calldata);
 
         // If the call reverted. Return the error.

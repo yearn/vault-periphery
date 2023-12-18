@@ -22,7 +22,7 @@ contract YieldManager is Governance {
     /// @notice Emitted when a vaults status is updated.
     event UpdateVaultAllocator(address indexed vault, address allocator);
 
-    /// @notice Emitted when a proposers status is updated.
+    /// @notice Emitted when a proposer status is updated.
     event UpdateProposer(address indexed proposer, bool status);
 
     /// @notice An event emitted when the max debt update loss is updated.
@@ -45,7 +45,7 @@ contract YieldManager is Governance {
 
     /// @notice Check if it has been opened or is an allocator.
     function _isProposerOrOpen() internal view {
-        require(open || proposers[msg.sender], "!allocator or open");
+        require(proposer[msg.sender] || open, "!allocator or open");
     }
 
     uint256 internal constant MAX_BPS = 10_000;
@@ -67,14 +67,11 @@ contract YieldManager is Governance {
     mapping(address => address) public vaultAllocator;
 
     /// @notice Addresses that are allowed to propose allocations.
-    mapping(address => bool) public proposers;
+    mapping(address => bool) public proposer;
 
-    constructor(
-        address _governance,
-        bytes4[] memory _selectors
-    ) Governance(_governance) {
+    constructor(address _governance) Governance(_governance) {
         // Deploy a new strategy manager
-        strategyManager = address(new StrategyManager(_governance, _selectors));
+        strategyManager = address(new StrategyManager(_governance));
         // Default to 1 BP loss
         maxDebtUpdateLoss = 1;
     }
@@ -186,6 +183,7 @@ contract YieldManager is Governance {
                 }
             }
 
+            // Get the target based on the new debt.
             uint256 _targetRatio = (_newDebt * MAX_BPS) / _totalAssets;
             // Update allocation.
             GenericDebtAllocator(allocator).setStrategyDebtRatios(
@@ -352,7 +350,7 @@ contract YieldManager is Governance {
         address _address,
         bool _allowed
     ) external onlyGovernance {
-        proposers[_address] = _allowed;
+        proposer[_address] = _allowed;
 
         emit UpdateProposer(_address, _allowed);
     }

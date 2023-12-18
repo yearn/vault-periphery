@@ -6,8 +6,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
-// TODO: Getters
-
 /**
  * @title YearnV3 Generic Debt Allocator
  * @author yearn.finance
@@ -431,12 +429,22 @@ contract GenericDebtAllocator is Governance {
         emit UpdateMaxAcceptableBaseFee(_maxAcceptableBaseFee);
     }
 
+    /**
+     * @notice Get a strategies target debt ratio.
+     * @param _strategy Address of the strategy.
+     * @return The strategies current targetRatio.
+     */
     function getStrategyTargetRatio(
         address _strategy
     ) external view virtual returns (uint256) {
         return configs[_strategy].targetRatio;
     }
 
+    /**
+     * @notice Get a strategies max debt ratio.
+     * @param _strategy Address of the strategy.
+     * @return The strategies current maxRatio.
+     */
     function getStrategyMaxRatio(
         address _strategy
     ) external view virtual returns (uint256) {

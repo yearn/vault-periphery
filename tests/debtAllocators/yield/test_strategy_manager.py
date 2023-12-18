@@ -2,17 +2,11 @@ import ape
 from ape import chain, project
 from utils.constants import ZERO_ADDRESS, MAX_INT, ROLES
 
-allowed_selectors = ["0x2606a10b", "0xdf69b22a"]
-
 
 def test_strategy_manager_setup(strategy_manager, mock_tokenized):
     assert strategy_manager.strategyInfo(mock_tokenized).active == False
     assert strategy_manager.strategyInfo(mock_tokenized).owner == ZERO_ADDRESS
     assert strategy_manager.strategyInfo(mock_tokenized).debtManager == ZERO_ADDRESS
-    for selector in allowed_selectors:
-        assert strategy_manager.allowedSelectors(selector)
-    # Check random selector
-    assert strategy_manager.allowedSelectors("0x9bbefdb6") == False
 
 
 def test_add_new_strategy(

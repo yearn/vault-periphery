@@ -16,13 +16,13 @@ def test_yield_manager_setup(yield_manager, daddy, vault, management, strategy_m
     assert yield_manager.governance() == daddy
     assert yield_manager.open() == False
     assert yield_manager.maxDebtUpdateLoss() == 1
-    assert yield_manager.proposers(management) == False
+    assert yield_manager.proposer(management) == False
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
 
 
 def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management):
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
-    assert yield_manager.proposers(management) == False
+    assert yield_manager.proposer(management) == False
     assert yield_manager.open() == False
     assert yield_manager.maxDebtUpdateLoss() == 1
 
@@ -48,7 +48,7 @@ def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management
 
     assert event.proposer == management
     assert event.status == True
-    assert yield_manager.proposers(management) == True
+    assert yield_manager.proposer(management) == True
 
     tx = yield_manager.setProposer(management, False, sender=daddy)
 
@@ -56,7 +56,7 @@ def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management
 
     assert event.proposer == management
     assert event.status == False
-    assert yield_manager.proposers(management) == False
+    assert yield_manager.proposer(management) == False
 
     loss = int(8)
     with ape.reverts("!governance"):

@@ -473,9 +473,7 @@ def strategy_manager(project, yield_manager):
 @pytest.fixture(scope="session")
 def deploy_yield_manager(project, daddy):
     def deploy_yield_manager():
-        yield_manager = daddy.deploy(
-            project.YieldManager, daddy, ["0x2606a10b", "0xdf69b22a"]
-        )
+        yield_manager = daddy.deploy(project.YieldManager, daddy)
 
         return yield_manager
 
