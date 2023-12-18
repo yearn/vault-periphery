@@ -29,6 +29,7 @@ def security(accounts):
 def management(accounts):
     yield accounts[3]
 
+
 @pytest.fixture(scope="session")
 def fee_recipient(accounts):
     return accounts[4]
@@ -462,6 +463,7 @@ def role_manager(
     return role_manager
 
 
+@pytest.fixture(scope="session")
 def strategy_manager(project, yield_manager):
     strategy_manager = project.StrategyManager.at(yield_manager.strategyManager())
 
