@@ -77,8 +77,10 @@ contract StrategyManager is Governance {
         );
         require(strategyOwner[_strategy] == address(0), "already active");
 
-        // Accept management of the strategy.
-        IStrategy(_strategy).acceptManagement();
+        if (IStrategy(_strategy).management() != address(this)) {
+            // Accept management of the strategy.
+            IStrategy(_strategy).acceptManagement();
+        }
 
         // Store the owner of the strategy.
         strategyOwner[_strategy] = _owner;

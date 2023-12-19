@@ -57,9 +57,6 @@ contract YieldManager is Governance {
     /// @notice Flag to set to allow anyone to propose allocations.
     bool public open;
 
-    /// @notice Max loss to accept on debt updates in basis points.
-    uint256 public maxDebtUpdateLoss;
-
     /// @notice Address that should hold the strategies `management` role.
     address public immutable strategyManager;
 
@@ -72,8 +69,6 @@ contract YieldManager is Governance {
     constructor(address _governance) Governance(_governance) {
         // Deploy a new strategy manager
         strategyManager = address(new StrategyManager(_governance));
-        // Default to 1 BP loss
-        maxDebtUpdateLoss = 1;
     }
 
     /**
@@ -189,6 +184,7 @@ contract YieldManager is Governance {
             uint256 _targetRatio = _newDebt < _totalAssets
                 ? (_newDebt * MAX_BPS) / _totalAssets
                 : MAX_BPS;
+
             // Update allocation.
             GenericDebtAllocator(allocator).setStrategyDebtRatios(
                 _strategy,
@@ -324,7 +320,9 @@ contract YieldManager is Governance {
                     StrategyManager(strategyManager).reportFullProfit(
                         _strategy
                     );
-                } else if (
+                }
+
+                if (
                     // We cannot decrease debt if the strategy has any unrealised losses.
                     IVault(_vault).assess_share_of_unrealised_losses(
                         _strategy,
@@ -336,7 +334,11 @@ contract YieldManager is Governance {
                 }
             }
 
-            uint256 _targetRatio = (_newDebt * MAX_BPS) / _totalAssets;
+            // Get the target based on the new debt.
+            uint256 _targetRatio = _newDebt < _totalAssets
+                ? (_newDebt * MAX_BPS) / _totalAssets
+                : MAX_BPS;
+
             // Update allocation.
             GenericDebtAllocator(allocator).setStrategyDebtRatios(
                 _strategy,
@@ -381,20 +383,5 @@ contract YieldManager is Governance {
         open = _open;
 
         emit UpdateOpen(_open);
-    }
-
-    /**
-     * @notice Set the max loss in Basis points to allow on debt updates.
-     * @dev Withdrawing during debt updates use {redeem} which allows for 100% loss.
-     *      This can be used to assure a loss is not realized on redeem outside the tolerance.
-     * @param _maxDebtUpdateLoss The max loss to accept on debt updates.
-     */
-    function setMaxDebtUpdateLoss(
-        uint256 _maxDebtUpdateLoss
-    ) external virtual onlyGovernance {
-        require(_maxDebtUpdateLoss <= MAX_BPS, "higher than max");
-        maxDebtUpdateLoss = _maxDebtUpdateLoss;
-
-        emit UpdateMaxDebtUpdateLoss(_maxDebtUpdateLoss);
     }
 }
