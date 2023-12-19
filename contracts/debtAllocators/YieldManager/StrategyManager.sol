@@ -20,8 +20,8 @@ contract StrategyManager is Governance {
     }
 
     /// @notice Strategy must be added and debt manager is calling.
-    modifier onlyStrategyAndDebtManager(address _strategy) {
-        _checkStrategyAndDebtManager(_strategy);
+    modifier onlyStrategyAndYieldManager(address _strategy) {
+        _checkStrategyAndYieldManager(_strategy);
         _;
     }
 
@@ -31,7 +31,7 @@ contract StrategyManager is Governance {
     }
 
     /// @notice Checks if the msg sender is the debt manager and the strategy is added.
-    function _checkStrategyAndDebtManager(
+    function _checkStrategyAndYieldManager(
         address _strategy
     ) internal view virtual {
         require(
@@ -141,7 +141,7 @@ contract StrategyManager is Governance {
      */
     function reportFullProfit(
         address _strategy
-    ) external onlyStrategyAndDebtManager(_strategy) {
+    ) external onlyStrategyAndYieldManager(_strategy) {
         // Get the current unlock rate.
         uint256 profitUnlock = IStrategy(_strategy).profitMaxUnlockTime();
 

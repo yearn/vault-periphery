@@ -171,7 +171,9 @@ contract YieldManager is Governance {
                     StrategyManager(strategyManager).reportFullProfit(
                         _strategy
                     );
-                } else if (
+                }
+
+                if (
                     // We cannot decrease debt if the strategy has any unrealised losses.
                     IVault(_vault).assess_share_of_unrealised_losses(
                         _strategy,
@@ -184,7 +186,9 @@ contract YieldManager is Governance {
             }
 
             // Get the target based on the new debt.
-            uint256 _targetRatio = (_newDebt * MAX_BPS) / _totalAssets;
+            uint256 _targetRatio = _newDebt < _totalAssets
+                ? (_newDebt * MAX_BPS) / _totalAssets
+                : MAX_BPS;
             // Update allocation.
             GenericDebtAllocator(allocator).setStrategyDebtRatios(
                 _strategy,
