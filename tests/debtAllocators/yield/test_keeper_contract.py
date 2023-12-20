@@ -10,6 +10,7 @@ def test_keeper_setup(keeper, mock_tokenized, daddy, yield_manager):
 
 
 def test_add_new_strategy(keeper, mock_tokenized, daddy, yield_manager, management):
+    mock_tokenized.setKeeper(daddy, sender=management)
     assert keeper.strategyOwner(mock_tokenized) == ZERO_ADDRESS
     assert keeper.keepers(yield_manager) == False
 
@@ -37,9 +38,7 @@ def test_add_new_strategy(keeper, mock_tokenized, daddy, yield_manager, manageme
         keeper.addNewStrategy(mock_tokenized, sender=daddy)
 
 
-def test_remove_strategy(
-    keeper, mock_tokenized, yield_manager, management, user, daddy
-):
+def test_remove_strategy(keeper, mock_tokenized, management, user, daddy):
     # Will revert on modifier if not yet added.
     with ape.reverts("!owner"):
         keeper.removeStrategy(mock_tokenized, sender=management)

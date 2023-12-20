@@ -83,12 +83,13 @@ contract Keeper is Governance {
     }
 
     /**
-     * @notice Removes the management of a strategy, transferring it to the `owner`.
+     * @notice Removes the strategy.
      * @param _strategy The address of the strategy.
      */
-    function removeStrategy(
-        address _strategy
-    ) external onlyStrategyOwner(_strategy) {
+    function removeStrategy(address _strategy) external {
+        // Only governance or the strategy owner can call.
+        if (msg.sender != governance) _checkStrategyOwner(_strategy);
+
         delete strategyOwner[_strategy];
 
         emit StrategyRemoved(_strategy);
