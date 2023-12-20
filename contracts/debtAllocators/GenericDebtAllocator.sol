@@ -156,6 +156,11 @@ contract GenericDebtAllocator is Governance {
     ) external virtual onlyKeepers {
         IVault _vault = IVault(vault);
 
+        // If going to 0 record full balance first.
+        if (_targetDebt == 0) {
+            _vault.process_report(_strategy);
+        }
+
         // Cache initial values in case of loss.
         uint256 initialDebt = _vault.strategies(_strategy).current_debt;
         uint256 initialAssets = _vault.totalAssets();

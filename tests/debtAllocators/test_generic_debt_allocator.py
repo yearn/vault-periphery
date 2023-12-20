@@ -297,7 +297,11 @@ def test_update_debt(
     with ape.reverts("not allowed"):
         generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
 
-    vault.add_role(generic_debt_allocator, ROLES.DEBT_MANAGER, sender=daddy)
+    vault.add_role(
+        generic_debt_allocator,
+        ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER,
+        sender=daddy,
+    )
 
     generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
 
