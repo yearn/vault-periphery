@@ -15,7 +15,6 @@ def test_yield_manager_setup(yield_manager, daddy, vault, management, strategy_m
     assert yield_manager.strategyManager() == strategy_manager
     assert yield_manager.governance() == daddy
     assert yield_manager.open() == False
-    assert yield_manager.maxDebtUpdateLoss() == 1
     assert yield_manager.proposer(management) == False
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
 
@@ -24,7 +23,6 @@ def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
     assert yield_manager.proposer(management) == False
     assert yield_manager.open() == False
-    assert yield_manager.maxDebtUpdateLoss() == 1
 
     with ape.reverts("!governance"):
         yield_manager.setVaultAllocator(
@@ -57,17 +55,6 @@ def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management
     assert event.proposer == management
     assert event.status == False
     assert yield_manager.proposer(management) == False
-
-    loss = int(8)
-    with ape.reverts("!governance"):
-        yield_manager.setMaxDebtUpdateLoss(loss, sender=management)
-
-    tx = yield_manager.setMaxDebtUpdateLoss(loss, sender=daddy)
-
-    event = list(tx.decode_logs(yield_manager.UpdateMaxDebtUpdateLoss))[0]
-
-    assert event.newMaxDebtUpdateLoss == loss
-    assert yield_manager.maxDebtUpdateLoss() == loss
 
     with ape.reverts("!governance"):
         yield_manager.setOpen(True, sender=management)

@@ -18,15 +18,12 @@ import {GenericDebtAllocator} from "../GenericDebtAllocator.sol";
 contract YieldManager is Governance {
     /// @notice Emitted when the open flag is updated.
     event UpdateOpen(bool status);
-
-    /// @notice Emitted when a vaults status is updated.
-    event UpdateVaultAllocator(address indexed vault, address allocator);
-
+    
     /// @notice Emitted when a proposer status is updated.
     event UpdateProposer(address indexed proposer, bool status);
 
-    /// @notice An event emitted when the max debt update loss is updated.
-    event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
+    /// @notice Emitted when a vaults status is updated.
+    event UpdateVaultAllocator(address indexed vault, address allocator);
 
     // Struct that contains the address of the strategy and its best allocation.
     struct Allocation {
