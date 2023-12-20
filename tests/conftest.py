@@ -51,7 +51,7 @@ def vault_manager(accounts):
 
 
 @pytest.fixture(scope="session")
-def keeper(accounts):
+def strategy_manager(accounts):
     yield accounts[8]
 
 
@@ -464,16 +464,26 @@ def role_manager(
 
 
 @pytest.fixture(scope="session")
-def strategy_manager(project, yield_manager):
-    strategy_manager = project.StrategyManager.at(yield_manager.strategyManager())
+def deploy_keeper(project, daddy):
+    def deploy_keeper():
+        keeper = daddy.deploy(project.Keeper, daddy)
 
-    yield strategy_manager
+        return keeper
+
+    yield deploy_keeper
 
 
 @pytest.fixture(scope="session")
-def deploy_yield_manager(project, daddy):
+def keeper(deploy_keeper):
+    keeper = deploy_keeper()
+
+    yield keeper
+
+
+@pytest.fixture(scope="session")
+def deploy_yield_manager(project, daddy, keeper):
     def deploy_yield_manager():
-        yield_manager = daddy.deploy(project.YieldManager, daddy)
+        yield_manager = daddy.deploy(project.YieldManager, keeper, daddy)
 
         return yield_manager
 

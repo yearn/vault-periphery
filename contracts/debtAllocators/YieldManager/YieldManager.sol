@@ -4,8 +4,7 @@ pragma solidity 0.8.18;
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
 
-import {StrategyManager, Governance} from "./StrategyManager.sol";
-
+import {Keeper, Governance} from "./Keeper.sol";
 import {GenericDebtAllocator} from "../GenericDebtAllocator.sol";
 
 /**
@@ -18,7 +17,7 @@ import {GenericDebtAllocator} from "../GenericDebtAllocator.sol";
 contract YieldManager is Governance {
     /// @notice Emitted when the open flag is updated.
     event UpdateOpen(bool status);
-    
+
     /// @notice Emitted when a proposer status is updated.
     event UpdateProposer(address indexed proposer, bool status);
 
@@ -55,17 +54,16 @@ contract YieldManager is Governance {
     bool public open;
 
     /// @notice Address that should hold the strategies `management` role.
-    address public immutable strategyManager;
-
-    /// @notice Mapping for vaults that can be allocated for => its debt allocator.
-    mapping(address => address) public vaultAllocator;
+    address public immutable keeper;
 
     /// @notice Addresses that are allowed to propose allocations.
     mapping(address => bool) public proposer;
 
-    constructor(address _governance) Governance(_governance) {
-        // Deploy a new strategy manager
-        strategyManager = address(new StrategyManager(_governance));
+    /// @notice Mapping for vaults that can be allocated for => its debt allocator.
+    mapping(address => address) public vaultAllocator;
+
+    constructor(address _keeper, address _governance) Governance(_governance) {
+        keeper = _keeper;
     }
 
     /**
@@ -160,9 +158,7 @@ contract YieldManager is Governance {
                 // If we are pulling all debt from a strategy.
                 if (_newDebt == 0) {
                     // We need to report profits and have them immediately unlock to not lose out on locked profit.
-                    StrategyManager(strategyManager).reportFullProfit(
-                        _strategy
-                    );
+                    Keeper(keeper).report(_strategy);
                 }
 
                 if (
@@ -314,9 +310,7 @@ contract YieldManager is Governance {
                 // If we are pulling all debt from a strategy.
                 if (_newDebt == 0) {
                     // We need to report profits and have them immediately unlock to not lose out on locked profit.
-                    StrategyManager(strategyManager).reportFullProfit(
-                        _strategy
-                    );
+                    Keeper(keeper).report(_strategy);
                 }
 
                 if (

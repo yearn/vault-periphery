@@ -33,4 +33,6 @@ contract MockTokenized is MockTokenizedStrategy {
         strategyStorage().totalIdle -= _amount;
         strategyStorage().totalDebt += _amount;
     }
+
+    function tendThis(uint256) external {}
 }
