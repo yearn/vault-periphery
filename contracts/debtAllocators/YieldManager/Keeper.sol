@@ -53,7 +53,7 @@ contract Keeper is Governance {
      * @notice Add a new strategy, using the current `management` as the owner.
      * @param _strategy The address of the strategy.
      */
-    function addNewStrategy(address _strategy) external onlyGovernance {
+    function addNewStrategy(address _strategy) external virtual onlyGovernance {
         address currentManager = IStrategy(_strategy).management();
         require(strategyOwner[_strategy] == address(0), "already active");
         require(IStrategy(_strategy).keeper() == address(this), "!keeper");
@@ -72,7 +72,7 @@ contract Keeper is Governance {
     function updateStrategyOwner(
         address _strategy,
         address _newOwner
-    ) external onlyStrategyOwner(_strategy) {
+    ) external virtual onlyStrategyOwner(_strategy) {
         require(
             _newOwner != address(0) &&
                 _newOwner != address(this) &&
@@ -86,7 +86,7 @@ contract Keeper is Governance {
      * @notice Removes the strategy.
      * @param _strategy The address of the strategy.
      */
-    function removeStrategy(address _strategy) external {
+    function removeStrategy(address _strategy) external virtual {
         // Only governance or the strategy owner can call.
         if (msg.sender != governance) _checkStrategyOwner(_strategy);
 
@@ -99,7 +99,7 @@ contract Keeper is Governance {
      * @notice Reports full profit for a strategy.
      * @param _strategy The address of the strategy.
      */
-    function report(address _strategy) external onlyKeepers(_strategy) {
+    function report(address _strategy) external virtual onlyKeepers(_strategy) {
         // Report profits.
         IStrategy(_strategy).report();
     }
@@ -108,7 +108,7 @@ contract Keeper is Governance {
      * @notice Tends a strategy.
      * @param _strategy The address of the strategy.
      */
-    function tend(address _strategy) external onlyKeepers(_strategy) {
+    function tend(address _strategy) external virtual onlyKeepers(_strategy) {
         // Tend.
         IStrategy(_strategy).tend();
     }

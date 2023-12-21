@@ -84,7 +84,7 @@ contract YieldManager is Governance {
     function updateAllocationPermissioned(
         address _vault,
         Allocation[] memory _newAllocations
-    ) public onlyGovernance {
+    ) public virtual onlyGovernance {
         // Move funds
         _allocate(_vault, _newAllocations);
     }
@@ -113,6 +113,7 @@ contract YieldManager is Governance {
         Allocation[] memory _newAllocations
     )
         external
+        virtual
         onlyProposersOrOpen
         returns (uint256 _currentYield, uint256 _afterYield)
     {
@@ -213,7 +214,7 @@ contract YieldManager is Governance {
     function validateAllocation(
         address _vault,
         Allocation[] memory _newAllocations
-    ) external view returns (bool) {
+    ) external view virtual returns (bool) {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
 
@@ -245,7 +246,12 @@ contract YieldManager is Governance {
     function getCurrentAndExpectedYield(
         address _vault,
         Allocation[] memory _newAllocations
-    ) external view returns (uint256 _currentYield, uint256 _expectedYield) {
+    )
+        external
+        view
+        virtual
+        returns (uint256 _currentYield, uint256 _expectedYield)
+    {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
 
@@ -290,7 +296,7 @@ contract YieldManager is Governance {
     function _allocate(
         address _vault,
         Allocation[] memory _newAllocations
-    ) internal {
+    ) internal virtual {
         address allocator = vaultAllocator[_vault];
         require(allocator != address(0), "vault not added");
         address _strategy;
@@ -350,7 +356,7 @@ contract YieldManager is Governance {
     function setProposer(
         address _address,
         bool _allowed
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         proposer[_address] = _allowed;
 
         emit UpdateProposer(_address, _allowed);
@@ -364,7 +370,7 @@ contract YieldManager is Governance {
     function setVaultAllocator(
         address _vault,
         address _allocator
-    ) external onlyGovernance {
+    ) external virtual onlyGovernance {
         vaultAllocator[_vault] = _allocator;
 
         emit UpdateVaultAllocator(_vault, _allocator);
@@ -374,7 +380,7 @@ contract YieldManager is Governance {
      * @notice Sets the open status of the contract.
      * @param _open The new open status to set.
      */
-    function setOpen(bool _open) external onlyGovernance {
+    function setOpen(bool _open) external virtual onlyGovernance {
         open = _open;
 
         emit UpdateOpen(_open);
