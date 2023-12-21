@@ -123,16 +123,17 @@ contract GenericDebtAllocator is Governance {
         uint256 _minimumChange
     ) public virtual {
         require(address(vault) == address(0), "!initialized");
+        // Set initial variables.
         vault = _vault;
         governance = _governance;
-        // Default to allow governance to be a keeper.
-        keepers[_governance] = true;
-
         minimumChange = _minimumChange;
-        // Default max base fee to uint256 max
-        maxAcceptableBaseFee = type(uint256).max;
+
         // Default max loss on debt updates to 1 BP.
         maxDebtUpdateLoss = 1;
+        // Default to allow governance to be a keeper.
+        keepers[_governance] = true;
+        // Default max base fee to uint256 max
+        maxAcceptableBaseFee = type(uint256).max;
     }
 
     /**

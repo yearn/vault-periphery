@@ -11,6 +11,16 @@ import {GenericDebtAllocatorFactory} from "../debtAllocators/GenericDebtAllocato
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Governance2Step {
+    /// @notice Emitted when a new vault has been deployed or added.
+    event AddedNewVault(
+        address indexed vault,
+        address indexed debtAllocator,
+        uint256 rating
+    );
+
+    /// @notice Emitted when a vault is removed.
+    event RemovedVault(address indexed vault);
+
     /// @notice Emitted when a new address is set for a position.
     event UpdatePositionHolder(
         bytes32 indexed position,
@@ -22,16 +32,6 @@ contract RoleManager is Governance2Step {
 
     /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
-
-    /// @notice Emitted when a new vault has been deployed or added.
-    event AddedNewVault(
-        address indexed vault,
-        address indexed debtAllocator,
-        uint256 rating
-    );
-
-    /// @notice Emitted when a vault is removed.
-    event RemovedVault(address indexed vault);
 
     /// @notice Config that holds all vault info.
     struct VaultConfig {
