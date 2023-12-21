@@ -483,7 +483,7 @@ def keeper(deploy_keeper):
 @pytest.fixture(scope="session")
 def deploy_yield_manager(project, daddy, keeper):
     def deploy_yield_manager():
-        yield_manager = daddy.deploy(project.YieldManager, keeper, daddy)
+        yield_manager = daddy.deploy(project.YieldManager, daddy, keeper)
 
         return yield_manager
 
@@ -500,6 +500,6 @@ def yield_manager(deploy_yield_manager):
 @pytest.fixture(scope="session")
 def apr_oracle(project):
     oracle = project.MockOracle
-    address = "0x02b0210fC1575b38147B232b40D7188eF14C04f2"
+    address = "0xF012fBb9283e03994A7829fCE994a105cC066c14"
     networks.provider.set_code(address, oracle.contract_type.runtime_bytecode.bytecode)
     yield oracle.at(address)

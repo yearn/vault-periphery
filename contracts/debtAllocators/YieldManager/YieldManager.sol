@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.18;
 
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
@@ -48,7 +48,7 @@ contract YieldManager is Governance {
 
     /// @notice Contract that holds the logic and oracles for each strategy.
     AprOracle internal constant aprOracle =
-        AprOracle(0x02b0210fC1575b38147B232b40D7188eF14C04f2);
+        AprOracle(0xF012fBb9283e03994A7829fCE994a105cC066c14);
 
     /// @notice Flag to set to allow anyone to propose allocations.
     bool public open;
@@ -62,7 +62,7 @@ contract YieldManager is Governance {
     /// @notice Mapping for vaults that can be allocated for => its debt allocator.
     mapping(address => address) public vaultAllocator;
 
-    constructor(address _keeper, address _governance) Governance(_governance) {
+    constructor(address _governance, address _keeper) Governance(_governance) {
         keeper = _keeper;
     }
 
@@ -146,13 +146,6 @@ contract YieldManager is Governance {
             // Add to the amount currently being earned.
             _currentYield += _strategyApr;
 
-            // If no change move to the next strategy.
-            if (_newDebt == _currentDebt) {
-                // We assume the new apr will be the same as current.
-                _afterYield += _strategyApr;
-                continue;
-            }
-
             // If we are withdrawing.
             if (_currentDebt > _newDebt) {
                 // If we are pulling all debt from a strategy.
@@ -178,14 +171,24 @@ contract YieldManager is Governance {
                 ? (_newDebt * MAX_BPS) / _totalAssets
                 : MAX_BPS;
 
-            // Update allocation.
-            GenericDebtAllocator(allocator).setStrategyDebtRatios(
-                _strategy,
-                _targetRatio
-            );
+            // If different than the current target.
+            if (
+                GenericDebtAllocator(allocator).getStrategyTargetRatio(
+                    _strategy
+                ) != _targetRatio
+            ) {
+                // Update allocation.
+                GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                    _strategy,
+                    _targetRatio
+                );
+            }
 
-            // Get the new APR
-            if (_newDebt != 0) {
+            // Add the expected change in APR based on new debt.
+            if (_newDebt == _currentDebt) {
+                // We assume the new apr will be the same as current.
+                _afterYield += _strategyApr;
+            } else if (_newDebt != 0) {
                 _afterYield += (aprOracle.getStrategyApr(
                     _strategy,
                     int256(_newDebt) - int256(_currentDebt)
@@ -300,11 +303,6 @@ contract YieldManager is Governance {
             // Get the debt the strategy current has.
             _currentDebt = IVault(_vault).strategies(_strategy).current_debt;
 
-            // If no change move to the next strategy.
-            if (_newDebt == _currentDebt) {
-                continue;
-            }
-
             // If we are withdrawing.
             if (_currentDebt > _newDebt) {
                 // If we are pulling all debt from a strategy.
@@ -330,11 +328,17 @@ contract YieldManager is Governance {
                 ? (_newDebt * MAX_BPS) / _totalAssets
                 : MAX_BPS;
 
-            // Update allocation.
-            GenericDebtAllocator(allocator).setStrategyDebtRatios(
-                _strategy,
-                _targetRatio
-            );
+            if (
+                GenericDebtAllocator(allocator).getStrategyTargetRatio(
+                    _strategy
+                ) != _targetRatio
+            ) {
+                // Update allocation.
+                GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                    _strategy,
+                    _targetRatio
+                );
+            }
         }
     }
 
