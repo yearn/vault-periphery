@@ -90,23 +90,24 @@ contract YieldManager is Governance {
     }
 
     /**
-     * @notice Update a `_vault`s allocation of debt.
+     * @notice Update a `_vault`s target allocation of debt.
      * @dev This takes the address of a vault and an array of
-     * its strategies and their specific allocation.
+     * its strategies and their specific target allocations.
      *
      * The `_newAllocations` array should:
      *   - Contain all strategies that hold any amount of debt from the vault
      *       even if the debt wont be adjusted in order to get the correct
-     *       on chain APR.
+     *       on chain rate.
      *   - Be ordered so that all debt decreases are at the beginning of the array
      *       and debt increases at the end.
-     *
-     * It is expected that the proposer does all needed checks for values such
-     * as max_debt, maxWithdraw, min total Idle etc. that are enforced on debt
-     * updates at the vault level.
+     *   - Account for all limiting values such as the vaults max_debt and min_total_idle
+     *      as well as the strategies maxDeposit/maxRedeem that are enforced on debt updates.
+     *   - Account for the expected differences in amounts caused unrealised losses or profits.
      *
      * @param _vault The address of the vault to propose an allocation for.
      * @param _newAllocations Array of strategies and their new proposed allocation.
+     * @return _currentRate The current weighted rate that the collective strategies are earning.
+     * @return _expectedRate The expected weighted rate that the collective strategies would earn.
      */
     function updateAllocation(
         address _vault,
@@ -115,7 +116,7 @@ contract YieldManager is Governance {
         external
         virtual
         onlyProposersOrOpen
-        returns (uint256 _currentYield, uint256 _afterYield)
+        returns (uint256 _currentRate, uint256 _expectedRate)
     {
         address allocator = vaultAllocator[_vault];
         require(allocator != address(0), "vault not added");
@@ -140,18 +141,18 @@ contract YieldManager is Governance {
             // Add to what we have accounted for.
             _accountedFor += _currentDebt;
 
-            // Get the current weighted APR the strategy is earning
-            uint256 _strategyApr = (aprOracle.getStrategyApr(_strategy, 0) *
+            // Get the current weighted rate the strategy is earning
+            uint256 _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
                 _currentDebt);
 
             // Add to the amount currently being earned.
-            _currentYield += _strategyApr;
+            _currentRate += _strategyRate;
 
             // If we are withdrawing.
             if (_currentDebt > _newDebt) {
                 // If we are pulling all debt from a strategy.
                 if (_newDebt == 0) {
-                    // We need to report profits and have them immediately unlock to not lose out on locked profit.
+                    // We need to report profits to have them start to unlock.
                     Keeper(keeper).report(_strategy);
                 }
 
@@ -163,8 +164,27 @@ contract YieldManager is Governance {
                     ) != 0
                 ) {
                     // Realize the loss.
-                    IVault(_vault).process_report(_strategy);
+                    (, uint256 _loss) = IVault(_vault).process_report(
+                        _strategy
+                    );
+                    // Update balances.
+                    _currentDebt -= _loss;
+                    _totalAssets -= _loss;
+                    _accountedFor -= _loss;
                 }
+
+                // Make sure we the vault can withdraw that amount.
+                require(
+                    _maxWithdraw(_vault, _strategy) >= _currentDebt - _newDebt,
+                    "max withdraw"
+                );
+            } else if (_currentDebt < _newDebt) {
+                // Make sure the vault can deposit the desired amount.
+                require(
+                    IVault(_strategy).maxDeposit(_vault) >=
+                        _newDebt - _currentDebt,
+                    "max deposit"
+                );
             }
 
             // Get the target based on the new debt.
@@ -185,21 +205,24 @@ contract YieldManager is Governance {
                 );
             }
 
-            // Add the expected change in APR based on new debt.
+            // If the new and current debt are the same.
             if (_newDebt == _currentDebt) {
-                // We assume the new apr will be the same as current.
-                _afterYield += _strategyApr;
+                // We assume the new rate will be the same as current.
+                _expectedRate += _strategyRate;
             } else if (_newDebt != 0) {
-                _afterYield += (aprOracle.getStrategyApr(
+                _expectedRate += (aprOracle.getStrategyApr(
                     _strategy,
-                    int256(_newDebt) - int256(_currentDebt)
+                    int256(_newDebt) - int256(_currentDebt) // Debt change.
                 ) * _newDebt);
             }
         }
 
+        // Make sure the minimum_total_idle was respected.
+        _checkMinimumTotalIdle(_vault, allocator);
         // Make sure the ending amounts are the same otherwise rates could be wrong.
         require(_totalAssets == _accountedFor, "cheater");
-        require(_afterYield > _currentYield, "fail");
+        // Make sure we expect to earn more than we currently are.
+        require(_expectedRate > _currentRate, "fail");
     }
 
     /**
@@ -235,13 +258,15 @@ contract YieldManager is Governance {
     }
 
     /**
-     * @notice Get the current weighted yield the vault is earning and the expected
-     * APR based on the proposed changes.
+     * @notice Get the current weighted yield rate the vault is earning
+     *  and the expected rate based on the proposed changes.
      *
      * Must divide by the totalAssets to get the APR as 1e18.
      *
      * @param _vault The address of the vault to propose an allocation for.
      * @param _newAllocations Array of strategies and their new proposed allocation.
+     * @return _currentRate The current weighted rate that the collective strategies are earning.
+     * @return _expectedRate The expected weighted rate that the collective strategies would earn.
      */
     function getCurrentAndExpectedYield(
         address _vault,
@@ -250,7 +275,7 @@ contract YieldManager is Governance {
         external
         view
         virtual
-        returns (uint256 _currentYield, uint256 _expectedYield)
+        returns (uint256 _currentRate, uint256 _expectedRate)
     {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
@@ -266,20 +291,20 @@ contract YieldManager is Governance {
             _strategy = _newAllocations[i].strategy;
             _currentDebt = IVault(_vault).strategies(_strategy).current_debt;
 
-            // Get the current weighted APR the strategy is earning
-            uint256 _strategyApr = (aprOracle.getStrategyApr(_strategy, 0) *
+            // Get the current weighted rate the strategy is earning
+            uint256 _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
                 _currentDebt);
 
             // Add to the amount currently being earned.
-            _currentYield += _strategyApr;
+            _currentRate += _strategyRate;
 
             // If the strategies debt is not changing.
             if (_currentDebt == _newDebt) {
                 // No need to call the APR oracle again.
-                _expectedYield += _strategyApr;
+                _expectedRate += _strategyRate;
             } else {
-                // We add what its expected to yield and its new expected debt
-                _expectedYield += (aprOracle.getStrategyApr(
+                // We add the expected rate with the new debt.
+                _expectedRate += (aprOracle.getStrategyApr(
                     _strategy,
                     int256(_newDebt) - int256(_currentDebt)
                 ) * _newDebt);
@@ -325,8 +350,26 @@ contract YieldManager is Governance {
                     ) != 0
                 ) {
                     // Realize the loss.
-                    IVault(_vault).process_report(_strategy);
+                    (, uint256 _loss) = IVault(_vault).process_report(
+                        _strategy
+                    );
+                    // Update balances.
+                    _currentDebt -= _loss;
+                    _totalAssets -= _loss;
                 }
+
+                // Make sure we the vault can withdraw that amount.
+                require(
+                    _maxWithdraw(_vault, _strategy) >= _currentDebt - _newDebt,
+                    "max withdraw"
+                );
+            } else if (_currentDebt < _newDebt) {
+                // Make sure the vault can deposit the desired amount.
+                require(
+                    IVault(_strategy).maxDeposit(_vault) >=
+                        _newDebt - _currentDebt,
+                    "max deposit"
+                );
             }
 
             // Get the target based on the new debt.
@@ -345,6 +388,49 @@ contract YieldManager is Governance {
                     _targetRatio
                 );
             }
+        }
+    }
+
+    /**
+     * @dev Helper function to get the max a vault can withdraw from a strategy to
+     * avoid stack to deep.
+     *
+     * Uses maxRedeem and convertToAssets since that is what the vault uses.
+     */
+    function _maxWithdraw(
+        address _vault,
+        address _strategy
+    ) internal view virtual returns (uint256) {
+        return
+            IVault(_strategy).convertToAssets(
+                IVault(_strategy).maxRedeem(_vault)
+            );
+    }
+
+    /**
+     * @dev Helper function to check that the minimum_total_idle of the vault
+     * is accounted for in the allocation given.
+     *
+     * The expected Rate could be wrong if it allocated funds not allowed to be deployed.
+     *
+     * Use a separate function to avoid stack to deep.
+     */
+    function _checkMinimumTotalIdle(
+        address _vault,
+        address _allocator
+    ) internal view virtual {
+        uint256 totalRatio = GenericDebtAllocator(_allocator).debtRatio();
+        uint256 minIdle = IVault(_vault).minimum_total_idle();
+
+        // No need if minIdle is 0.
+        if (minIdle != 0) {
+            // Make sure we wouldn't allocate more than allowed.
+            require(
+                // Use 1e18 precision for more exact checks.
+                1e18 - (1e14 * totalRatio) >=
+                    (minIdle * 1e18) / IVault(_vault).totalAssets(),
+                "min idle"
+            );
         }
     }
 

@@ -6,6 +6,7 @@ import {MockTokenizedStrategy} from "@yearn-vaults/test/mocks/ERC4626/MockTokeni
 contract MockTokenized is MockTokenizedStrategy {
     uint256 public apr;
     uint256 public loss;
+    uint256 public limit;
 
     constructor(
         address _asset,
@@ -35,4 +36,19 @@ contract MockTokenized is MockTokenizedStrategy {
     }
 
     function tendThis(uint256) external {}
+
+    function availableWithdrawLimit(
+        address _owner
+    ) public view virtual override returns (uint256) {
+        if (limit != 0) {
+            uint256 _totalAssets = strategyStorage().totalIdle;
+            return _totalAssets > limit ? _totalAssets - limit : 0;
+        } else {
+            return super.availableWithdrawLimit(_owner);
+        }
+    }
+
+    function setLimit(uint256 _limit) external {
+        limit = _limit;
+    }
 }

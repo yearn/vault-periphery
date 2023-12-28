@@ -82,7 +82,7 @@ contract GenericDebtAllocator is Governance {
     // Can't be more than 10_000.
     uint256 public debtRatio;
 
-    /// @notice Time to wait between debt updates.
+    /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
 
     /// @notice The minimum amount denominated in asset that will

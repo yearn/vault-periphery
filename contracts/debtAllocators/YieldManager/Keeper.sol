@@ -54,9 +54,10 @@ contract Keeper is Governance {
      * @param _strategy The address of the strategy.
      */
     function addNewStrategy(address _strategy) external virtual onlyGovernance {
-        address currentManager = IStrategy(_strategy).management();
         require(strategyOwner[_strategy] == address(0), "already active");
         require(IStrategy(_strategy).keeper() == address(this), "!keeper");
+
+        address currentManager = IStrategy(_strategy).management();
 
         // Store the owner of the strategy.
         strategyOwner[_strategy] = currentManager;
