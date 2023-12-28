@@ -11,6 +11,9 @@ import {GenericDebtAllocatorFactory} from "../debtAllocators/GenericDebtAllocato
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Governance2Step {
+    /// @notice Revert message for when a vault has already been deployed.
+    error AlreadyDeployed(address _vault);
+
     /// @notice Emitted when a new vault has been deployed or added.
     event AddedNewVault(
         address indexed vault,
@@ -109,6 +112,9 @@ contract RoleManager is Governance2Step {
     mapping(bytes32 => Position) internal _positions;
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
+    /// @notice Mapping of underlying asset, api version and rating to vault.
+    mapping(address => mapping(string => mapping(uint256 => address)))
+        public _assetToVault;
 
     constructor(
         address _governance,
@@ -261,6 +267,12 @@ contract RoleManager is Governance2Step {
             _profitMaxUnlockTime
         );
 
+        // Check that a vault does not exist for that asset, api and rating.
+        // This reverts late to not waste gas when used correctly.
+        string memory _apiVersion = IVault(_vault).apiVersion();
+        if (_assetToVault[_asset][_apiVersion][_rating] != address(0))
+            revert AlreadyDeployed(_assetToVault[_asset][_apiVersion][_rating]);
+
         // Deploy a new debt allocator for the vault.
         address _debtAllocator = _deployAllocator(_vault);
 
@@ -281,6 +293,9 @@ contract RoleManager is Governance2Step {
             debtAllocator: _debtAllocator,
             index: vaults.length
         });
+
+        // Add the vault to the mapping.
+        _assetToVault[_asset][_apiVersion][_rating] = _vault;
 
         // Add the vault to the array.
         vaults.push(_vault);
@@ -437,6 +452,11 @@ contract RoleManager is Governance2Step {
         address _debtAllocator
     ) public virtual onlyPositionHolder(DADDY) {
         require(_rating > 0 && _rating < 6, "rating out of range");
+        // Check that a vault does not exist for that asset, api and rating.
+        address _asset = IVault(_vault).asset();
+        string memory _apiVersion = IVault(_vault).apiVersion();
+        if (_assetToVault[_asset][_apiVersion][_rating] != address(0))
+            revert AlreadyDeployed(_assetToVault[_asset][_apiVersion][_rating]);
 
         // If not the current role manager.
         if (IVault(_vault).role_manager() != address(this)) {
@@ -450,6 +470,7 @@ contract RoleManager is Governance2Step {
         // Check if the vault has been endorsed yet in the registry.
         if (!Registry(registry).isEndorsed(_vault)) {
             // If not endorse it.
+            // NOTE: This will revert if adding a vault of an older version.
             Registry(registry).endorseMultiStrategyVault(_vault);
         }
 
@@ -463,11 +484,14 @@ contract RoleManager is Governance2Step {
 
         // Add the vault config to the mapping.
         vaultConfig[_vault] = VaultConfig({
-            asset: IVault(_vault).asset(),
+            asset: _asset,
             rating: _rating,
             debtAllocator: _debtAllocator,
             index: vaults.length
         });
+
+        // Add the vault to the mapping.
+        _assetToVault[_asset][_apiVersion][_rating] = _vault;
 
         // Add the vault to the array.
         vaults.push(_vault);
@@ -522,23 +546,28 @@ contract RoleManager is Governance2Step {
     function removeVault(
         address _vault
     ) external virtual onlyPositionHolder(BRAIN) {
+        // Get the vault specific config.
+        VaultConfig memory config = vaultConfig[_vault];
         // Make sure the vault has been added to the role manager.
-        require(vaultConfig[_vault].asset != address(0), "vault not added");
+        require(config.asset != address(0), "vault not added");
 
         // Transfer the role manager position.
         IVault(_vault).transfer_role_manager(chad);
 
-        // Index that the vault is in the array.
-        uint256 index = vaultConfig[_vault].index;
         // Address of the vault to replace it with.
         address vaultToMove = vaults[vaults.length - 1];
 
         // Move the last vault to the index of `_vault`
-        vaults[index] = vaultToMove;
-        vaultConfig[vaultToMove].index = index;
+        vaults[config.index] = vaultToMove;
+        vaultConfig[vaultToMove].index = config.index;
 
         // Remove the last item.
         vaults.pop();
+
+        // Delete the vault from the mapping.
+        delete _assetToVault[config.asset][IVault(_vault).apiVersion()][
+            config.rating
+        ];
 
         // Delete the config for `_vault`.
         delete vaultConfig[_vault];
@@ -609,6 +638,23 @@ contract RoleManager is Governance2Step {
      */
     function getAllVaults() external view virtual returns (address[] memory) {
         return vaults;
+    }
+
+    /**
+     * @notice Get the vault for a specific asset, api and rating.
+     * @dev This will return address(0) if one has not been added or deployed.
+     *
+     * @param _asset The underlying asset used.
+     * @param _apiVersion The version of the vault.
+     * @param _rating The rating of the vault.
+     * @return The vault for the specified `_asset`, `_apiVersion` and `_rating`.
+     */
+    function getVault(
+        address _asset,
+        string memory _apiVersion,
+        uint256 _rating
+    ) external view virtual returns (address) {
+        return _assetToVault[_asset][_apiVersion][_rating];
     }
 
     /**

@@ -144,9 +144,6 @@ def test_update_allocation(
     with ape.reverts("ratio too high"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    print(
-        f"Max redeem is {strategy_two.maxRedeem(vault)}, Max withdraw is {strategy_two.convertToAssets(strategy_two.maxRedeem(vault))}, amount is {amount}"
-    )
     allocation = [(strategy_two, amount // 2)]
     with ape.reverts("fail"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
