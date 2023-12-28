@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
-      - uses: ApeWorX/github-action@v2.0
+      - uses: ApeWorX/github-action@v2.4
         with:
           python-version: '3.10'
 
