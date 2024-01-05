@@ -23,8 +23,8 @@ contract Keeper is Governance {
     }
 
     /// @notice Only the keepers can call.
-    modifier onlyKeepers(address _strategy) {
-        _checkKeepers(_strategy);
+    modifier onlyKeepers() {
+        _checkKeepers();
         _;
     }
 
@@ -33,12 +33,9 @@ contract Keeper is Governance {
         require(strategyOwner[_strategy] == msg.sender, "!owner");
     }
 
-    /// @notice Checks if the msg sender is a keeper and the strategy is added.
-    function _checkKeepers(address _strategy) internal view virtual {
-        require(
-            keepers[msg.sender] && strategyOwner[_strategy] != address(0),
-            "!keeper"
-        );
+    /// @notice Checks if the msg sender is a keeper.
+    function _checkKeepers() internal view virtual {
+        require(keepers[msg.sender], "!keeper");
     }
 
     /// @notice Address check for keepers allowed to call.
@@ -100,18 +97,24 @@ contract Keeper is Governance {
      * @notice Reports full profit for a strategy.
      * @param _strategy The address of the strategy.
      */
-    function report(address _strategy) external virtual onlyKeepers(_strategy) {
-        // Report profits.
-        IStrategy(_strategy).report();
+    function report(address _strategy) external virtual onlyKeepers {
+        // If the strategy has been added to the keeper.
+        if (strategyOwner[_strategy] != address(0)) {
+            // Report profits.
+            IStrategy(_strategy).report();
+        }
     }
 
     /**
      * @notice Tends a strategy.
      * @param _strategy The address of the strategy.
      */
-    function tend(address _strategy) external virtual onlyKeepers(_strategy) {
-        // Tend.
-        IStrategy(_strategy).tend();
+    function tend(address _strategy) external virtual onlyKeepers {
+        // If the strategy has been added to the keeper.
+        if (strategyOwner[_strategy] != address(0)) {
+            // Tend.
+            IStrategy(_strategy).tend();
+        }
     }
 
     /**

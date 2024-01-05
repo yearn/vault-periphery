@@ -30,7 +30,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
  */
 contract GenericDebtAllocator is Governance {
     /// @notice An event emitted when a strategies debt ratios are Updated.
-    event UpdateStrategyDebtRatios(
+    event UpdateStrategyDebtRatio(
         address indexed strategy,
         uint256 newTargetRatio,
         uint256 newMaxRatio,
@@ -55,13 +55,17 @@ contract GenericDebtAllocator is Governance {
     /// @notice Struct for each strategies info.
     struct Config {
         // The ideal percent in Basis Points the strategy should have.
-        uint256 targetRatio;
+        uint16 targetRatio;
         // The max percent of assets the strategy should hold.
-        uint256 maxRatio;
+        uint16 maxRatio;
         // Timestamp of the last time debt was updated.
         // The debt updates must be done through this allocator
         // for this to be used.
-        uint256 lastUpdate;
+        uint128 lastUpdate;
+        // We have an extra 96 bits in the slot.
+        // So we declare the variable in the struct so it can be
+        // used if this contract is inherited.
+        uint96 open;
     }
 
     modifier onlyKeepers() {
@@ -100,7 +104,7 @@ contract GenericDebtAllocator is Governance {
     mapping(address => bool) public keepers;
 
     /// @notice Mapping of strategy => its config.
-    mapping(address => Config) public configs;
+    mapping(address => Config) internal _configs;
 
     constructor(
         address _vault,
@@ -154,7 +158,7 @@ contract GenericDebtAllocator is Governance {
     function update_debt(
         address _strategy,
         uint256 _targetDebt
-    ) external virtual onlyKeepers {
+    ) public virtual onlyKeepers {
         IVault _vault = IVault(vault);
 
         // If going to 0 record full balance first.
@@ -179,7 +183,7 @@ contract GenericDebtAllocator is Governance {
         }
 
         // Update the last time the strategies debt was updated.
-        configs[_strategy].lastUpdate = block.timestamp;
+        _configs[_strategy].lastUpdate = uint128(block.timestamp);
     }
 
     /**
@@ -195,7 +199,7 @@ contract GenericDebtAllocator is Governance {
      */
     function shouldUpdateDebt(
         address _strategy
-    ) external view virtual returns (bool, bytes memory) {
+    ) public view virtual returns (bool, bytes memory) {
         // Check the base fee isn't too high.
         if (block.basefee > maxAcceptableBaseFee) {
             return (false, bytes("Base Fee"));
@@ -209,7 +213,7 @@ contract GenericDebtAllocator is Governance {
         require(params.activation != 0, "!active");
 
         // Get the strategy specific debt config.
-        Config memory config = configs[_strategy];
+        Config memory config = getConfig(_strategy);
 
         if (block.timestamp - config.lastUpdate <= minimumWait) {
             return (false, bytes("min wait"));
@@ -302,18 +306,45 @@ contract GenericDebtAllocator is Governance {
     }
 
     /**
+     * @notice Increase a strategies target debt ratio.
+     * @dev `setStrategyDebtRatio` functions will do all needed checks.
+     * @param _strategy The address of the strategy to increase the debt ratio for.
+     * @param _increase The amount in Basis Points to increase it.
+     */
+    function increaseStrategyDebtRatio(
+        address _strategy,
+        uint256 _increase
+    ) external virtual {
+        uint256 _currentRatio = getConfig(_strategy).targetRatio;
+        setStrategyDebtRatio(_strategy, _currentRatio + _increase);
+    }
+
+    /**
+     * @notice Decrease a strategies target debt ratio.
+     * @param _strategy The address of the strategy to decrease the debt ratio for.
+     * @param _decrease The amount in Basis Points to decrease it.
+     */
+    function decreaseStrategyDebtRatio(
+        address _strategy,
+        uint256 _decrease
+    ) external virtual {
+        uint256 _currentRatio = getConfig(_strategy).targetRatio;
+        setStrategyDebtRatio(_strategy, _currentRatio - _decrease);
+    }
+
+    /**
      * @notice Sets a new target debt ratio for a strategy.
      * @dev This will default to a 10% increase for max debt.
      *
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
      */
-    function setStrategyDebtRatios(
+    function setStrategyDebtRatio(
         address _strategy,
         uint256 _targetRatio
-    ) external virtual {
+    ) public virtual {
         uint256 maxRatio = Math.min((_targetRatio * 11_000) / MAX_BPS, MAX_BPS);
-        setStrategyDebtRatios(_strategy, _targetRatio, maxRatio);
+        setStrategyDebtRatio(_strategy, _targetRatio, maxRatio);
     }
 
     /**
@@ -325,7 +356,7 @@ contract GenericDebtAllocator is Governance {
      * @param _targetRatio Amount in Basis points to allocate.
      * @param _maxRatio Max ratio to give on debt increases.
      */
-    function setStrategyDebtRatios(
+    function setStrategyDebtRatio(
         address _strategy,
         uint256 _targetRatio,
         uint256 _maxRatio
@@ -337,21 +368,24 @@ contract GenericDebtAllocator is Governance {
         // Max cannot be lower than the target.
         require(_maxRatio >= _targetRatio, "max ratio");
 
+        // Get the current config.
+        Config memory config = getConfig(_strategy);
+
         // Get what will be the new total debt ratio.
-        uint256 newDebtRatio = debtRatio -
-            configs[_strategy].targetRatio +
-            _targetRatio;
+        uint256 newDebtRatio = debtRatio - config.targetRatio + _targetRatio;
 
         // Make sure it is under 100% allocated
         require(newDebtRatio <= MAX_BPS, "ratio too high");
 
-        // Write to storage.
-        configs[_strategy].targetRatio = _targetRatio;
-        configs[_strategy].maxRatio = _maxRatio;
+        // Update local config.
+        config.targetRatio = uint16(_targetRatio);
+        config.maxRatio = uint16(_maxRatio);
 
+        // Write to storage.
+        _configs[_strategy] = config;
         debtRatio = newDebtRatio;
 
-        emit UpdateStrategyDebtRatios(
+        emit UpdateStrategyDebtRatio(
             _strategy,
             _targetRatio,
             _maxRatio,
@@ -436,6 +470,18 @@ contract GenericDebtAllocator is Governance {
     }
 
     /**
+     * @notice Get a strategies full config.
+     * @dev Used for customizations by inheriting the contract.
+     * @param _strategy Address of the strategy.
+     * @return The strategies current Config.
+     */
+    function getConfig(
+        address _strategy
+    ) public view virtual returns (Config memory) {
+        return _configs[_strategy];
+    }
+
+    /**
      * @notice Get a strategies target debt ratio.
      * @param _strategy Address of the strategy.
      * @return The strategies current targetRatio.
@@ -443,7 +489,7 @@ contract GenericDebtAllocator is Governance {
     function getStrategyTargetRatio(
         address _strategy
     ) external view virtual returns (uint256) {
-        return configs[_strategy].targetRatio;
+        return getConfig(_strategy).targetRatio;
     }
 
     /**
@@ -454,6 +500,6 @@ contract GenericDebtAllocator is Governance {
     function getStrategyMaxRatio(
         address _strategy
     ) external view virtual returns (uint256) {
-        return configs[_strategy].maxRatio;
+        return getConfig(_strategy).maxRatio;
     }
 }

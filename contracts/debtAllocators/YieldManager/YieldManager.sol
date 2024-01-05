@@ -67,29 +67,6 @@ contract YieldManager is Governance {
     }
 
     /**
-     * @notice Update a `_vault`s allocation of debt.
-     * @dev This takes the address of a vault and an array of
-     * its strategies and their specific allocation.
-     *
-     * The `_newAllocations` array should:
-     *   - Be ordered so that all debt decreases are at the beginning of the array
-     *       and debt increases at the end.
-     *
-     * This will not do any APR checks and assumes the sender has completed
-     * any and all necessary checks before sending.
-     *
-     * @param _vault The address of the vault to propose an allocation for.
-     * @param _newAllocations Array of strategies and their new proposed allocation.
-     */
-    function updateAllocationPermissioned(
-        address _vault,
-        Allocation[] memory _newAllocations
-    ) public virtual onlyGovernance {
-        // Move funds
-        _allocate(_vault, _newAllocations);
-    }
-
-    /**
      * @notice Update a `_vault`s target allocation of debt.
      * @dev This takes the address of a vault and an array of
      * its strategies and their specific target allocations.
@@ -152,7 +129,7 @@ contract YieldManager is Governance {
             if (_currentDebt > _newDebt) {
                 // If we are pulling all debt from a strategy.
                 if (_newDebt == 0) {
-                    // We need to report profits to have them start to unlock.
+                    // Try to report profits to have them start to unlock.
                     Keeper(keeper).report(_strategy);
                 }
 
@@ -179,6 +156,11 @@ contract YieldManager is Governance {
                     "max withdraw"
                 );
             } else if (_currentDebt < _newDebt) {
+                // Make sure the strategy is allowed that much.
+                require(
+                    IVault(_vault).strategies(_strategy).max_debt >= _newDebt,
+                    "max debt"
+                );
                 // Make sure the vault can deposit the desired amount.
                 require(
                     IVault(_strategy).maxDeposit(_vault) >=
@@ -199,7 +181,7 @@ contract YieldManager is Governance {
                 ) != _targetRatio
             ) {
                 // Update allocation.
-                GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                GenericDebtAllocator(allocator).setStrategyDebtRatio(
                     _strategy,
                     _targetRatio
                 );
@@ -313,15 +295,24 @@ contract YieldManager is Governance {
     }
 
     /**
-     * @notice Allocate a vaults debt based on the new proposed Allocation.
+     * @notice Update a `_vault`s allocation of debt.
+     * @dev This takes the address of a vault and an array of
+     * its strategies and their specific allocation.
+     *
+     * The `_newAllocations` array should:
+     *   - Be ordered so that all debt decreases are at the beginning of the array
+     *       and debt increases at the end.
+     *
+     * This will not do any APR checks and assumes the sender has completed
+     * any and all necessary checks before sending.
      *
      * @param _vault The address of the vault to propose an allocation for.
      * @param _newAllocations Array of strategies and their new proposed allocation.
      */
-    function _allocate(
+    function updateAllocationPermissioned(
         address _vault,
         Allocation[] memory _newAllocations
-    ) internal virtual {
+    ) external virtual onlyGovernance {
         address allocator = vaultAllocator[_vault];
         require(allocator != address(0), "vault not added");
         address _strategy;
@@ -364,6 +355,11 @@ contract YieldManager is Governance {
                     "max withdraw"
                 );
             } else if (_currentDebt < _newDebt) {
+                // Make sure the strategy is allowed that much.
+                require(
+                    IVault(_vault).strategies(_strategy).max_debt >= _newDebt,
+                    "max debt"
+                );
                 // Make sure the vault can deposit the desired amount.
                 require(
                     IVault(_strategy).maxDeposit(_vault) >=
@@ -383,7 +379,7 @@ contract YieldManager is Governance {
                 ) != _targetRatio
             ) {
                 // Update allocation.
-                GenericDebtAllocator(allocator).setStrategyDebtRatios(
+                GenericDebtAllocator(allocator).setStrategyDebtRatio(
                     _strategy,
                     _targetRatio
                 );

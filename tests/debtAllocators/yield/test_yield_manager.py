@@ -115,12 +115,20 @@ def test_update_allocation(
         sender=daddy,
     )
 
+    # Set max debt for strategy to 0.
+    vault.update_max_debt_for_strategy(strategy_two, 0, sender=daddy)
+
+    with ape.reverts("max debt"):
+        yield_manager.updateAllocation(vault, allocation, sender=user)
+
+    vault.update_max_debt_for_strategy(strategy_two, 2**256 - 1, sender=daddy)
+
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
     (before, now) = tx.return_value
 
-    assert generic_debt_allocator.configs(strategy_two).targetRatio == MAX_BPS
-    assert generic_debt_allocator.configs(strategy_one).targetRatio == 0
+    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == MAX_BPS
+    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == 0
     assert generic_debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
     assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == True
     assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[
@@ -161,8 +169,8 @@ def test_update_allocation(
     allocation = [(strategy_two, amount - to_move), (strategy_one, to_move)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert generic_debt_allocator.configs(strategy_two).targetRatio != MAX_BPS
-    assert generic_debt_allocator.configs(strategy_one).targetRatio != 0
+    assert generic_debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
+    assert generic_debt_allocator.getConfig(strategy_one).targetRatio != 0
     (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
     (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
@@ -192,17 +200,15 @@ def test_update_allocation(
 
     # Try and move all
     allocation = [(strategy_two, 0), (strategy_one, amount)]
-    # Strategy manager isnt the strategies management
-    with ape.reverts("!keeper"):
-        yield_manager.updateAllocation(vault, allocation, sender=user)
 
     strategy_two.setKeeper(keeper, sender=management)
     keeper.addNewStrategy(strategy_two, sender=daddy)
 
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert generic_debt_allocator.configs(strategy_two).targetRatio == 0
-    assert generic_debt_allocator.configs(strategy_one).targetRatio == MAX_BPS
+    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == 0
+    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
+
     (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
     (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
@@ -666,8 +672,8 @@ def test_update_allocation_permissioned(
     allocation = [(strategy_two, amount - to_move), (strategy_one, to_move)]
     tx = yield_manager.updateAllocationPermissioned(vault, allocation, sender=daddy)
 
-    assert generic_debt_allocator.configs(strategy_two).targetRatio != MAX_BPS
-    assert generic_debt_allocator.configs(strategy_one).targetRatio != 0
+    assert generic_debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
+    assert generic_debt_allocator.getConfig(strategy_one).targetRatio != 0
     (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
     (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
@@ -703,8 +709,8 @@ def test_update_allocation_permissioned(
 
     assert len(list(tx.decode_logs(strategy_two.Reported))) == 1
 
-    assert generic_debt_allocator.configs(strategy_two).targetRatio == 0
-    assert generic_debt_allocator.configs(strategy_one).targetRatio == MAX_BPS
+    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == 0
+    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
     (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
     (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
@@ -915,7 +921,7 @@ def test_update_allocation__min_idle(
     allocation = [(strategy_one, amount - min_idle)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatios))[0]
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
     assert event.newTargetRatio == 5_000
 
     # lower the min idle to 0
@@ -925,7 +931,7 @@ def test_update_allocation__min_idle(
     allocation = [(strategy_one, 0), (strategy_two, amount)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatios))
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))
 
     assert len(event) == 2
     assert event[0].newTargetRatio == 0
