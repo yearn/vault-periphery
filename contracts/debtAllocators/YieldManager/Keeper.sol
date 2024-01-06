@@ -18,23 +18,23 @@ contract Keeper is Governance {
 
     /// @notice Only the `_strategy` specific owner can call.
     modifier onlyStrategyOwner(address _strategy) {
-        _checkStrategyOwner(_strategy);
+        _isStrategyOwner(_strategy);
         _;
     }
 
     /// @notice Only the keepers can call.
     modifier onlyKeepers() {
-        _checkKeepers();
+        _isKeeper();
         _;
     }
 
     /// @notice Checks if the msg sender is the owner of the strategy.
-    function _checkStrategyOwner(address _strategy) internal view virtual {
+    function _isStrategyOwner(address _strategy) internal view virtual {
         require(strategyOwner[_strategy] == msg.sender, "!owner");
     }
 
     /// @notice Checks if the msg sender is a keeper.
-    function _checkKeepers() internal view virtual {
+    function _isKeeper() internal view virtual {
         require(keepers[msg.sender], "!keeper");
     }
 
@@ -86,7 +86,7 @@ contract Keeper is Governance {
      */
     function removeStrategy(address _strategy) external virtual {
         // Only governance or the strategy owner can call.
-        if (msg.sender != governance) _checkStrategyOwner(_strategy);
+        if (msg.sender != governance) _isStrategyOwner(_strategy);
 
         delete strategyOwner[_strategy];
 

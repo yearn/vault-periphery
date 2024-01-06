@@ -452,6 +452,7 @@ contract RoleManager is Governance2Step {
         address _debtAllocator
     ) public virtual onlyPositionHolder(DADDY) {
         require(_rating > 0 && _rating < 6, "rating out of range");
+
         // Check that a vault does not exist for that asset, api and rating.
         address _asset = IVault(_vault).asset();
         string memory _apiVersion = IVault(_vault).apiVersion();
