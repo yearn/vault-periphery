@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
-import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
 import {Clonable} from "@periphery/utils/Clonable.sol";
+import {Governance} from "@periphery/utils/Governance.sol";
+import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
 
 /**
  * @title YearnV3 Generic Debt Allocator Factory
@@ -11,11 +12,45 @@ import {Clonable} from "@periphery/utils/Clonable.sol";
  *  Factory for anyone to easily deploy their own generic
  *  debt allocator for a Yearn V3 Vault.
  */
-contract GenericDebtAllocatorFactory is Clonable {
+contract GenericDebtAllocatorFactory is Governance, Clonable {
     event NewDebtAllocator(address indexed allocator, address indexed vault);
 
-    constructor() {
-        original = address(new GenericDebtAllocator(address(1), address(2), 0));
+    /// @notice An event emitted when a keeper is added or removed.
+    event UpdateKeeper(address indexed keeper, bool allowed);
+
+    modifier onlyAuthorized() {
+        _isAuthorized();
+        _;
+    }
+
+    function _isAuthorized() internal view {
+        require(
+            msg.sender == roleManager || msg.sender == governance,
+            "!authorized"
+        );
+    }
+
+    function _isKeeper() internal view virtual {
+        require(keepers[msg.sender], "!keeper");
+    }
+
+    address public roleManager;
+
+    /// @notice Mapping of addresses that are allowed to update debt.
+    mapping(address => bool) public keepers;
+
+    /// @notice Mapping of vault => allocator.
+    mapping(address => address) public allocators;
+
+    constructor(
+        address _governance,
+        address _roleManager
+    ) Governance(_governance) {
+        original = address(new GenericDebtAllocator(address(1), 0));
+        roleManager = _roleManager;
+
+        // Default to allow governance to be a keeper.
+        keepers[_governance] = true;
     }
 
     /**
@@ -29,43 +64,59 @@ contract GenericDebtAllocatorFactory is Clonable {
     function newGenericDebtAllocator(
         address _vault
     ) external virtual returns (address) {
-        return newGenericDebtAllocator(_vault, msg.sender, 0);
-    }
-
-    /**
-     * @notice Clones a new debt allocator.
-     * @dev defaults to 0 for the `minimumChange`.
-     *
-     * @param _vault The vault for the allocator to be hooked to.
-     * @param _governance Address to serve as governance.
-     * @return Address of the new generic debt allocator
-     */
-    function newGenericDebtAllocator(
-        address _vault,
-        address _governance
-    ) external virtual returns (address) {
-        return newGenericDebtAllocator(_vault, _governance, 0);
+        return newGenericDebtAllocator(_vault, 0);
     }
 
     /**
      * @notice Clones a new debt allocator.
      * @param _vault The vault for the allocator to be hooked to.
-     * @param _governance Address to serve as governance.
      * @return newAllocator Address of the new generic debt allocator
      */
     function newGenericDebtAllocator(
         address _vault,
-        address _governance,
         uint256 _minimumChange
-    ) public virtual returns (address newAllocator) {
+    ) public virtual onlyAuthorized returns (address newAllocator) {
+        require(allocators[_vault] == address(0), "already deployed");
+
         newAllocator = _clone();
 
-        GenericDebtAllocator(newAllocator).initialize(
-            _vault,
-            _governance,
-            _minimumChange
-        );
+        GenericDebtAllocator(newAllocator).initialize(_vault, _minimumChange);
+
+        allocators[_vault] = newAllocator;
 
         emit NewDebtAllocator(newAllocator, _vault);
+    }
+
+    function shouldUpdateDebt(
+        address _vault,
+        address _strategy
+    ) public view virtual returns (bool, bytes memory) {
+        return
+            GenericDebtAllocator(allocators[_vault]).shouldUpdateDebt(
+                _strategy
+            );
+    }
+
+    function setAllocator(
+        address _vault,
+        address _allocator
+    ) external virtual onlyGovernance {
+        allocators[_vault] = _allocator;
+
+        emit NewDebtAllocator(_allocator, _vault);
+    }
+
+    /**
+     * @notice Set if a keeper can update debt.
+     * @param _address The address to set mapping for.
+     * @param _allowed If the address can call {update_debt}.
+     */
+    function setKeeper(
+        address _address,
+        bool _allowed
+    ) external virtual onlyGovernance {
+        keepers[_address] = _allowed;
+
+        emit UpdateKeeper(_address, _allowed);
     }
 }
