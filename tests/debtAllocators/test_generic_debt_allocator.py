@@ -19,7 +19,7 @@ def test_setup(generic_debt_allocator_factory, user, strategy, vault):
     assert generic_debt_allocator.keepers(user) == True
     assert generic_debt_allocator.vault() == vault.address
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
-    assert generic_debt_allocator.debtRatio() == 0
+    assert generic_debt_allocator.totalDebtRatio() == 0
     with ape.reverts("!active"):
         generic_debt_allocator.shouldUpdateDebt(strategy)
 
@@ -143,7 +143,7 @@ def test_set_ratios(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     new_strategy = create_strategy()
@@ -161,7 +161,7 @@ def test_set_ratios(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == target * 1.1
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, target * 1.1, 0, 0)
 
 
@@ -198,7 +198,7 @@ def test_increase_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     new_strategy = create_strategy()
@@ -221,7 +221,7 @@ def test_increase_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     target = int(10_000)
@@ -236,7 +236,7 @@ def test_increase_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
 
@@ -266,7 +266,7 @@ def test_decrease_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     target = int(2_000)
@@ -287,7 +287,7 @@ def test_decrease_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     target = int(0)
@@ -302,7 +302,7 @@ def test_decrease_debt_ratio(
     assert event.newTargetRatio == target
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
-    assert generic_debt_allocator.debtRatio() == target
+    assert generic_debt_allocator.totalDebtRatio() == target
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
 
 

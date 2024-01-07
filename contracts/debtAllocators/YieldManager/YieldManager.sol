@@ -415,7 +415,7 @@ contract YieldManager is Governance {
         address _vault,
         address _allocator
     ) internal view virtual {
-        uint256 totalRatio = GenericDebtAllocator(_allocator).debtRatio();
+        uint256 totalRatio = GenericDebtAllocator(_allocator).totalDebtRatio();
         uint256 minIdle = IVault(_vault).minimum_total_idle();
 
         // No need if minIdle is 0.

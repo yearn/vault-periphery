@@ -82,16 +82,16 @@ contract GenericDebtAllocator is Governance {
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
 
-    /// @notice Total debt ratio currently allocated in basis points.
-    // Can't be more than 10_000.
-    uint256 public debtRatio;
-
     /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
 
     /// @notice The minimum amount denominated in asset that will
     // need to be moved to trigger a debt update.
     uint256 public minimumChange;
+
+    /// @notice Total debt ratio currently allocated in basis points.
+    // Can't be more than 10_000.
+    uint256 public totalDebtRatio;
 
     /// @notice Max loss to accept on debt updates in basis points.
     uint256 public maxDebtUpdateLoss;
@@ -372,10 +372,12 @@ contract GenericDebtAllocator is Governance {
         Config memory config = getConfig(_strategy);
 
         // Get what will be the new total debt ratio.
-        uint256 newDebtRatio = debtRatio - config.targetRatio + _targetRatio;
+        uint256 newTotalDebtRatio = totalDebtRatio -
+            config.targetRatio +
+            _targetRatio;
 
         // Make sure it is under 100% allocated
-        require(newDebtRatio <= MAX_BPS, "ratio too high");
+        require(newTotalDebtRatio <= MAX_BPS, "ratio too high");
 
         // Update local config.
         config.targetRatio = uint16(_targetRatio);
@@ -383,13 +385,13 @@ contract GenericDebtAllocator is Governance {
 
         // Write to storage.
         _configs[_strategy] = config;
-        debtRatio = newDebtRatio;
+        totalDebtRatio = newTotalDebtRatio;
 
         emit UpdateStrategyDebtRatio(
             _strategy,
             _targetRatio,
             _maxRatio,
-            newDebtRatio
+            newTotalDebtRatio
         );
     }
 
