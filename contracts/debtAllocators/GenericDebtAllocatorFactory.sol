@@ -13,16 +13,22 @@ import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
  *  debt allocator for a Yearn V3 Vault.
  */
 contract GenericDebtAllocatorFactory is Governance, Clonable {
+    /// @notice Revert message for when a debt allocator already exists.
+    error AlreadyDeployed(address _allocator);
+
+    /// @notice An event emitted when a new debt allocator is added or deployed.
     event NewDebtAllocator(address indexed allocator, address indexed vault);
 
     /// @notice An event emitted when a keeper is added or removed.
     event UpdateKeeper(address indexed keeper, bool allowed);
 
+    /// @notice Only allow `governance` or the `roleManager`.
     modifier onlyAuthorized() {
         _isAuthorized();
         _;
     }
 
+    /// @notice Check is `governance` or the `roleManager`.
     function _isAuthorized() internal view {
         require(
             msg.sender == roleManager || msg.sender == governance,
@@ -30,10 +36,7 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
         );
     }
 
-    function _isKeeper() internal view virtual {
-        require(keepers[msg.sender], "!keeper");
-    }
-
+    /// @notice Address that is the roleManager for all vaults and can deploy allocators.
     address public roleManager;
 
     /// @notice Mapping of addresses that are allowed to update debt.
@@ -46,6 +49,7 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
         address _governance,
         address _roleManager
     ) Governance(_governance) {
+        // Deploy a dummy allocator as the original.
         original = address(new GenericDebtAllocator(address(1), 0));
         roleManager = _roleManager;
 
@@ -70,23 +74,40 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
     /**
      * @notice Clones a new debt allocator.
      * @param _vault The vault for the allocator to be hooked to.
+     * @param _minimumChange The minimum amount needed to trigger debt update.
      * @return newAllocator Address of the new generic debt allocator
      */
     function newGenericDebtAllocator(
         address _vault,
         uint256 _minimumChange
     ) public virtual onlyAuthorized returns (address newAllocator) {
-        require(allocators[_vault] == address(0), "already deployed");
+        // Make sure their is not already an allocator deployed for the vault.
+        if (allocators[_vault] != address(0))
+            revert AlreadyDeployed(allocators[_vault]);
 
+        // Clone new allocator off the original.
         newAllocator = _clone();
 
+        // Initialize the new allocator.
         GenericDebtAllocator(newAllocator).initialize(_vault, _minimumChange);
 
+        // Add it to the
         allocators[_vault] = newAllocator;
 
+        // Emit event.
         emit NewDebtAllocator(newAllocator, _vault);
     }
 
+    /**
+     * @notice Check if a strategy's debt should be updated.
+     * @dev This should be called by a keeper to decide if a strategies
+     * debt should be updated and if so by how much.
+     *
+     * @param _vault Address of the vault.
+     * @param _strategy Address of the strategy to check.
+     * @return . Bool representing if the debt should be updated.
+     * @return . Calldata if `true` or reason if `false`.
+     */
     function shouldUpdateDebt(
         address _vault,
         address _strategy
@@ -97,6 +118,14 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
             );
     }
 
+    /**
+     * @notice Set a specific allocator for a specific vault.
+     * @dev This will override any previously deployed versions and should
+     *   be done with care.
+     *
+     * @param _vault Address of the vault
+     * @param _allocator Address of the debtAllocator.
+     */
     function setAllocator(
         address _vault,
         address _allocator

@@ -69,21 +69,25 @@ contract GenericDebtAllocator {
         uint96 open;
     }
 
+    /// @notice Make sure the caller is governance.
     modifier onlyGovernance() {
         _isGovernance();
         _;
     }
 
+    /// @notice Make sure the caller is governance or a manager.
     modifier onlyManagers() {
         _isManager();
         _;
     }
 
+    /// @notice Make sure the caller is a keeper
     modifier onlyKeepers() {
         _isKeeper();
         _;
     }
 
+    /// @notice Check the Factories governance address.
     function _isGovernance() internal view virtual {
         require(
             msg.sender == GenericDebtAllocatorFactory(factory).governance(),
@@ -91,6 +95,7 @@ contract GenericDebtAllocator {
         );
     }
 
+    /// @notice Check is either factories governance or local manager.
     function _isManager() internal view virtual {
         require(
             msg.sender == GenericDebtAllocatorFactory(factory).governance() ||
@@ -99,6 +104,7 @@ contract GenericDebtAllocator {
         );
     }
 
+    /// @notice Check is one of the allowed keepers.
     function _isKeeper() internal view virtual {
         require(
             GenericDebtAllocatorFactory(factory).keepers(msg.sender),
@@ -111,11 +117,8 @@ contract GenericDebtAllocator {
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
 
+    /// @notice Address to get permissioned roles from.
     address public factory;
-
-    /// @notice Total debt ratio currently allocated in basis points.
-    // Can't be more than 10_000.
-    uint256 public debtRatio;
 
     /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
@@ -153,6 +156,7 @@ contract GenericDebtAllocator {
      */
     function initialize(address _vault, uint256 _minimumChange) public virtual {
         require(address(vault) == address(0), "!initialized");
+        // Set the factory to retrieve roles from.
         factory = msg.sender;
         // Set initial variables.
         vault = _vault;
@@ -214,8 +218,6 @@ contract GenericDebtAllocator {
      * @notice Check if a strategy's debt should be updated.
      * @dev This should be called by a keeper to decide if a strategies
      * debt should be updated and if so by how much.
-     *
-     * NOTE: This cannot be used to withdraw down to 0 debt.
      *
      * @param _strategy Address of the strategy to check.
      * @return . Bool representing if the debt should be updated.
