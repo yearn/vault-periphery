@@ -3,8 +3,9 @@ pragma solidity 0.8.18;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Governance} from "@periphery/utils/Governance.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
+
+import {GenericDebtAllocatorFactory} from "./GenericDebtAllocatorFactory.sol";
 
 /**
  * @title YearnV3 Generic Debt Allocator
@@ -28,7 +29,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
  *  And will pull funds from the strategy when it has `minimumChange`
  *  more than its `maxRatio`.
  */
-contract GenericDebtAllocator is Governance {
+contract GenericDebtAllocator {
     /// @notice An event emitted when a strategies debt ratios are Updated.
     event UpdateStrategyDebtRatio(
         address indexed strategy,
@@ -44,7 +45,7 @@ contract GenericDebtAllocator is Governance {
     event UpdateMinimumChange(uint256 newMinimumChange);
 
     /// @notice An event emitted when a keeper is added or removed.
-    event UpdateKeeper(address indexed keeper, bool allowed);
+    event UpdateManager(address indexed manager, bool allowed);
 
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
@@ -68,19 +69,56 @@ contract GenericDebtAllocator is Governance {
         uint96 open;
     }
 
+    /// @notice Make sure the caller is governance.
+    modifier onlyGovernance() {
+        _isGovernance();
+        _;
+    }
+
+    /// @notice Make sure the caller is governance or a manager.
+    modifier onlyManagers() {
+        _isManager();
+        _;
+    }
+
+    /// @notice Make sure the caller is a keeper
     modifier onlyKeepers() {
         _isKeeper();
         _;
     }
 
+    /// @notice Check the Factories governance address.
+    function _isGovernance() internal view virtual {
+        require(
+            msg.sender == GenericDebtAllocatorFactory(factory).governance(),
+            "!governance"
+        );
+    }
+
+    /// @notice Check is either factories governance or local manager.
+    function _isManager() internal view virtual {
+        require(
+            managers[msg.sender] ||
+                msg.sender == GenericDebtAllocatorFactory(factory).governance(),
+            "!manager"
+        );
+    }
+
+    /// @notice Check is one of the allowed keepers.
     function _isKeeper() internal view virtual {
-        require(keepers[msg.sender], "!keeper");
+        require(
+            GenericDebtAllocatorFactory(factory).keepers(msg.sender),
+            "!keeper"
+        );
     }
 
     uint256 internal constant MAX_BPS = 10_000;
 
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
+
+    /// @notice Address to get permissioned roles from.
+    address public factory;
 
     /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
@@ -101,41 +139,31 @@ contract GenericDebtAllocator is Governance {
     uint256 public maxAcceptableBaseFee;
 
     /// @notice Mapping of addresses that are allowed to update debt.
-    mapping(address => bool) public keepers;
+    mapping(address => bool) public managers;
 
     /// @notice Mapping of strategy => its config.
     mapping(address => Config) internal _configs;
 
-    constructor(
-        address _vault,
-        address _governance,
-        uint256 _minimumChange
-    ) Governance(_governance) {
-        initialize(_vault, _governance, _minimumChange);
+    constructor(address _vault, uint256 _minimumChange) {
+        initialize(_vault, _minimumChange);
     }
 
     /**
      * @notice Initializes the debt allocator.
      * @dev Should be called atomically after cloning.
      * @param _vault Address of the vault this allocates debt for.
-     * @param _governance Address to govern this contract.
      * @param _minimumChange The minimum in asset that must be moved.
      */
-    function initialize(
-        address _vault,
-        address _governance,
-        uint256 _minimumChange
-    ) public virtual {
+    function initialize(address _vault, uint256 _minimumChange) public virtual {
         require(address(vault) == address(0), "!initialized");
+        // Set the factory to retrieve roles from.
+        factory = msg.sender;
         // Set initial variables.
         vault = _vault;
-        governance = _governance;
         minimumChange = _minimumChange;
 
         // Default max loss on debt updates to 1 BP.
         maxDebtUpdateLoss = 1;
-        // Default to allow governance to be a keeper.
-        keepers[_governance] = true;
         // Default max base fee to uint256 max
         maxAcceptableBaseFee = type(uint256).max;
     }
@@ -190,8 +218,6 @@ contract GenericDebtAllocator is Governance {
      * @notice Check if a strategy's debt should be updated.
      * @dev This should be called by a keeper to decide if a strategies
      * debt should be updated and if so by how much.
-     *
-     * NOTE: This cannot be used to withdraw down to 0 debt.
      *
      * @param _strategy Address of the strategy to check.
      * @return . Bool representing if the debt should be updated.
@@ -334,7 +360,7 @@ contract GenericDebtAllocator is Governance {
 
     /**
      * @notice Sets a new target debt ratio for a strategy.
-     * @dev This will default to a 10% increase for max debt.
+     * @dev This will default to a 20% increase for max debt.
      *
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
@@ -343,7 +369,7 @@ contract GenericDebtAllocator is Governance {
         address _strategy,
         uint256 _targetRatio
     ) public virtual {
-        uint256 maxRatio = Math.min((_targetRatio * 11_000) / MAX_BPS, MAX_BPS);
+        uint256 maxRatio = Math.min((_targetRatio * 12_000) / MAX_BPS, MAX_BPS);
         setStrategyDebtRatio(_strategy, _targetRatio, maxRatio);
     }
 
@@ -360,7 +386,7 @@ contract GenericDebtAllocator is Governance {
         address _strategy,
         uint256 _targetRatio,
         uint256 _maxRatio
-    ) public virtual onlyKeepers {
+    ) public virtual onlyManagers {
         // Make sure a minimumChange has been set.
         require(minimumChange != 0, "!minimum");
         // Cannot be more than 100%.
@@ -393,20 +419,6 @@ contract GenericDebtAllocator is Governance {
             _maxRatio,
             newTotalDebtRatio
         );
-    }
-
-    /**
-     * @notice Set if a keeper can update debt.
-     * @param _address The address to set mapping for.
-     * @param _allowed If the address can call {update_debt}.
-     */
-    function setKeeper(
-        address _address,
-        bool _allowed
-    ) external virtual onlyGovernance {
-        keepers[_address] = _allowed;
-
-        emit UpdateKeeper(_address, _allowed);
     }
 
     /**
@@ -469,6 +481,20 @@ contract GenericDebtAllocator is Governance {
         maxAcceptableBaseFee = _maxAcceptableBaseFee;
 
         emit UpdateMaxAcceptableBaseFee(_maxAcceptableBaseFee);
+    }
+
+    /**
+     * @notice Set if a manager can update ratios.
+     * @param _address The address to set mapping for.
+     * @param _allowed If the address can call {update_debt}.
+     */
+    function setManager(
+        address _address,
+        bool _allowed
+    ) external virtual onlyGovernance {
+        managers[_address] = _allowed;
+
+        emit UpdateManager(_address, _allowed);
     }
 
     /**

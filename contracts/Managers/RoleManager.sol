@@ -318,7 +318,7 @@ contract RoleManager is Governance2Step {
         if (factory != address(0)) {
             // Deploy a new debt allocator for the vault with Brain as the gov.
             _debtAllocator = GenericDebtAllocatorFactory(factory)
-                .newGenericDebtAllocator(_vault, getPositionHolder(BRAIN));
+                .newGenericDebtAllocator(_vault);
         } else {
             // If no factory is set we should be using one central allocator.
             _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);

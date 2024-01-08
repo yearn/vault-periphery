@@ -3,10 +3,12 @@ from ape import chain, project
 from utils.constants import ZERO_ADDRESS, MAX_INT, ROLES
 
 
-def test_setup(generic_debt_allocator_factory, user, strategy, vault):
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(
-        vault, user, 0, sender=user
-    )
+def test_setup(generic_debt_allocator_factory, brain, user, strategy, vault):
+    assert generic_debt_allocator_factory.governance() == brain
+    assert generic_debt_allocator_factory.keepers(brain) == True
+    assert generic_debt_allocator_factory.roleManager() == ZERO_ADDRESS
+
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, 0, sender=user)
 
     events = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))
 
@@ -15,8 +17,8 @@ def test_setup(generic_debt_allocator_factory, user, strategy, vault):
 
     generic_debt_allocator = project.GenericDebtAllocator.at(events[0].allocator)
 
-    assert generic_debt_allocator.governance() == user
-    assert generic_debt_allocator.keepers(user) == True
+    assert generic_debt_allocator.managers(brain) == False
+    assert generic_debt_allocator.factory() == generic_debt_allocator_factory.address
     assert generic_debt_allocator.vault() == vault.address
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
     assert generic_debt_allocator.totalDebtRatio() == 0
@@ -24,31 +26,57 @@ def test_setup(generic_debt_allocator_factory, user, strategy, vault):
         generic_debt_allocator.shouldUpdateDebt(strategy)
 
 
-def test_set_keepers(generic_debt_allocator, daddy, vault, strategy, user):
-    assert generic_debt_allocator.keepers(daddy) == True
-    assert generic_debt_allocator.keepers(user) == False
+def test_set_keepers(
+    generic_debt_allocator_factory, generic_debt_allocator, brain, user
+):
+    assert generic_debt_allocator_factory.keepers(brain) == True
+    assert generic_debt_allocator_factory.keepers(user) == False
 
     with ape.reverts("!governance"):
-        generic_debt_allocator.setKeeper(user, True, sender=user)
+        generic_debt_allocator_factory.setKeeper(user, True, sender=user)
 
-    tx = generic_debt_allocator.setKeeper(user, True, sender=daddy)
+    tx = generic_debt_allocator_factory.setKeeper(user, True, sender=brain)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateKeeper))[0]
+    event = list(tx.decode_logs(generic_debt_allocator_factory.UpdateKeeper))[0]
 
     assert event.keeper == user
     assert event.allowed == True
-    assert generic_debt_allocator.keepers(user) == True
+    assert generic_debt_allocator_factory.keepers(user) == True
 
-    tx = generic_debt_allocator.setKeeper(daddy, False, sender=daddy)
+    tx = generic_debt_allocator_factory.setKeeper(brain, False, sender=brain)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateKeeper))[0]
+    event = list(tx.decode_logs(generic_debt_allocator_factory.UpdateKeeper))[0]
 
-    assert event.keeper == daddy
+    assert event.keeper == brain
     assert event.allowed == False
-    assert generic_debt_allocator.keepers(daddy) == False
+    assert generic_debt_allocator_factory.keepers(brain) == False
 
 
-def test_set_minimum_change(generic_debt_allocator, daddy, vault, strategy, user):
+def test_set_managers(generic_debt_allocator, brain, user):
+    assert generic_debt_allocator.managers(brain) == False
+    assert generic_debt_allocator.managers(user) == False
+
+    with ape.reverts("!governance"):
+        generic_debt_allocator.setManager(user, True, sender=user)
+
+    tx = generic_debt_allocator.setManager(user, True, sender=brain)
+
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateManager))[0]
+
+    assert event.manager == user
+    assert event.allowed == True
+    assert generic_debt_allocator.managers(user) == True
+
+    tx = generic_debt_allocator.setManager(user, False, sender=brain)
+
+    event = list(tx.decode_logs(generic_debt_allocator.UpdateManager))[0]
+
+    assert event.manager == user
+    assert event.allowed == False
+    assert generic_debt_allocator.managers(user) == False
+
+
+def test_set_minimum_change(generic_debt_allocator, brain, strategy, user):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
     assert generic_debt_allocator.minimumChange() == 0
 
@@ -58,9 +86,9 @@ def test_set_minimum_change(generic_debt_allocator, daddy, vault, strategy, user
         generic_debt_allocator.setMinimumChange(minimum, sender=user)
 
     with ape.reverts("zero"):
-        generic_debt_allocator.setMinimumChange(0, sender=daddy)
+        generic_debt_allocator.setMinimumChange(0, sender=brain)
 
-    tx = generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
+    tx = generic_debt_allocator.setMinimumChange(minimum, sender=brain)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateMinimumChange))[0]
 
@@ -68,7 +96,7 @@ def test_set_minimum_change(generic_debt_allocator, daddy, vault, strategy, user
     assert generic_debt_allocator.minimumChange() == minimum
 
 
-def test_set_minimum_wait(generic_debt_allocator, daddy, vault, strategy, user):
+def test_set_minimum_wait(generic_debt_allocator, brain, strategy, user):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
     assert generic_debt_allocator.minimumWait() == 0
 
@@ -77,7 +105,7 @@ def test_set_minimum_wait(generic_debt_allocator, daddy, vault, strategy, user):
     with ape.reverts("!governance"):
         generic_debt_allocator.setMinimumWait(minimum, sender=user)
 
-    tx = generic_debt_allocator.setMinimumWait(minimum, sender=daddy)
+    tx = generic_debt_allocator.setMinimumWait(minimum, sender=brain)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateMinimumWait))[0]
 
@@ -85,7 +113,7 @@ def test_set_minimum_wait(generic_debt_allocator, daddy, vault, strategy, user):
     assert generic_debt_allocator.minimumWait() == minimum
 
 
-def test_set_max_debt_update_loss(generic_debt_allocator, daddy, vault, strategy, user):
+def test_set_max_debt_update_loss(generic_debt_allocator, brain, strategy, user):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
     assert generic_debt_allocator.maxDebtUpdateLoss() == 1
 
@@ -95,9 +123,9 @@ def test_set_max_debt_update_loss(generic_debt_allocator, daddy, vault, strategy
         generic_debt_allocator.setMaxDebtUpdateLoss(max, sender=user)
 
     with ape.reverts("higher than max"):
-        generic_debt_allocator.setMaxDebtUpdateLoss(10_001, sender=daddy)
+        generic_debt_allocator.setMaxDebtUpdateLoss(10_001, sender=brain)
 
-    tx = generic_debt_allocator.setMaxDebtUpdateLoss(max, sender=daddy)
+    tx = generic_debt_allocator.setMaxDebtUpdateLoss(max, sender=brain)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateMaxDebtUpdateLoss))[0]
 
@@ -106,7 +134,7 @@ def test_set_max_debt_update_loss(generic_debt_allocator, daddy, vault, strategy
 
 
 def test_set_ratios(
-    generic_debt_allocator, daddy, vault, strategy, create_strategy, user
+    generic_debt_allocator, brain, daddy, vault, strategy, create_strategy, user
 ):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
 
@@ -114,28 +142,28 @@ def test_set_ratios(
     max = int(6_000)
     target = int(5_000)
 
-    with ape.reverts("!keeper"):
+    with ape.reverts("!manager"):
         generic_debt_allocator.setStrategyDebtRatio(strategy, target, max, sender=user)
 
     vault.add_strategy(strategy.address, sender=daddy)
 
     with ape.reverts("!minimum"):
-        generic_debt_allocator.setStrategyDebtRatio(strategy, target, max, sender=daddy)
+        generic_debt_allocator.setStrategyDebtRatio(strategy, target, max, sender=brain)
 
-    generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
+    generic_debt_allocator.setMinimumChange(minimum, sender=brain)
 
     with ape.reverts("max too high"):
         generic_debt_allocator.setStrategyDebtRatio(
-            strategy, target, int(10_001), sender=daddy
+            strategy, target, int(10_001), sender=brain
         )
 
     with ape.reverts("max ratio"):
         generic_debt_allocator.setStrategyDebtRatio(
-            strategy, int(max + 1), max, sender=daddy
+            strategy, int(max + 1), max, sender=brain
         )
 
     tx = generic_debt_allocator.setStrategyDebtRatio(
-        strategy, target, max, sender=daddy
+        strategy, target, max, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -150,32 +178,32 @@ def test_set_ratios(
     vault.add_strategy(new_strategy, sender=daddy)
     with ape.reverts("ratio too high"):
         generic_debt_allocator.setStrategyDebtRatio(
-            new_strategy, int(10_000), int(10_000), sender=daddy
+            new_strategy, int(10_000), int(10_000), sender=brain
         )
 
     target = int(8_000)
-    tx = generic_debt_allocator.setStrategyDebtRatio(strategy, target, sender=daddy)
+    tx = generic_debt_allocator.setStrategyDebtRatio(strategy, target, sender=brain)
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
 
     assert event.newTargetRatio == target
-    assert event.newMaxRatio == target * 1.1
+    assert event.newMaxRatio == target * 1.2
     assert event.newTotalDebtRatio == target
     assert generic_debt_allocator.totalDebtRatio() == target
-    assert generic_debt_allocator.getConfig(strategy) == (target, target * 1.1, 0, 0)
+    assert generic_debt_allocator.getConfig(strategy) == (target, target * 1.2, 0, 0)
 
 
 def test_increase_debt_ratio(
-    generic_debt_allocator, daddy, vault, strategy, create_strategy, user
+    generic_debt_allocator, brain, daddy, vault, strategy, create_strategy, user
 ):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
 
     minimum = int(1e17)
     target = int(5_000)
     increase = int(5_000)
-    max = target * 1.1
+    max = target * 1.2
 
-    with ape.reverts("!keeper"):
+    with ape.reverts("!manager"):
         generic_debt_allocator.increaseStrategyDebtRatio(
             strategy, increase, sender=user
         )
@@ -184,13 +212,13 @@ def test_increase_debt_ratio(
 
     with ape.reverts("!minimum"):
         generic_debt_allocator.increaseStrategyDebtRatio(
-            strategy, increase, sender=daddy
+            strategy, increase, sender=brain
         )
 
-    generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
+    generic_debt_allocator.setMinimumChange(minimum, sender=brain)
 
     tx = generic_debt_allocator.increaseStrategyDebtRatio(
-        strategy, increase, sender=daddy
+        strategy, increase, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -206,14 +234,14 @@ def test_increase_debt_ratio(
 
     with ape.reverts("ratio too high"):
         generic_debt_allocator.increaseStrategyDebtRatio(
-            new_strategy, int(5_001), sender=daddy
+            new_strategy, int(5_001), sender=brain
         )
 
     target = int(8_000)
-    max = target * 1.1
+    max = target * 1.2
     increase = int(3_000)
     tx = generic_debt_allocator.increaseStrategyDebtRatio(
-        strategy, increase, sender=daddy
+        strategy, increase, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -228,7 +256,7 @@ def test_increase_debt_ratio(
     max = int(10_000)
     increase = int(2_000)
     tx = generic_debt_allocator.increaseStrategyDebtRatio(
-        strategy, increase, sender=daddy
+        strategy, increase, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -241,24 +269,24 @@ def test_increase_debt_ratio(
 
 
 def test_decrease_debt_ratio(
-    generic_debt_allocator, daddy, vault, strategy, create_strategy, user
+    generic_debt_allocator, brain, vault, strategy, daddy, create_strategy, user
 ):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
 
     minimum = int(1e17)
     target = int(5_000)
-    max = target * 1.1
+    max = target * 1.2
 
     vault.add_strategy(strategy.address, sender=daddy)
-    generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
+    generic_debt_allocator.setMinimumChange(minimum, sender=brain)
 
     # Underflow
     with ape.reverts():
-        generic_debt_allocator.decreaseStrategyDebtRatio(strategy, target, sender=daddy)
+        generic_debt_allocator.decreaseStrategyDebtRatio(strategy, target, sender=brain)
 
     # Add the target
     tx = generic_debt_allocator.increaseStrategyDebtRatio(
-        strategy, target, sender=daddy
+        strategy, target, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -270,16 +298,16 @@ def test_decrease_debt_ratio(
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     target = int(2_000)
-    max = target * 1.1
+    max = target * 1.2
     decrease = int(3_000)
 
-    with ape.reverts("!keeper"):
+    with ape.reverts("!manager"):
         generic_debt_allocator.decreaseStrategyDebtRatio(
             strategy, decrease, sender=user
         )
 
     tx = generic_debt_allocator.decreaseStrategyDebtRatio(
-        strategy, decrease, sender=daddy
+        strategy, decrease, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -294,7 +322,7 @@ def test_decrease_debt_ratio(
     max = int(0)
     decrease = int(2_000)
     tx = generic_debt_allocator.decreaseStrategyDebtRatio(
-        strategy, decrease, sender=daddy
+        strategy, decrease, sender=brain
     )
 
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
@@ -307,7 +335,7 @@ def test_decrease_debt_ratio(
 
 
 def test_should_update_debt(
-    generic_debt_allocator, vault, strategy, daddy, deposit_into_vault, amount
+    generic_debt_allocator, vault, strategy, brain, daddy, deposit_into_vault, amount
 ):
     assert generic_debt_allocator.getConfig(strategy.address) == (0, 0, 0, 0)
     vault.add_role(generic_debt_allocator, ROLES.DEBT_MANAGER, sender=daddy)
@@ -321,8 +349,8 @@ def test_should_update_debt(
     target = int(5_000)
     max = int(5_000)
 
-    generic_debt_allocator.setMinimumChange(minimum, sender=daddy)
-    generic_debt_allocator.setStrategyDebtRatio(strategy, target, max, sender=daddy)
+    generic_debt_allocator.setMinimumChange(minimum, sender=brain)
+    generic_debt_allocator.setStrategyDebtRatio(strategy, target, max, sender=brain)
 
     # Vault has no assets so should be false.
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
@@ -345,7 +373,7 @@ def test_should_update_debt(
     print("Made ", vault.update_debt.encode_input(strategy.address, amount // 2))
     assert bytes == vault.update_debt.encode_input(strategy.address, amount // 2)
 
-    generic_debt_allocator.update_debt(strategy, amount // 2, sender=daddy)
+    generic_debt_allocator.update_debt(strategy, amount // 2, sender=brain)
     chain.mine(1)
 
     # Should now be false again once allocated
@@ -355,7 +383,7 @@ def test_should_update_debt(
 
     # Update the ratio to make true
     generic_debt_allocator.setStrategyDebtRatio(
-        strategy, int(target + 1), int(target + 1), sender=daddy
+        strategy, int(target + 1), int(target + 1), sender=brain
     )
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
@@ -365,13 +393,13 @@ def test_should_update_debt(
     )
 
     # Set a minimumWait time
-    generic_debt_allocator.setMinimumWait(MAX_INT, sender=daddy)
+    generic_debt_allocator.setMinimumWait(MAX_INT, sender=brain)
     # Should now be false
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
     assert bytes == ("min wait").encode("utf-8")
 
-    generic_debt_allocator.setMinimumWait(0, sender=daddy)
+    generic_debt_allocator.setMinimumWait(0, sender=brain)
 
     # Lower the max debt so its == to current debt
     vault.update_max_debt_for_strategy(strategy, int(amount // 2), sender=daddy)
@@ -399,16 +427,16 @@ def test_should_update_debt(
     vault.set_minimum_total_idle(0, sender=daddy)
 
     # increase the minimum so its false again
-    generic_debt_allocator.setMinimumChange(int(1e30), sender=daddy)
+    generic_debt_allocator.setMinimumChange(int(1e30), sender=brain)
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
     assert bool == False
     assert bytes == ("Below Min").encode("utf-8")
 
     # Lower the target and minimum
-    generic_debt_allocator.setMinimumChange(int(1), sender=daddy)
+    generic_debt_allocator.setMinimumChange(int(1), sender=brain)
     generic_debt_allocator.setStrategyDebtRatio(
-        strategy, int(target // 2), int(target // 2), sender=daddy
+        strategy, int(target // 2), int(target // 2), sender=brain
     )
 
     (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy.address)
@@ -417,7 +445,15 @@ def test_should_update_debt(
 
 
 def test_update_debt(
-    generic_debt_allocator, vault, strategy, daddy, user, deposit_into_vault, amount
+    generic_debt_allocator_factory,
+    generic_debt_allocator,
+    vault,
+    strategy,
+    brain,
+    daddy,
+    user,
+    deposit_into_vault,
+    amount,
 ):
     assert generic_debt_allocator.getConfig(strategy) == (0, 0, 0, 0)
     deposit_into_vault(vault, amount)
@@ -434,7 +470,7 @@ def test_update_debt(
 
     # This reverts by the vault
     with ape.reverts("not allowed"):
-        generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
+        generic_debt_allocator.update_debt(strategy, amount, sender=brain)
 
     vault.add_role(
         generic_debt_allocator,
@@ -442,14 +478,14 @@ def test_update_debt(
         sender=daddy,
     )
 
-    generic_debt_allocator.update_debt(strategy, amount, sender=daddy)
+    generic_debt_allocator.update_debt(strategy, amount, sender=brain)
 
     timestamp = generic_debt_allocator.getConfig(strategy)[2]
     assert timestamp != 0
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount
 
-    generic_debt_allocator.setKeeper(user, True, sender=daddy)
+    generic_debt_allocator_factory.setKeeper(user, True, sender=brain)
 
     generic_debt_allocator.update_debt(strategy, 0, sender=user)
 
