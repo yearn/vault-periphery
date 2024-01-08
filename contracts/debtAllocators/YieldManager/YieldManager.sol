@@ -5,7 +5,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {AprOracle} from "@periphery/AprOracle/AprOracle.sol";
 
 import {Keeper, Governance} from "./Keeper.sol";
-import {GenericDebtAllocator} from "../GenericDebtAllocator.sol";
+import {DebtAllocator} from "../DebtAllocator.sol";
 
 /**
  * @title YearnV3 Yield Yield Based Debt Allocator
@@ -176,12 +176,11 @@ contract YieldManager is Governance {
 
             // If different than the current target.
             if (
-                GenericDebtAllocator(allocator).getStrategyTargetRatio(
-                    _strategy
-                ) != _targetRatio
+                DebtAllocator(allocator).getStrategyTargetRatio(_strategy) !=
+                _targetRatio
             ) {
                 // Update allocation.
-                GenericDebtAllocator(allocator).setStrategyDebtRatio(
+                DebtAllocator(allocator).setStrategyDebtRatio(
                     _strategy,
                     _targetRatio
                 );
@@ -374,12 +373,11 @@ contract YieldManager is Governance {
                 : MAX_BPS;
 
             if (
-                GenericDebtAllocator(allocator).getStrategyTargetRatio(
-                    _strategy
-                ) != _targetRatio
+                DebtAllocator(allocator).getStrategyTargetRatio(_strategy) !=
+                _targetRatio
             ) {
                 // Update allocation.
-                GenericDebtAllocator(allocator).setStrategyDebtRatio(
+                DebtAllocator(allocator).setStrategyDebtRatio(
                     _strategy,
                     _targetRatio
                 );
@@ -415,7 +413,7 @@ contract YieldManager is Governance {
         address _vault,
         address _allocator
     ) internal view virtual {
-        uint256 totalRatio = GenericDebtAllocator(_allocator).totalDebtRatio();
+        uint256 totalRatio = DebtAllocator(_allocator).totalDebtRatio();
         uint256 minIdle = IVault(_vault).minimum_total_idle();
 
         // No need if minIdle is 0.

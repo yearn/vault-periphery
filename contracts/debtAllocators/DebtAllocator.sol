@@ -4,14 +4,13 @@ pragma solidity 0.8.18;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-
-import {GenericDebtAllocatorFactory} from "./GenericDebtAllocatorFactory.sol";
+import {DebtAllocatorFactory} from "./DebtAllocatorFactory.sol";
 
 /**
- * @title YearnV3 Generic Debt Allocator
+ * @title YearnV3 Debt Allocator
  * @author yearn.finance
  * @notice
- *  This Generic Debt Allocator is meant to be used alongside
+ *  This Debt Allocator is meant to be used alongside
  *  a Yearn V3 vault to provide the needed triggers for a keeper
  *  to perform automated debt updates for the vaults strategies.
  *
@@ -29,7 +28,7 @@ import {GenericDebtAllocatorFactory} from "./GenericDebtAllocatorFactory.sol";
  *  And will pull funds from the strategy when it has `minimumChange`
  *  more than its `maxRatio`.
  */
-contract GenericDebtAllocator {
+contract DebtAllocator {
     /// @notice An event emitted when a strategies debt ratios are Updated.
     event UpdateStrategyDebtRatio(
         address indexed strategy,
@@ -49,9 +48,6 @@ contract GenericDebtAllocator {
 
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
-
-    /// @notice An event emitted when the max base fee is updated.
-    event UpdateMaxAcceptableBaseFee(uint256 newMaxAcceptableBaseFee);
 
     /// @notice Struct for each strategies info.
     struct Config {
@@ -90,7 +86,7 @@ contract GenericDebtAllocator {
     /// @notice Check the Factories governance address.
     function _isGovernance() internal view virtual {
         require(
-            msg.sender == GenericDebtAllocatorFactory(factory).governance(),
+            msg.sender == DebtAllocatorFactory(factory).governance(),
             "!governance"
         );
     }
@@ -99,17 +95,14 @@ contract GenericDebtAllocator {
     function _isManager() internal view virtual {
         require(
             managers[msg.sender] ||
-                msg.sender == GenericDebtAllocatorFactory(factory).governance(),
+                msg.sender == DebtAllocatorFactory(factory).governance(),
             "!manager"
         );
     }
 
     /// @notice Check is one of the allowed keepers.
     function _isKeeper() internal view virtual {
-        require(
-            GenericDebtAllocatorFactory(factory).keepers(msg.sender),
-            "!keeper"
-        );
+        require(DebtAllocatorFactory(factory).keepers(msg.sender), "!keeper");
     }
 
     uint256 internal constant MAX_BPS = 10_000;
@@ -133,10 +126,6 @@ contract GenericDebtAllocator {
 
     /// @notice Max loss to accept on debt updates in basis points.
     uint256 public maxDebtUpdateLoss;
-
-    /// @notice Max the chains base fee can be during debt update.
-    // Will default to max uint256 and need to be set to be used.
-    uint256 public maxAcceptableBaseFee;
 
     /// @notice Mapping of addresses that are allowed to update debt.
     mapping(address => bool) public managers;
@@ -164,8 +153,6 @@ contract GenericDebtAllocator {
 
         // Default max loss on debt updates to 1 BP.
         maxDebtUpdateLoss = 1;
-        // Default max base fee to uint256 max
-        maxAcceptableBaseFee = type(uint256).max;
     }
 
     /**
@@ -227,7 +214,7 @@ contract GenericDebtAllocator {
         address _strategy
     ) public view virtual returns (bool, bytes memory) {
         // Check the base fee isn't too high.
-        if (block.basefee > maxAcceptableBaseFee) {
+        if (!DebtAllocatorFactory(factory).isCurrentBaseFeeAcceptable()) {
             return (false, bytes("Base Fee"));
         }
 
@@ -464,23 +451,6 @@ contract GenericDebtAllocator {
         minimumWait = _minimumWait;
 
         emit UpdateMinimumWait(_minimumWait);
-    }
-
-    /**
-     * @notice Set the max acceptable base fee.
-     * @dev This defaults to max uint256 and will need to
-     * be set for it to be used.
-     *
-     * Is denominated in gwei. So 50gwei would be set as 50e9.
-     *
-     * @param _maxAcceptableBaseFee The new max base fee.
-     */
-    function setMaxAcceptableBaseFee(
-        uint256 _maxAcceptableBaseFee
-    ) external virtual onlyGovernance {
-        maxAcceptableBaseFee = _maxAcceptableBaseFee;
-
-        emit UpdateMaxAcceptableBaseFee(_maxAcceptableBaseFee);
     }
 
     /**

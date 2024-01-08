@@ -19,7 +19,7 @@ def full_setup(
     daddy,
     brain,
     yield_manager,
-    generic_debt_allocator,
+    debt_allocator,
     keeper,
     management,
     user,
@@ -28,12 +28,12 @@ def full_setup(
     strategy_one = deploy_mock_tokenized("One", int(1e16))
     strategy_two = deploy_mock_tokenized("two", int(1e17))
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
-    generic_debt_allocator.setManager(yield_manager, True, sender=brain)
-    generic_debt_allocator.setMinimumChange(1, sender=brain)
+    yield_manager.setVaultAllocator(vault, debt_allocator, sender=daddy)
+    debt_allocator.setManager(yield_manager, True, sender=brain)
+    debt_allocator.setMinimumChange(1, sender=brain)
     vault.add_role(yield_manager, ROLES.REPORTING_MANAGER, sender=daddy)
     vault.set_role(
-        generic_debt_allocator,
+        debt_allocator,
         ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER,
         sender=daddy,
     )
@@ -53,23 +53,21 @@ def test_yield_manager_setup(yield_manager, daddy, vault, management, keeper):
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
 
 
-def test_setters(yield_manager, daddy, vault, generic_debt_allocator, management):
+def test_setters(yield_manager, daddy, vault, debt_allocator, management):
     assert yield_manager.vaultAllocator(vault) == ZERO_ADDRESS
     assert yield_manager.proposer(management) == False
     assert yield_manager.open() == False
 
     with ape.reverts("!governance"):
-        yield_manager.setVaultAllocator(
-            vault, generic_debt_allocator, sender=management
-        )
+        yield_manager.setVaultAllocator(vault, debt_allocator, sender=management)
 
-    tx = yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    tx = yield_manager.setVaultAllocator(vault, debt_allocator, sender=daddy)
 
     event = list(tx.decode_logs(yield_manager.UpdateVaultAllocator))[0]
 
     assert event.vault == vault
-    assert event.allocator == generic_debt_allocator
-    assert yield_manager.vaultAllocator(vault) == generic_debt_allocator
+    assert event.allocator == debt_allocator
+    assert yield_manager.vaultAllocator(vault) == debt_allocator
 
     with ape.reverts("!governance"):
         yield_manager.setProposer(management, True, sender=management)
@@ -113,7 +111,7 @@ def test_update_allocation(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     # Strategy two will have the higher apr
     strategy_one = deploy_mock_tokenized("One", int(1e16))
@@ -135,16 +133,16 @@ def test_update_allocation(
     with ape.reverts("vault not added"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    yield_manager.setVaultAllocator(vault, debt_allocator, sender=daddy)
 
     # Must give allocator the manager role
     with ape.reverts("!manager"):
         yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    generic_debt_allocator.setManager(yield_manager, True, sender=brain)
-    generic_debt_allocator.setMinimumChange(1, sender=brain)
+    debt_allocator.setManager(yield_manager, True, sender=brain)
+    debt_allocator.setMinimumChange(1, sender=brain)
     vault.set_role(
-        generic_debt_allocator,
+        debt_allocator,
         ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER,
         sender=daddy,
     )
@@ -161,17 +159,17 @@ def test_update_allocation(
 
     (before, now) = tx.return_value
 
-    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == MAX_BPS
-    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == 0
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == True
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[
+    assert debt_allocator.getConfig(strategy_two).targetRatio == MAX_BPS
+    assert debt_allocator.getConfig(strategy_one).targetRatio == 0
+    assert debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == True
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[
         1
     ] == vault.update_debt.encode_input(strategy_two.address, amount)
     assert before == 0
 
-    generic_debt_allocator.update_debt(strategy_two, amount, sender=brain)
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+    debt_allocator.update_debt(strategy_two, amount, sender=brain)
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
 
     # assert now == int(1e17 * amount)
     assert vault.totalIdle() == 0
@@ -203,26 +201,26 @@ def test_update_allocation(
     allocation = [(strategy_two, amount - to_move), (strategy_one, to_move)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert generic_debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
-    assert generic_debt_allocator.getConfig(strategy_one).targetRatio != 0
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
+    assert debt_allocator.getConfig(strategy_one).targetRatio != 0
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == True
     assert bytes_two == vault.update_debt.encode_input(
         strategy_two.address, amount - to_move
     )
 
-    generic_debt_allocator.update_debt(strategy_two, amount - to_move, sender=brain)
+    debt_allocator.update_debt(strategy_two, amount - to_move, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool_one == True
     assert bytes_one == vault.update_debt.encode_input(strategy_one, to_move)
 
-    generic_debt_allocator.update_debt(strategy_one, to_move, sender=brain)
+    debt_allocator.update_debt(strategy_one, to_move, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == False
 
@@ -240,25 +238,25 @@ def test_update_allocation(
 
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == 0
-    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
+    assert debt_allocator.getConfig(strategy_two).targetRatio == 0
+    assert debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == True
     assert bytes_two == vault.update_debt.encode_input(strategy_two.address, 0)
 
-    generic_debt_allocator.update_debt(strategy_two, 0, sender=brain)
+    debt_allocator.update_debt(strategy_two, 0, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool_one == True
     assert bytes_one == vault.update_debt.encode_input(strategy_one, amount)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == False
 
@@ -287,7 +285,7 @@ def test_update_allocation_pending_profit(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -296,7 +294,7 @@ def test_update_allocation_pending_profit(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -308,7 +306,7 @@ def test_update_allocation_pending_profit(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -322,18 +320,18 @@ def test_update_allocation_pending_profit(
 
     assert len(list(tx.decode_logs(strategy_one.Reported))) == 1
 
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_one, 0)
 
-    tx = generic_debt_allocator.update_debt(strategy_one, 0, sender=brain)
+    tx = debt_allocator.update_debt(strategy_one, 0, sender=brain)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].gain == profit
 
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_two, amount + profit)
 
@@ -350,7 +348,7 @@ def test_update_allocation_pending_loss(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -359,7 +357,7 @@ def test_update_allocation_pending_loss(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -370,7 +368,7 @@ def test_update_allocation_pending_loss(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -384,14 +382,14 @@ def test_update_allocation_pending_loss(
 
     assert len(list(tx.decode_logs(vault.StrategyReported))) == 1
 
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_one, 0)
 
-    generic_debt_allocator.update_debt(strategy_one, 0, sender=brain)
+    debt_allocator.update_debt(strategy_one, 0, sender=brain)
 
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_two, amount - loss)
 
@@ -408,7 +406,7 @@ def test_update_allocation_pending_loss_move_half(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -417,7 +415,7 @@ def test_update_allocation_pending_loss_move_half(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -428,7 +426,7 @@ def test_update_allocation_pending_loss_move_half(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -446,13 +444,13 @@ def test_update_allocation_pending_loss_move_half(
     assert len(list(tx.decode_logs(vault.StrategyReported))) == 1
     assert vault.totalAssets() < amount
 
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool == True
 
-    generic_debt_allocator.update_debt(strategy_one, amount - to_move, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount - to_move, sender=brain)
 
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_two, to_move - loss)
 
@@ -469,7 +467,7 @@ def test_update_allocation_pending_loss_move_all(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -478,7 +476,7 @@ def test_update_allocation_pending_loss_move_all(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -489,7 +487,7 @@ def test_update_allocation_pending_loss_move_all(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -507,13 +505,13 @@ def test_update_allocation_pending_loss_move_all(
     assert len(list(tx.decode_logs(vault.StrategyReported))) == 1
     assert vault.totalAssets() < amount
 
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    assert debt_allocator.shouldUpdateDebt(strategy_two)[0] == False
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool == True
 
-    generic_debt_allocator.update_debt(strategy_one, amount - to_move, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount - to_move, sender=brain)
 
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_two, to_move - loss)
 
@@ -528,14 +526,14 @@ def test_validate_allocation(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one = deploy_mock_tokenized("One")
     strategy_two = deploy_mock_tokenized("two")
     setup_vault(vault, [strategy_one, strategy_two], apr_oracle, daddy)
-    yield_manager.setVaultAllocator(vault, generic_debt_allocator, sender=daddy)
+    yield_manager.setVaultAllocator(vault, debt_allocator, sender=daddy)
     vault.set_role(
-        generic_debt_allocator,
+        debt_allocator,
         ROLES.DEBT_MANAGER | ROLES.REPORTING_MANAGER,
         sender=daddy,
     )
@@ -552,7 +550,7 @@ def test_validate_allocation(
         vault, [(strategy_one, amount), (strategy_two, 0)]
     )
 
-    generic_debt_allocator.update_debt(strategy_one, amount // 2, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount // 2, sender=brain)
 
     assert yield_manager.validateAllocation(vault, []) == False
     assert yield_manager.validateAllocation(vault, [(strategy_one, amount)])
@@ -561,9 +559,7 @@ def test_validate_allocation(
     )
 
     # Now will be false
-    generic_debt_allocator.update_debt(
-        strategy_two, vault.totalIdle() // 2, sender=brain
-    )
+    debt_allocator.update_debt(strategy_two, vault.totalIdle() // 2, sender=brain)
 
     assert yield_manager.validateAllocation(vault, []) == False
     assert yield_manager.validateAllocation(vault, [(strategy_one, amount)]) == False
@@ -635,7 +631,7 @@ def test_update_allocation_permissioned(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -644,7 +640,7 @@ def test_update_allocation_permissioned(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -666,12 +662,12 @@ def test_update_allocation_permissioned(
 
     tx = yield_manager.updateAllocationPermissioned(vault, allocation, sender=daddy)
 
-    assert generic_debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
-    (bool, bytes) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert debt_allocator.shouldUpdateDebt(strategy_one)[0] == False
+    (bool, bytes) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool == True
     assert bytes == vault.update_debt.encode_input(strategy_two, amount)
 
-    generic_debt_allocator.update_debt(strategy_two, amount, sender=brain)
+    debt_allocator.update_debt(strategy_two, amount, sender=brain)
 
     allocation = [(strategy_one, amount)]
     with ape.reverts("ratio too high"):
@@ -690,26 +686,26 @@ def test_update_allocation_permissioned(
     allocation = [(strategy_two, amount - to_move), (strategy_one, to_move)]
     tx = yield_manager.updateAllocationPermissioned(vault, allocation, sender=daddy)
 
-    assert generic_debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
-    assert generic_debt_allocator.getConfig(strategy_one).targetRatio != 0
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert debt_allocator.getConfig(strategy_two).targetRatio != MAX_BPS
+    assert debt_allocator.getConfig(strategy_one).targetRatio != 0
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == True
     assert bytes_two == vault.update_debt.encode_input(
         strategy_two.address, amount - to_move
     )
 
-    generic_debt_allocator.update_debt(strategy_two, amount - to_move, sender=brain)
+    debt_allocator.update_debt(strategy_two, amount - to_move, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool_one == True
     assert bytes_one == vault.update_debt.encode_input(strategy_one, to_move)
 
-    generic_debt_allocator.update_debt(strategy_one, to_move, sender=brain)
+    debt_allocator.update_debt(strategy_one, to_move, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == False
 
@@ -724,24 +720,24 @@ def test_update_allocation_permissioned(
 
     assert len(list(tx.decode_logs(strategy_two.Reported))) == 1
 
-    assert generic_debt_allocator.getConfig(strategy_two).targetRatio == 0
-    assert generic_debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    assert debt_allocator.getConfig(strategy_two).targetRatio == 0
+    assert debt_allocator.getConfig(strategy_one).targetRatio == MAX_BPS
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == True
     assert bytes_two == vault.update_debt.encode_input(strategy_two.address, 0)
 
-    generic_debt_allocator.update_debt(strategy_two, 0, sender=brain)
+    debt_allocator.update_debt(strategy_two, 0, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
     assert bool_one == True
     assert bytes_one == vault.update_debt.encode_input(strategy_one, amount)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
-    (bool_one, bytes_one) = generic_debt_allocator.shouldUpdateDebt(strategy_one)
-    (bool_two, bytes_two) = generic_debt_allocator.shouldUpdateDebt(strategy_two)
+    (bool_one, bytes_one) = debt_allocator.shouldUpdateDebt(strategy_one)
+    (bool_two, bytes_two) = debt_allocator.shouldUpdateDebt(strategy_two)
     assert bool_one == False
     assert bool_two == False
 
@@ -764,7 +760,7 @@ def test_update_allocation__max_withdraw(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -773,7 +769,7 @@ def test_update_allocation__max_withdraw(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -782,7 +778,7 @@ def test_update_allocation__max_withdraw(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -823,7 +819,7 @@ def test_update_allocation__max_deposit(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -832,7 +828,7 @@ def test_update_allocation__max_deposit(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -841,7 +837,7 @@ def test_update_allocation__max_deposit(
     asset.approve(vault, amount, sender=user)
     vault.deposit(amount, user, sender=user)
 
-    generic_debt_allocator.update_debt(strategy_one, amount, sender=brain)
+    debt_allocator.update_debt(strategy_one, amount, sender=brain)
 
     assert vault.totalAssets() == amount
     assert vault.totalDebt() == amount
@@ -882,7 +878,7 @@ def test_update_allocation__min_idle(
     amount,
     asset,
     deploy_mock_tokenized,
-    generic_debt_allocator,
+    debt_allocator,
 ):
     strategy_one, strategy_two = full_setup(
         deploy_mock_tokenized=deploy_mock_tokenized,
@@ -891,7 +887,7 @@ def test_update_allocation__min_idle(
         daddy=daddy,
         brain=brain,
         yield_manager=yield_manager,
-        generic_debt_allocator=generic_debt_allocator,
+        debt_allocator=debt_allocator,
         keeper=keeper,
         management=management,
         user=user,
@@ -924,7 +920,7 @@ def test_update_allocation__min_idle(
     allocation = [(strategy_one, amount - min_idle)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
+    event = list(tx.decode_logs(debt_allocator.UpdateStrategyDebtRatio))[0]
     assert event.newTargetRatio == 5_000
 
     # lower the min idle to 0
@@ -934,7 +930,7 @@ def test_update_allocation__min_idle(
     allocation = [(strategy_one, 0), (strategy_two, amount)]
     tx = yield_manager.updateAllocation(vault, allocation, sender=user)
 
-    event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))
+    event = list(tx.decode_logs(debt_allocator.UpdateStrategyDebtRatio))
 
     assert len(event) == 2
     assert event[0].newTargetRatio == 0

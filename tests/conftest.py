@@ -395,33 +395,31 @@ def address_provider(deploy_address_provider):
 
 
 @pytest.fixture(scope="session")
-def deploy_generic_debt_allocator_factory(project, daddy, brain):
-    def deploy_generic_debt_allocator_factory(gov=daddy):
-        generic_debt_allocator_factory = gov.deploy(
-            project.GenericDebtAllocatorFactory, brain, ZERO_ADDRESS
-        )
+def deploy_debt_allocator_factory(project, daddy, brain):
+    def deploy_debt_allocator_factory(gov=daddy):
+        debt_allocator_factory = gov.deploy(project.DebtAllocatorFactory, brain)
 
-        return generic_debt_allocator_factory
+        return debt_allocator_factory
 
-    yield deploy_generic_debt_allocator_factory
+    yield deploy_debt_allocator_factory
 
 
 @pytest.fixture(scope="session")
-def generic_debt_allocator_factory(deploy_generic_debt_allocator_factory):
-    generic_debt_allocator_factory = deploy_generic_debt_allocator_factory()
+def debt_allocator_factory(deploy_debt_allocator_factory):
+    debt_allocator_factory = deploy_debt_allocator_factory()
 
-    yield generic_debt_allocator_factory
+    yield debt_allocator_factory
 
 
 @pytest.fixture(scope="session")
-def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy):
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+def debt_allocator(debt_allocator_factory, project, vault, daddy):
+    tx = debt_allocator_factory.newDebtAllocator(vault, sender=daddy)
 
-    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
 
-    generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
+    debt_allocator = project.DebtAllocator.at(event.allocator)
 
-    yield generic_debt_allocator
+    yield debt_allocator
 
 
 @pytest.fixture(scope="session")
@@ -448,7 +446,7 @@ def role_manager(
     daddy,
     brain,
     healthcheck_accountant,
-    generic_debt_allocator_factory,
+    debt_allocator_factory,
     registry,
 ):
     role_manager = deploy_role_manager()
@@ -458,9 +456,8 @@ def role_manager(
     )
     role_manager.setPositionHolder(role_manager.REGISTRY(), registry, sender=daddy)
     role_manager.setPositionHolder(
-        role_manager.ALLOCATOR_FACTORY(), generic_debt_allocator_factory, sender=daddy
+        role_manager.ALLOCATOR_FACTORY(), debt_allocator_factory, sender=daddy
     )
-    generic_debt_allocator_factory.setRoleManager(role_manager, sender=brain)
 
     return role_manager
 

@@ -7,7 +7,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
-import {GenericDebtAllocatorFactory} from "../debtAllocators/GenericDebtAllocatorFactory.sol";
+import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Governance2Step {
@@ -21,8 +21,11 @@ contract RoleManager is Governance2Step {
         uint256 rating
     );
 
-    /// @notice Emitted when a vault is removed.
-    event RemovedVault(address indexed vault);
+    /// @notice Emitted when a vaults debt allocator is updated.
+    event UpdateDebtAllocator(
+        address indexed vault,
+        address indexed debtAllocator
+    );
 
     /// @notice Emitted when a new address is set for a position.
     event UpdatePositionHolder(
@@ -30,11 +33,20 @@ contract RoleManager is Governance2Step {
         address indexed newAddress
     );
 
+    /// @notice Emitted when a vault is removed.
+    event RemovedVault(address indexed vault);
+
     /// @notice Emitted when a new set of roles is set for a position
     event UpdatePositionRoles(bytes32 indexed position, uint256 newRoles);
 
     /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
     event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
+
+    /// @notice Position struct
+    struct Position {
+        address holder;
+        uint96 roles;
+    }
 
     /// @notice Config that holds all vault info.
     struct VaultConfig {
@@ -42,12 +54,6 @@ contract RoleManager is Governance2Step {
         uint256 rating;
         address debtAllocator;
         uint256 index;
-    }
-
-    /// @notice Position struct
-    struct Position {
-        address holder;
-        uint96 roles;
     }
 
     /// @notice Only allow either governance or the position holder to call.
@@ -317,8 +323,9 @@ contract RoleManager is Governance2Step {
         // If we have a factory set.
         if (factory != address(0)) {
             // Deploy a new debt allocator for the vault with Brain as the gov.
-            _debtAllocator = GenericDebtAllocatorFactory(factory)
-                .newGenericDebtAllocator(_vault);
+            _debtAllocator = DebtAllocatorFactory(factory).newDebtAllocator(
+                _vault
+            );
         } else {
             // If no factory is set we should be using one central allocator.
             _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
@@ -537,6 +544,9 @@ contract RoleManager is Governance2Step {
 
         // Update the vaults config.
         vaultConfig[_vault].debtAllocator = _debtAllocator;
+
+        // Emit event.
+        emit UpdateDebtAllocator(_vault, _debtAllocator);
     }
 
     /**
