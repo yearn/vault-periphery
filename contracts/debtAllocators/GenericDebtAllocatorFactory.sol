@@ -10,8 +10,7 @@ import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
  * @title YearnV3 Generic Debt Allocator Factory
  * @author yearn.finance
  * @notice
- *  Factory for anyone to easily deploy their own generic
- *  debt allocator for a Yearn V3 Vault.
+ *  Factory to deploy a debt allocator for a YearnV3 vault.
  */
 contract GenericDebtAllocatorFactory is Governance, Clonable {
     /// @notice Revert message for when a debt allocator already exists.

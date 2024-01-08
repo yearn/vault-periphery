@@ -187,10 +187,10 @@ def test_set_ratios(
     event = list(tx.decode_logs(generic_debt_allocator.UpdateStrategyDebtRatio))[0]
 
     assert event.newTargetRatio == target
-    assert event.newMaxRatio == target * 1.1
+    assert event.newMaxRatio == target * 1.2
     assert event.newTotalDebtRatio == target
     assert generic_debt_allocator.totalDebtRatio() == target
-    assert generic_debt_allocator.getConfig(strategy) == (target, target * 1.1, 0, 0)
+    assert generic_debt_allocator.getConfig(strategy) == (target, target * 1.2, 0, 0)
 
 
 def test_increase_debt_ratio(
@@ -201,7 +201,7 @@ def test_increase_debt_ratio(
     minimum = int(1e17)
     target = int(5_000)
     increase = int(5_000)
-    max = target * 1.1
+    max = target * 1.2
 
     with ape.reverts("!manager"):
         generic_debt_allocator.increaseStrategyDebtRatio(
@@ -238,7 +238,7 @@ def test_increase_debt_ratio(
         )
 
     target = int(8_000)
-    max = target * 1.1
+    max = target * 1.2
     increase = int(3_000)
     tx = generic_debt_allocator.increaseStrategyDebtRatio(
         strategy, increase, sender=brain
@@ -275,7 +275,7 @@ def test_decrease_debt_ratio(
 
     minimum = int(1e17)
     target = int(5_000)
-    max = target * 1.1
+    max = target * 1.2
 
     vault.add_strategy(strategy.address, sender=daddy)
     generic_debt_allocator.setMinimumChange(minimum, sender=brain)
@@ -298,7 +298,7 @@ def test_decrease_debt_ratio(
     assert generic_debt_allocator.getConfig(strategy) == (target, max, 0, 0)
 
     target = int(2_000)
-    max = target * 1.1
+    max = target * 1.2
     decrease = int(3_000)
 
     with ape.reverts("!manager"):

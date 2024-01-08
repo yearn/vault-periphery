@@ -98,8 +98,8 @@ contract GenericDebtAllocator {
     /// @notice Check is either factories governance or local manager.
     function _isManager() internal view virtual {
         require(
-            msg.sender == GenericDebtAllocatorFactory(factory).governance() ||
-                managers[msg.sender],
+            managers[msg.sender] ||
+                msg.sender == GenericDebtAllocatorFactory(factory).governance(),
             "!manager"
         );
     }
@@ -360,7 +360,7 @@ contract GenericDebtAllocator {
 
     /**
      * @notice Sets a new target debt ratio for a strategy.
-     * @dev This will default to a 10% increase for max debt.
+     * @dev This will default to a 20% increase for max debt.
      *
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
@@ -369,7 +369,7 @@ contract GenericDebtAllocator {
         address _strategy,
         uint256 _targetRatio
     ) public virtual {
-        uint256 maxRatio = Math.min((_targetRatio * 11_000) / MAX_BPS, MAX_BPS);
+        uint256 maxRatio = Math.min((_targetRatio * 12_000) / MAX_BPS, MAX_BPS);
         setStrategyDebtRatio(_strategy, _targetRatio, maxRatio);
     }
 
