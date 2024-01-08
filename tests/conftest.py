@@ -1,6 +1,6 @@
 import pytest
 from ape import accounts, project, networks
-from utils.constants import MAX_INT, WEEK, ROLES
+from utils.constants import MAX_INT, WEEK, ROLES, ZERO_ADDRESS
 from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
 import os
@@ -395,9 +395,11 @@ def address_provider(deploy_address_provider):
 
 
 @pytest.fixture(scope="session")
-def deploy_generic_debt_allocator_factory(project, daddy):
+def deploy_generic_debt_allocator_factory(project, daddy, brain):
     def deploy_generic_debt_allocator_factory(gov=daddy):
-        generic_debt_allocator_factory = gov.deploy(project.GenericDebtAllocatorFactory)
+        generic_debt_allocator_factory = gov.deploy(
+            project.GenericDebtAllocatorFactory, brain, ZERO_ADDRESS
+        )
 
         return generic_debt_allocator_factory
 
@@ -413,9 +415,7 @@ def generic_debt_allocator_factory(deploy_generic_debt_allocator_factory):
 
 @pytest.fixture(scope="session")
 def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy):
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(
-        vault, daddy, sender=daddy
-    )
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
 
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -446,6 +446,7 @@ def deploy_role_manager(project, daddy, brain, security, keeper, strategy_manage
 def role_manager(
     deploy_role_manager,
     daddy,
+    brain,
     healthcheck_accountant,
     generic_debt_allocator_factory,
     registry,
@@ -459,6 +460,7 @@ def role_manager(
     role_manager.setPositionHolder(
         role_manager.ALLOCATOR_FACTORY(), generic_debt_allocator_factory, sender=daddy
     )
+    generic_debt_allocator_factory.setRoleManager(role_manager, sender=brain)
 
     return role_manager
 

@@ -2,6 +2,7 @@
 pragma solidity 0.8.18;
 
 import {Clonable} from "@periphery/utils/Clonable.sol";
+import {RoleManager} from "../Managers/RoleManager.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 import {GenericDebtAllocator} from "./GenericDebtAllocator.sol";
 
@@ -16,11 +17,14 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
     /// @notice Revert message for when a debt allocator already exists.
     error AlreadyDeployed(address _allocator);
 
-    /// @notice An event emitted when a new debt allocator is added or deployed.
-    event NewDebtAllocator(address indexed allocator, address indexed vault);
+    /// @notice An even emitted when a new `roleManager` is set.
+    event UpdateRoleManager(address indexed roleManager);
 
     /// @notice An event emitted when a keeper is added or removed.
     event UpdateKeeper(address indexed keeper, bool allowed);
+
+    /// @notice An event emitted when a new debt allocator is added or deployed.
+    event NewDebtAllocator(address indexed allocator, address indexed vault);
 
     /// @notice Only allow `governance` or the `roleManager`.
     modifier onlyAuthorized() {
@@ -42,19 +46,20 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
     /// @notice Mapping of addresses that are allowed to update debt.
     mapping(address => bool) public keepers;
 
-    /// @notice Mapping of vault => allocator.
-    mapping(address => address) public allocators;
-
     constructor(
         address _governance,
         address _roleManager
     ) Governance(_governance) {
         // Deploy a dummy allocator as the original.
         original = address(new GenericDebtAllocator(address(1), 0));
+
+        // Set the initial role manager.
         roleManager = _roleManager;
+        emit UpdateRoleManager(_roleManager);
 
         // Default to allow governance to be a keeper.
         keepers[_governance] = true;
+        emit UpdateKeeper(_governance, true);
     }
 
     /**
@@ -80,19 +85,12 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
     function newGenericDebtAllocator(
         address _vault,
         uint256 _minimumChange
-    ) public virtual onlyAuthorized returns (address newAllocator) {
-        // Make sure their is not already an allocator deployed for the vault.
-        if (allocators[_vault] != address(0))
-            revert AlreadyDeployed(allocators[_vault]);
-
+    ) public virtual returns (address newAllocator) {
         // Clone new allocator off the original.
         newAllocator = _clone();
 
         // Initialize the new allocator.
         GenericDebtAllocator(newAllocator).initialize(_vault, _minimumChange);
-
-        // Add it to the
-        allocators[_vault] = newAllocator;
 
         // Emit event.
         emit NewDebtAllocator(newAllocator, _vault);
@@ -113,26 +111,28 @@ contract GenericDebtAllocatorFactory is Governance, Clonable {
         address _strategy
     ) public view virtual returns (bool, bytes memory) {
         return
-            GenericDebtAllocator(allocators[_vault]).shouldUpdateDebt(
-                _strategy
-            );
+            GenericDebtAllocator(allocator(_vault)).shouldUpdateDebt(_strategy);
     }
 
     /**
-     * @notice Set a specific allocator for a specific vault.
-     * @dev This will override any previously deployed versions and should
-     *   be done with care.
-     *
-     * @param _vault Address of the vault
-     * @param _allocator Address of the debtAllocator.
+     * @notice Helper function to easily get a vaults debt allocator from the role manager.
+     * @param _vault Address of the vault to get the allocator for.
+     * @return Address of the vaults debt allocator if one exists.
      */
-    function setAllocator(
-        address _vault,
-        address _allocator
-    ) external virtual onlyGovernance {
-        allocators[_vault] = _allocator;
+    function allocator(address _vault) public view virtual returns (address) {
+        return RoleManager(roleManager).getDebtAllocator(_vault);
+    }
 
-        emit NewDebtAllocator(_allocator, _vault);
+    /**
+     * @notice Update the Role Manager address.
+     * @param _roleManager New role manager address.
+     */
+    function setRoleManager(
+        address _roleManager
+    ) external virtual onlyGovernance {
+        roleManager = _roleManager;
+
+        emit UpdateRoleManager(_roleManager);
     }
 
     /**

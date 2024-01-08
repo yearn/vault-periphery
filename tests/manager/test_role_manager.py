@@ -370,7 +370,6 @@ def test_deploy_new_vault(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
 
 def test_deploy_new_vault__duplicate_reverts(
@@ -546,7 +545,6 @@ def test_deploy_new_vault__default_values(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
 
 def setup_role_manager(
@@ -667,7 +665,6 @@ def test_add_new_vault__endorsed(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
 
 def test_add_new_vault__not_endorsed(
@@ -779,7 +776,6 @@ def test_add_new_vault__not_endorsed(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
 
 def test_add_new_vault__with_debt_allocator(
@@ -824,7 +820,7 @@ def test_add_new_vault__with_debt_allocator(
     assert registry.numAssets() == 0
     assert registry.numEndorsedVaults(asset) == 0
 
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=brain)
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
     assert event.vault == vault
     debt_allocator = project.GenericDebtAllocator.at(event.allocator)
@@ -892,7 +888,6 @@ def test_add_new_vault__with_debt_allocator(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == daddy
 
 
 def test_add_new_vault__with_accountant(
@@ -936,7 +931,7 @@ def test_add_new_vault__with_accountant(
     assert registry.numAssets() == 0
     assert registry.numEndorsedVaults(asset) == 0
 
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=brain)
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
     assert event.vault == vault
     debt_allocator = project.GenericDebtAllocator.at(event.allocator)
@@ -1008,7 +1003,6 @@ def test_add_new_vault__with_accountant(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == daddy
 
 
 def test_add_new_vault__duplicate_reverts(
@@ -1156,7 +1150,6 @@ def test_new_debt_allocator__deploys_one(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
     # Update to a new debt allocator
     with ape.reverts("!allowed"):
@@ -1172,7 +1165,6 @@ def test_new_debt_allocator__deploys_one(
 
     assert new_debt_allocator != debt_allocator
     assert new_debt_allocator.vault() == vault
-    assert new_debt_allocator.governance() == brain
     assert new_debt_allocator.maxAcceptableBaseFee() == MAX_INT
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
@@ -1273,9 +1265,7 @@ def test_new_debt_allocator__already_deployed(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
-
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=daddy)
+    tx = generic_debt_allocator_factory.newGenericDebtAllocator(vault, sender=brain)
     event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
     new_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
@@ -1290,7 +1280,6 @@ def test_new_debt_allocator__already_deployed(
 
     assert new_debt_allocator != debt_allocator
     assert new_debt_allocator.vault() == vault
-    assert new_debt_allocator.governance() == daddy
     assert new_debt_allocator.maxAcceptableBaseFee() == MAX_INT
 
     (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
@@ -1394,7 +1383,6 @@ def test_remove_vault(
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
-    assert debt_allocator.governance() == brain
 
     # Remove the vault
     with ape.reverts("!allowed"):
