@@ -79,7 +79,7 @@ contract YieldManager is Governance {
      *       and debt increases at the end.
      *   - Account for all limiting values such as the vaults max_debt and min_total_idle
      *      as well as the strategies maxDeposit/maxRedeem that are enforced on debt updates.
-     *   - Account for the expected differences in amounts caused unrealised losses or profits.
+     *   - Account for the expected differences in amounts caused by unrealised losses or profits.
      *
      * @param _vault The address of the vault to propose an allocation for.
      * @param _newAllocations Array of strategies and their new proposed allocation.
@@ -110,6 +110,8 @@ contract YieldManager is Governance {
         address _strategy;
         uint256 _currentDebt;
         uint256 _newDebt;
+        uint256 _strategyRate;
+        uint256 _targetRatio;
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
             _strategy = _newAllocations[i].strategy;
             _newDebt = uint256(_newAllocations[i].newDebt);
@@ -119,7 +121,7 @@ contract YieldManager is Governance {
             _accountedFor += _currentDebt;
 
             // Get the current weighted rate the strategy is earning
-            uint256 _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
+            _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
                 _currentDebt);
 
             // Add to the amount currently being earned.
@@ -170,7 +172,7 @@ contract YieldManager is Governance {
             }
 
             // Get the target based on the new debt.
-            uint256 _targetRatio = _newDebt < _totalAssets
+            _targetRatio = _newDebt < _totalAssets
                 ? (_newDebt * MAX_BPS) / _totalAssets
                 : MAX_BPS;
 
@@ -249,7 +251,7 @@ contract YieldManager is Governance {
      * @return _currentRate The current weighted rate that the collective strategies are earning.
      * @return _expectedRate The expected weighted rate that the collective strategies would earn.
      */
-    function getCurrentAndExpectedYield(
+    function getCurrentAndExpectedRate(
         address _vault,
         Allocation[] memory _newAllocations
     )
@@ -267,13 +269,14 @@ contract YieldManager is Governance {
         uint256 _newDebt;
         address _strategy;
         uint256 _currentDebt;
+        uint256 _strategyRate;
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
             _newDebt = uint256(_newAllocations[i].newDebt);
             _strategy = _newAllocations[i].strategy;
             _currentDebt = IVault(_vault).strategies(_strategy).current_debt;
 
             // Get the current weighted rate the strategy is earning
-            uint256 _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
+            _strategyRate = (aprOracle.getStrategyApr(_strategy, 0) *
                 _currentDebt);
 
             // Add to the amount currently being earned.
@@ -299,8 +302,14 @@ contract YieldManager is Governance {
      * its strategies and their specific allocation.
      *
      * The `_newAllocations` array should:
+     *   - Contain all strategies that hold any amount of debt from the vault
+     *       even if the debt wont be adjusted in order to get the correct
+     *       on chain rate.
      *   - Be ordered so that all debt decreases are at the beginning of the array
      *       and debt increases at the end.
+     *   - Account for all limiting values such as the vaults max_debt and min_total_idle
+     *      as well as the strategies maxDeposit/maxRedeem that are enforced on debt updates.
+     *   - Account for the expected differences in amounts caused by unrealised losses or profits.
      *
      * This will not do any APR checks and assumes the sender has completed
      * any and all necessary checks before sending.
@@ -317,6 +326,7 @@ contract YieldManager is Governance {
         address _strategy;
         uint256 _newDebt;
         uint256 _currentDebt;
+        uint256 _targetRatio;
         uint256 _totalAssets = IVault(_vault).totalAssets();
         for (uint256 i = 0; i < _newAllocations.length; ++i) {
             _strategy = _newAllocations[i].strategy;
@@ -368,7 +378,7 @@ contract YieldManager is Governance {
             }
 
             // Get the target based on the new debt.
-            uint256 _targetRatio = _newDebt < _totalAssets
+            _targetRatio = _newDebt < _totalAssets
                 ? (_newDebt * MAX_BPS) / _totalAssets
                 : MAX_BPS;
 

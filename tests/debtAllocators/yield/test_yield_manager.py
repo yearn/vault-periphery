@@ -589,27 +589,25 @@ def test_get_current_and_expected(
     vault.deposit(amount, user, sender=user)
 
     allocation = []
-    (current, expected) = yield_manager.getCurrentAndExpectedYield(vault, allocation)
+    (current, expected) = yield_manager.getCurrentAndExpectedRate(vault, allocation)
 
     assert current == 0
     assert expected == 0
 
     allocation = [(strategy_one, 0), (strategy_two, 0)]
-    (current, expected) = yield_manager.getCurrentAndExpectedYield(vault, allocation)
+    (current, expected) = yield_manager.getCurrentAndExpectedRate(vault, allocation)
     assert current == 0
     assert expected == 0
 
     allocation = [(strategy_one, amount), (strategy_two, 0)]
-    (current, expected) = yield_manager.getCurrentAndExpectedYield(vault, allocation)
+    (current, expected) = yield_manager.getCurrentAndExpectedRate(vault, allocation)
     assert current == 0
     assert expected != 0
 
     vault.update_debt(strategy_one, amount, sender=daddy)
 
     allocation = [(strategy_one, 0), (strategy_two, amount)]
-    (current, new_expected) = yield_manager.getCurrentAndExpectedYield(
-        vault, allocation
-    )
+    (current, new_expected) = yield_manager.getCurrentAndExpectedRate(vault, allocation)
     assert current == expected
     assert expected != 0
     assert expected > 0

@@ -10,17 +10,17 @@ deployer = accounts.load("")
 
 
 def deploy_allocator_factory():
-    print("Deploying Generic Debt Allocator Factory on ChainID", chain.chain_id)
+    print("Deploying Debt Allocator Factory on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
         return
 
-    allocator_factory = project.GenericDebtAllocatorFactory
+    allocator_factory = project.DebtAllocatorFactory
     deployer_contract = project.Deployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "Generic Debt Allocator Factory"
+    salt_string = "Debt Allocator Factory"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -34,9 +34,14 @@ def deploy_allocator_factory():
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
 
+    gov = input("Governance? ")
+
+    allocator_constructor = allocator_factory.constructor.encode_input(gov)
+
     # generate and deploy
     deploy_bytecode = HexBytes(
         HexBytes(allocator_factory.contract_type.deployment_bytecode.bytecode)
+        + allocator_constructor
     )
 
     print(f"Deploying the Factory...")
@@ -50,6 +55,8 @@ def deploy_allocator_factory():
     print("------------------")
     print(f"Deployed the Factory to {address}")
     print("------------------")
+    print(f"Encoded Constructor to use for verifaction {allocator_constructor.hex()[2:]}")
+
 
 
 def main():
