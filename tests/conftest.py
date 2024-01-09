@@ -1,6 +1,6 @@
 import pytest
-from ape import accounts, project
-from utils.constants import MAX_INT, WEEK, ROLES
+from ape import accounts, project, networks
+from utils.constants import MAX_INT, WEEK, ROLES, ZERO_ADDRESS
 from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
 import os
@@ -52,7 +52,7 @@ def vault_manager(accounts):
 
 @pytest.fixture(scope="session")
 def strategy_manager(accounts):
-    return accounts[8]
+    yield accounts[8]
 
 
 @pytest.fixture(scope="session")
@@ -204,6 +204,24 @@ def create_strategy(project, management, asset):
 def strategy(asset, create_strategy):
     strategy = create_strategy(asset)
     yield strategy
+
+
+@pytest.fixture(scope="session")
+def deploy_mock_tokenized(project, daddy, asset, management, keeper):
+    def deploy_mock_tokenized(name="name", apr=0):
+        mock_tokenized = daddy.deploy(
+            project.MockTokenized, asset, name, management, keeper, apr
+        )
+        return mock_tokenized
+
+    yield deploy_mock_tokenized
+
+
+@pytest.fixture(scope="session")
+def mock_tokenized(deploy_mock_tokenized):
+    mock_tokenized = deploy_mock_tokenized()
+
+    yield mock_tokenized
 
 
 @pytest.fixture(scope="function")
@@ -377,33 +395,31 @@ def address_provider(deploy_address_provider):
 
 
 @pytest.fixture(scope="session")
-def deploy_generic_debt_allocator_factory(project, daddy):
-    def deploy_generic_debt_allocator_factory(gov=daddy):
-        generic_debt_allocator_factory = gov.deploy(project.GenericDebtAllocatorFactory)
+def deploy_debt_allocator_factory(project, daddy, brain):
+    def deploy_debt_allocator_factory(gov=daddy):
+        debt_allocator_factory = gov.deploy(project.DebtAllocatorFactory, brain)
 
-        return generic_debt_allocator_factory
+        return debt_allocator_factory
 
-    yield deploy_generic_debt_allocator_factory
-
-
-@pytest.fixture(scope="session")
-def generic_debt_allocator_factory(deploy_generic_debt_allocator_factory):
-    generic_debt_allocator_factory = deploy_generic_debt_allocator_factory()
-
-    yield generic_debt_allocator_factory
+    yield deploy_debt_allocator_factory
 
 
 @pytest.fixture(scope="session")
-def generic_debt_allocator(generic_debt_allocator_factory, project, vault, daddy):
-    tx = generic_debt_allocator_factory.newGenericDebtAllocator(
-        vault, daddy, sender=daddy
-    )
+def debt_allocator_factory(deploy_debt_allocator_factory):
+    debt_allocator_factory = deploy_debt_allocator_factory()
 
-    event = list(tx.decode_logs(generic_debt_allocator_factory.NewDebtAllocator))[0]
+    yield debt_allocator_factory
 
-    generic_debt_allocator = project.GenericDebtAllocator.at(event.allocator)
 
-    yield generic_debt_allocator
+@pytest.fixture(scope="session")
+def debt_allocator(debt_allocator_factory, project, vault, daddy):
+    tx = debt_allocator_factory.newDebtAllocator(vault, sender=daddy)
+
+    event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
+
+    debt_allocator = project.DebtAllocator.at(event.allocator)
+
+    yield debt_allocator
 
 
 @pytest.fixture(scope="session")
@@ -428,8 +444,9 @@ def deploy_role_manager(project, daddy, brain, security, keeper, strategy_manage
 def role_manager(
     deploy_role_manager,
     daddy,
+    brain,
     healthcheck_accountant,
-    generic_debt_allocator_factory,
+    debt_allocator_factory,
     registry,
 ):
     role_manager = deploy_role_manager()
@@ -439,7 +456,49 @@ def role_manager(
     )
     role_manager.setPositionHolder(role_manager.REGISTRY(), registry, sender=daddy)
     role_manager.setPositionHolder(
-        role_manager.ALLOCATOR_FACTORY(), generic_debt_allocator_factory, sender=daddy
+        role_manager.ALLOCATOR_FACTORY(), debt_allocator_factory, sender=daddy
     )
 
     return role_manager
+
+
+@pytest.fixture(scope="session")
+def deploy_keeper(project, daddy):
+    def deploy_keeper():
+        keeper = daddy.deploy(project.Keeper, daddy)
+
+        return keeper
+
+    yield deploy_keeper
+
+
+@pytest.fixture(scope="session")
+def keeper(deploy_keeper):
+    keeper = deploy_keeper()
+
+    yield keeper
+
+
+@pytest.fixture(scope="session")
+def deploy_yield_manager(project, daddy, keeper):
+    def deploy_yield_manager():
+        yield_manager = daddy.deploy(project.YieldManager, daddy, keeper)
+
+        return yield_manager
+
+    yield deploy_yield_manager
+
+
+@pytest.fixture(scope="session")
+def yield_manager(deploy_yield_manager):
+    yield_manager = deploy_yield_manager()
+
+    yield yield_manager
+
+
+@pytest.fixture(scope="session")
+def apr_oracle(project):
+    oracle = project.MockOracle
+    address = "0xF012fBb9283e03994A7829fCE994a105cC066c14"
+    networks.provider.set_code(address, oracle.contract_type.runtime_bytecode.bytecode)
+    yield oracle.at(address)

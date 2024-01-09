@@ -2,17 +2,22 @@ name: yearn-v3-vault-periphery
 
 plugins:
   - name: solidity
+    version: 0.6.11
   - name: vyper
+    version: 0.6.13
   - name: etherscan
+    version: 0.6.11
   - name: hardhat
+    version: 0.6.13
   - name: infura
+    version: 0.6.5
 
 default_ecosystem: ethereum
 
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    version: 4.8.2
+    ref: 4.8.2
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
     ref: v3.0.1

@@ -16,9 +16,11 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
-      - uses: ApeWorX/github-action@v2.4
+      - uses: ApeWorX/github-action@v2.0
         with:
           python-version: '3.10'
+          ape-version-pin: "==0.6.27"
+          ape-plugins-list: 'solidity==0.6.11 vyper==0.6.13 infura==0.6.5 hardhat==0.6.13 etherscan==0.6.11'
 
       - name: install vyper
         run: pip install git+https://github.com/vyperlang/vyper

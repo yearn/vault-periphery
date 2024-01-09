@@ -6,19 +6,19 @@ import hashlib
 deployer = accounts.load("")
 
 
-def deploy_role_manager():
+def deploy_yield_manager():
 
-    print("Deploying Role Manager on ChainID", chain.chain_id)
+    print("Deploying Yield Manager on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
         return
 
-    role_manager = project.RoleManager
+    yield_manager = project.YieldManager
     deployer_contract = project.Deployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
 
-    salt_string = "Role Manager"
+    salt_string = "Yield Manager test"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -32,22 +32,19 @@ def deploy_role_manager():
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
 
-    print(f"Deploying the Role Manager...")
+    print(f"Deploying the Yield Manager...")
     print("Enter the addresses to use on deployment.")
 
     gov = input("Governance? ")
-    daddy = input("Daddy? ")
-    brain = input("Brain? ")
-    security = input("Security? ")
     keeper = input("Keeper? ")
-    strategy_manager = input("Strategy manager? ")
 
-    constructor = role_manager.constructor.encode_input(
-        gov, daddy, brain, security, keeper, strategy_manager
+    constructor = yield_manager.constructor.encode_input(
+        gov,
+        keeper,
     )
 
     deploy_bytecode = HexBytes(
-        HexBytes(role_manager.contract_type.deployment_bytecode.bytecode) + constructor
+        HexBytes(yield_manager.contract_type.deployment_bytecode.bytecode) + constructor
     )
 
     tx = deployer_contract.deploy(deploy_bytecode, salt, sender=deployer)
@@ -57,10 +54,10 @@ def deploy_role_manager():
     address = event[0].addr
 
     print("------------------")
-    print(f"Deployed the Role Manager to {address}")
+    print(f"Deployed the Yield Manager to {address}")
     print("------------------")
     print(f"Encoded Constructor to use for verifaction {constructor.hex()[2:]}")
 
 
 def main():
-    deploy_role_manager()
+    deploy_yield_manager()
