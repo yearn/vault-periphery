@@ -55,8 +55,9 @@ def deploy_allocator_factory():
     print("------------------")
     print(f"Deployed the Factory to {address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verifaction {allocator_constructor.hex()[2:]}")
-
+    print(
+        f"Encoded Constructor to use for verifaction {allocator_constructor.hex()[2:]}"
+    )
 
 
 def main():
