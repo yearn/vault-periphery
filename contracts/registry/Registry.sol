@@ -21,6 +21,7 @@ import {ReleaseRegistry} from "./ReleaseRegistry.sol";
  *  API version.
  */
 contract Registry is Governance {
+    /// @notice Emitted when a new vault is deployed or added.
     event NewEndorsedVault(
         address indexed vault,
         address indexed asset,
@@ -28,6 +29,7 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
+    /// @notice Emitted when a vault is removed.
     event RemovedVault(
         address indexed vault,
         address indexed asset,
@@ -35,26 +37,33 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
+    /// @notice Emitted when a vault is tagged which a string.
     event VaultTagged(address indexed vault);
 
+    /// @notice Emitted when gov adds ore removes a `tagger`.
     event UpdateTagger(address indexed account, bool status);
 
+    /// @notice Emitted when gov adds ore removes a `endorser`.
     event UpdateEndorser(address indexed account, bool status);
 
+    /// @notice Can only be gov or an `endorser`.
     modifier onlyEndorsers() {
         _isEndorser();
         _;
     }
 
+    /// @notice Can only be gov or a `tagger`.
     modifier onlyTaggers() {
         _isTagger();
         _;
     }
 
+    /// @notice Check is gov or an `endorser`.
     function _isEndorser() internal view {
         require(msg.sender == governance || endorsers[msg.sender], "!endorser");
     }
 
+    /// @notice Check is gov or a `tagger`.
     function _isTagger() internal view {
         require(msg.sender == governance || taggers[msg.sender], "!tagger");
     }
@@ -359,6 +368,14 @@ contract Registry is Governance {
         );
     }
 
+    /**
+     * @dev Function used to register a newly deployed or added vault.
+     *
+     * This well set all of the values for the vault in the `vaultInfo`
+     * mapping as well as add the vault and the underlying asset to any
+     * relevant arrays for tracking.
+     *
+     */
     function _registerVault(
         address _vault,
         address _asset,
@@ -418,40 +435,37 @@ contract Registry is Governance {
      * @param _vault Address of the vault to remove.
      */
     function removeVault(address _vault) external virtual onlyEndorsers {
-        require(vaultInfo[_vault].asset != address(0), "!endorsed");
-
-        // TODO: just pull full struct down.
-        // Get the asset the vault is using.
-        address asset = IVault(_vault).asset();
-        // Get the release version for this specific vault.
-        uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
-            IVault(_vault).apiVersion()
+        // Get the struct with all the vaults data.
+        Info memory info = vaultInfo[_vault];
+        require(info.asset != address(0), "!endorsed");
+        require(
+            _endorsedVaults[info.asset][info.index] == _vault,
+            "wrong vault"
         );
-        uint256 _index = vaultInfo[_vault].index;
-
-        require(_endorsedVaults[asset][_index] == _vault, "wrong vault");
 
         // Get the vault at the end of the array
-        address lastVault = _endorsedVaults[asset][
-            _endorsedVaults[asset].length - 1
+        address lastVault = _endorsedVaults[info.asset][
+            _endorsedVaults[info.asset].length - 1
         ];
 
-        // If more than one vault in the array.
+        // If `_vault` is not the last item in the array.
         if (lastVault != _vault) {
             // Set the last index to the spot we are removing.
-            _endorsedVaults[asset][_index] = lastVault;
-            vaultInfo[lastVault].index = uint64(_index);
+            _endorsedVaults[info.asset][info.index] = lastVault;
+
+            // Update the index of the vault we moved
+            vaultInfo[lastVault].index = uint64(info.index);
         }
 
         // Pop the last item off the array.
-        _endorsedVaults[asset].pop();
+        _endorsedVaults[info.asset].pop();
 
         // Emit the event.
         emit RemovedVault(
             _vault,
-            asset,
-            releaseTarget,
-            vaultInfo[_vault].vaultType
+            info.asset,
+            info.releaseVersion,
+            info.vaultType
         );
 
         // Delete the struct.
