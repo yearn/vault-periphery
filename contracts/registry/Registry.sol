@@ -35,9 +35,11 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
-    event UpdateEndorser(address indexed account, bool status);
+    event VaultTagged(address indexed vault);
 
     event UpdateTagger(address indexed account, bool status);
+
+    event UpdateEndorser(address indexed account, bool status);
 
     modifier onlyEndorsers() {
         _isEndorser();
@@ -65,21 +67,23 @@ contract Registry is Governance {
         // The release number corresponding to the release registries version.
         uint96 releaseVersion;
         // Type of vault.
-        uint128 vaultType;
+        uint64 vaultType;
         // Time when the vault was deployed for easier indexing.
         uint128 deploymentTimestamp;
-        // String so that management to tag a vault with any info for FE's.
+        // Index the vault is at in array for easy removals.
+        uint64 index;
+        // String so that management can tag a vault with any info for FE's.
         string tag;
     }
+
+    // Address used to get the specific versions from.
+    address public immutable releaseRegistry;
 
     // Default type used for Multi strategy "Allocator" vaults.
     uint256 public constant MULTI_STRATEGY_TYPE = 1;
 
     // Default type used for Single "Tokenized" Strategy vaults.
     uint256 public constant SINGLE_STRATEGY_TYPE = 2;
-
-    // Address used to get the specific versions from.
-    address public immutable releaseRegistry;
 
     // Custom name for this Registry.
     string public name;
@@ -362,17 +366,18 @@ contract Registry is Governance {
         uint256 _vaultType,
         uint256 _deploymentTimestamp
     ) internal virtual {
-        // Add to the endorsed vaults array.
-        _endorsedVaults[_asset].push(_vault);
-
         // Set the Info struct for this vault
         vaultInfo[_vault] = Info({
             asset: _asset,
             releaseVersion: uint96(_releaseTarget),
-            vaultType: uint128(_vaultType),
+            vaultType: uint64(_vaultType),
             deploymentTimestamp: uint128(_deploymentTimestamp),
+            index: uint64(_endorsedVaults[_asset].length),
             tag: ""
         });
+
+        // Add to the endorsed vaults array.
+        _endorsedVaults[_asset].push(_vault);
 
         if (!assetIsUsed[_asset]) {
             // We have a new asset to add
@@ -387,7 +392,7 @@ contract Registry is Governance {
      * @notice Tag a vault with a specific string.
      * @dev This is available to governance to tag any vault or strategy
      * on chain if desired to arbitrarily classify any vaults.
-     *   i.e. Certain credit ratings ("AAA") / Vault status ("Shutdown") etc.
+     *   i.e. Certain ratings ("A") / Vault status ("Shutdown") etc.
      *
      * @param _vault Address of the vault or strategy to tag.
      * @param _tag The string to tag the vault or strategy with.
@@ -398,10 +403,12 @@ contract Registry is Governance {
     ) external virtual onlyTaggers {
         require(vaultInfo[_vault].asset != address(0), "!Endorsed");
         vaultInfo[_vault].tag = _tag;
+
+        emit VaultTagged(_vault);
     }
 
     /**
-     * @notice Remove a `_vault` at a specific `_index`.
+     * @notice Remove a `_vault`.
      * @dev Can be used as an efficient way to remove a vault
      * to not have to iterate over the full array.
      *
@@ -409,27 +416,32 @@ contract Registry is Governance {
      * if it is no longer in use and will have to be done manually.
      *
      * @param _vault Address of the vault to remove.
-     * @param _index Index in the `endorsedVaults` array `_vault` sits at.
      */
-    function removeVault(
-        address _vault,
-        uint256 _index
-    ) external virtual onlyEndorsers {
+    function removeVault(address _vault) external virtual onlyEndorsers {
         require(vaultInfo[_vault].asset != address(0), "!endorsed");
 
+        // TODO: just pull full struct down.
         // Get the asset the vault is using.
         address asset = IVault(_vault).asset();
         // Get the release version for this specific vault.
         uint256 releaseTarget = ReleaseRegistry(releaseRegistry).releaseTargets(
             IVault(_vault).apiVersion()
         );
+        uint256 _index = vaultInfo[_vault].index;
 
-        require(_endorsedVaults[asset][_index] == _vault, "wrong index");
+        require(_endorsedVaults[asset][_index] == _vault, "wrong vault");
 
-        // Set the last index to the spot we are removing.
-        _endorsedVaults[asset][_index] = _endorsedVaults[asset][
+        // Get the vault at the end of the array
+        address lastVault = _endorsedVaults[asset][
             _endorsedVaults[asset].length - 1
         ];
+
+        // If more than one vault in the array.
+        if (lastVault != _vault) {
+            // Set the last index to the spot we are removing.
+            _endorsedVaults[asset][_index] = lastVault;
+            vaultInfo[lastVault].index = uint64(_index);
+        }
 
         // Pop the last item off the array.
         _endorsedVaults[asset].pop();

@@ -464,8 +464,11 @@ def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, str
 
     tag = "Test Tag"
 
-    registry.tagVault(vault.address, tag, sender=daddy)
+    tx = registry.tagVault(vault.address, tag, sender=daddy)
 
+    event = list(tx.decode_logs(registry.VaultTagged))[0]
+
+    assert event.vault == vault.address
     assert registry.vaultInfo(vault.address).asset == asset.address
     assert registry.vaultInfo(vault.address).tag == tag
 
@@ -481,8 +484,11 @@ def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, str
 
     tag = "Test Tag"
 
-    registry.tagVault(strategy.address, tag, sender=daddy)
+    tx = registry.tagVault(strategy.address, tag, sender=daddy)
 
+    event = list(tx.decode_logs(registry.VaultTagged))[0]
+
+    assert event.vault == strategy.address
     assert registry.vaultInfo(strategy.address).asset == asset.address
     assert registry.vaultInfo(strategy.address).tag == tag
 
@@ -534,7 +540,7 @@ def test__remove_vault(registry, asset, release_registry, vault_factory, daddy):
     assert registry.vaultInfo(new_vault.address).deploymentTimestamp == block
 
     # Remove the vault
-    tx = registry.removeVault(new_vault, 0, sender=daddy)
+    tx = registry.removeVault(new_vault, sender=daddy)
 
     event = list(tx.decode_logs(registry.RemovedVault))
 
@@ -607,7 +613,7 @@ def test__remove_vault__two_vaults(
     assert registry.vaultInfo(second_vault.address).releaseVersion == 0
 
     # Remove the first vault
-    tx = registry.removeVault(new_vault, 0, sender=daddy)
+    tx = registry.removeVault(new_vault, sender=daddy)
 
     event = list(tx.decode_logs(registry.RemovedVault))
 
@@ -667,7 +673,7 @@ def test__remove_strategy(
     )
 
     # Remove the strategy
-    tx = registry.removeVault(strategy, 0, sender=daddy)
+    tx = registry.removeVault(strategy, sender=daddy)
 
     event = list(tx.decode_logs(registry.RemovedVault))
 
@@ -728,7 +734,7 @@ def test__remove_strategy__two_strategies(
     )
 
     # Remove the first strategy
-    tx = registry.removeVault(strategy, 0, sender=daddy)
+    tx = registry.removeVault(strategy, sender=daddy)
 
     event = list(tx.decode_logs(registry.RemovedVault))
 
@@ -787,7 +793,7 @@ def test__remove_asset(
         registry.removeAsset(asset.address, 0, sender=daddy)
 
     # Remove the strategy
-    registry.removeVault(strategy.address, 0, sender=daddy)
+    registry.removeVault(strategy.address, sender=daddy)
 
     registry.removeAsset(asset.address, 0, sender=daddy)
 
@@ -832,7 +838,7 @@ def test__access(
 
     # cant remove vault or asset
     with ape.reverts("!endorser"):
-        registry.removeVault(new_vault.address, 0, sender=user)
+        registry.removeVault(new_vault.address, sender=user)
 
     with ape.reverts("!endorser"):
         registry.removeAsset(asset.address, 0, sender=user)
@@ -874,7 +880,7 @@ def test__access(
     assert registry.vaultInfo(new_vault).tag == "tag"
 
     # User should be able to remove vaults and assets now too.
-    registry.removeVault(new_vault, 0, sender=user)
+    registry.removeVault(new_vault, sender=user)
 
     assert registry.isEndorsed(new_vault) == False
 
