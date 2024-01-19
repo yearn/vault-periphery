@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import {ReleaseRegistry} from "./ReleaseRegistry.sol";
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 
-import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
-import {ReleaseRegistry} from "./ReleaseRegistry.sol";
+interface IVaultFactory {
+    function deploy_new_vault(
+        address asset,
+        string memory name,
+        string memory symbol,
+        address role_manager,
+        uint256 profit_max_unlock_time
+    ) external returns (address);
+
+    function apiVersion() external view returns (string memory);
+}
 
 /**
  * @title YearnV3 Registry
@@ -277,7 +285,7 @@ contract Registry is Governance {
 
         // Deploy New vault.
         _vault = IVaultFactory(factory).deploy_new_vault(
-            ERC20(_asset),
+            _asset,
             _name,
             _symbol,
             _roleManager,

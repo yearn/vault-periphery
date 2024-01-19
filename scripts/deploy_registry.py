@@ -1,12 +1,6 @@
 from ape import project, accounts, Contract, chain, networks
-from ape.utils import ZERO_ADDRESS
-from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
-import os
-import hashlib
-from copy import deepcopy
-
-deployer = accounts.load("")
+from scripts.deployments import getSalt, deploy_contract
 
 
 def deploy_release_and_factory():
@@ -17,20 +11,11 @@ def deploy_release_and_factory():
 
     release_registry = project.ReleaseRegistry
     factory = project.RegistryFactory
-    deployer_contract = project.Deployer.at(
-        "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
-    )
 
-    salt_string = "registry"
+    deployer = input("Name of account to use? ")
+    deployer = accounts.load(deployer)
 
-    # Create a SHA-256 hash object
-    hash_object = hashlib.sha256()
-    # Update the hash object with the string data
-    hash_object.update(salt_string.encode("utf-8"))
-    # Get the hexadecimal representation of the hash
-    hex_hash = hash_object.hexdigest()
-    # Convert the hexadecimal hash to an integer
-    salt = int(hex_hash, 16)
+    salt = getSalt("registry")
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
@@ -50,6 +35,11 @@ def deploy_release_and_factory():
 
         print(f"Deploying Release Registry...")
 
+        # Use old deployer contract to get the same address.
+        deployer_contract = project.Deployer.at(
+            "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
+        )
+
         release_tx = deployer_contract.deploy(
             release_deploy_bytecode, salt, sender=deployer
         )
@@ -60,7 +50,7 @@ def deploy_release_and_factory():
 
         print(f"Deployed the vault release to {release_address}")
         print("------------------")
-    print(f"Encoded Constructor to use for verifaction {release_constructor.hex()}")
+        print(f"Encoded Constructor to use for verifaction {release_constructor.hex()}")
 
     # Deploy factory
     print(f"Deploying factory...")
@@ -72,16 +62,8 @@ def deploy_release_and_factory():
         + factory_constructor
     )
 
-    factory_tx = deployer_contract.deploy(
-        factory_deploy_bytecode, salt, sender=deployer
-    )
+    deploy_contract(factory_deploy_bytecode, salt, deployer)
 
-    factory_event = list(factory_tx.decode_logs(deployer_contract.Deployed))
-
-    deployed_factory = factory.at(factory_event[0].addr)
-
-    print("------------------")
-    print(f"Deployed Registry Factory to {deployed_factory.address}")
     print("------------------")
     print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()[2:]}")
 
