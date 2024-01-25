@@ -440,19 +440,47 @@ contract HealthCheckAccountant {
     }
 
     /**
-     * @notice Function to withdraw the underlying asset from a vault.
-     * @param vault The vault to withdraw from.
-     * @param amount The amount in the underlying to withdraw.
+     * @notice Get the full config used for a specific `strategy` and `vault` combo.
+     * @param vault Address of the vault.
+     * @param strategy Address of the strategy.
+     * @return fee The config that would be used during the report.
      */
-    function withdrawUnderlying(
+    function getStrategyConfig(
         address vault,
-        uint256 amount
-    ) external virtual onlyFeeManager {
-        IVault(vault).withdraw(amount, address(this), address(this), maxLoss);
+        address strategy
+    ) external view returns (Fee memory fee) {
+        // Check if custom config is set.
+        if (_useCustomConfig[vault][strategy] != 0) {
+            fee = customConfig[vault][strategy];
+        } else {
+            // Otherwise use the default.
+            fee = defaultConfig;
+        }
     }
 
     /**
-     * @notice Sets the `maxLoss` parameter to be used on withdraws.
+     * @notice Function to redeem the underlying asset from a vault.
+     * @dev Will default to using the full balance of the vault.
+     * @param vault The vault to redeem from.
+     */
+    function redeemUnderlying(address vault) external virtual {
+        redeemUnderlying(vault, IVault(vault).balanceOf(address(this)));
+    }
+
+    /**
+     * @notice Function to redeem the underlying asset from a vault.
+     * @param vault The vault to redeem from.
+     * @param amount The amount in vault shares to redeem.
+     */
+    function redeemUnderlying(
+        address vault,
+        uint256 amount
+    ) public virtual onlyFeeManager {
+        IVault(vault).redeem(amount, address(this), address(this), maxLoss);
+    }
+
+    /**
+     * @notice Sets the `maxLoss` parameter to be used on redeems.
      * @param _maxLoss The amount in basis points to set as the maximum loss.
      */
     function setMaxLoss(uint256 _maxLoss) external virtual onlyFeeManager {

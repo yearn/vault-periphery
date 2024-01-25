@@ -678,7 +678,7 @@ def test_distribute(
     assert vault.balanceOf(fee_recipient.address) == amount
 
 
-def test_withdraw_underlying(
+def test_redeem_underlying(
     refund_accountant, daddy, user, vault, asset, deposit_into_vault, amount
 ):
     accountant = refund_accountant
@@ -695,9 +695,9 @@ def test_withdraw_underlying(
     assert asset.balanceOf(accountant.address) == 0
 
     with ape.reverts("!fee manager"):
-        accountant.withdrawUnderlying(vault.address, amount, sender=user)
+        accountant.redeemUnderlying(vault.address, amount, sender=user)
 
-    tx = accountant.withdrawUnderlying(vault.address, amount, sender=daddy)
+    tx = accountant.redeemUnderlying(vault.address, amount, sender=daddy)
 
     assert vault.balanceOf(user) == 0
     assert vault.balanceOf(accountant.address) == 0

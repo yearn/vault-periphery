@@ -48,7 +48,7 @@ contract YieldManager is Governance {
 
     /// @notice Contract that holds the logic and oracles for each strategy.
     AprOracle internal constant aprOracle =
-        AprOracle(0xF012fBb9283e03994A7829fCE994a105cC066c14);
+        AprOracle(0x27aD2fFc74F74Ed27e1C0A19F1858dD0963277aE);
 
     /// @notice Flag to set to allow anyone to propose allocations.
     bool public open;

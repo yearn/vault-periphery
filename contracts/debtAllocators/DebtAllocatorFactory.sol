@@ -3,7 +3,6 @@ pragma solidity 0.8.18;
 
 import {DebtAllocator} from "./DebtAllocator.sol";
 import {Clonable} from "@periphery/utils/Clonable.sol";
-import {RoleManager} from "../Managers/RoleManager.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 
 /**
