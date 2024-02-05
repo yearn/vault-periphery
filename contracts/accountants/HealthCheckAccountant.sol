@@ -151,29 +151,15 @@ contract HealthCheckAccountant {
     ) {
         require(_feeManager != address(0), "ZERO ADDRESS");
         require(_feeRecipient != address(0), "ZERO ADDRESS");
-        require(
-            defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
+
+        _updateDefaultConfig(
+            defaultManagement,
+            defaultPerformance,
+            defaultRefund,
+            defaultMaxFee,
+            defaultMaxGain,
+            defaultMaxLoss
         );
-        require(
-            defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
-        );
-        require(defaultMaxLoss <= MAX_BPS, "too high");
-
-        feeManager = _feeManager;
-        feeRecipient = _feeRecipient;
-
-        defaultConfig = Fee({
-            managementFee: defaultManagement,
-            performanceFee: defaultPerformance,
-            refundRatio: defaultRefund,
-            maxFee: defaultMaxFee,
-            maxGain: defaultMaxGain,
-            maxLoss: defaultMaxLoss
-        });
-
-        emit UpdateDefaultFeeConfig(defaultConfig);
     }
 
     /**
@@ -323,14 +309,36 @@ contract HealthCheckAccountant {
         uint16 defaultMaxGain,
         uint16 defaultMaxLoss
     ) external virtual onlyFeeManager {
+        _updateDefaultConfig(
+            defaultManagement,
+            defaultPerformance,
+            defaultRefund,
+            defaultMaxFee,
+            defaultMaxGain,
+            defaultMaxLoss
+        );
+    }
+
+    /**
+     * @dev Updates the Accountant's default fee config.
+     *   Is used during deployment and during any future updates.
+     */
+    function _updateDefaultConfig(
+        uint16 defaultManagement,
+        uint16 defaultPerformance,
+        uint16 defaultRefund,
+        uint16 defaultMaxFee,
+        uint16 defaultMaxGain,
+        uint16 defaultMaxLoss
+    ) internal virtual {
         // Check for threshold and limit conditions.
         require(
             defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
+            "management fee threshold"
         );
         require(
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
+            "performance fee threshold"
         );
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
@@ -373,11 +381,11 @@ contract HealthCheckAccountant {
         // Check for threshold and limit conditions.
         require(
             customManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
+            "management fee threshold"
         );
         require(
             customPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
+            "performance fee threshold"
         );
         require(customMaxLoss <= MAX_BPS, "too high");
 
