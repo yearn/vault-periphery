@@ -393,20 +393,23 @@ contract RoleManager is Governance2Step {
      * @param _vault Address of the vault to set up the accountant for.
      */
     function _setAccountant(address _vault) internal virtual {
-        // Temporarily give this contract the ability to set the accountant.
-        IVault(_vault).add_role(address(this), Roles.ACCOUNTANT_MANAGER);
-
         // Get the current accountant.
         address accountant = getPositionHolder(ACCOUNTANT);
 
-        // Set the account on the vault.
-        IVault(_vault).set_accountant(accountant);
+        // If there is an accountant set.
+        if (accountant != address(0)) {
+            // Temporarily give this contract the ability to set the accountant.
+            IVault(_vault).add_role(address(this), Roles.ACCOUNTANT_MANAGER);
 
-        // Take away the role.
-        IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
+            // Set the account on the vault.
+            IVault(_vault).set_accountant(accountant);
 
-        // Whitelist the vault in the accountant.
-        HealthCheckAccountant(accountant).addVault(_vault);
+            // Take away the role.
+            IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
+
+            // Whitelist the vault in the accountant.
+            HealthCheckAccountant(accountant).addVault(_vault);
+        }
     }
 
     /**
@@ -799,7 +802,15 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address assigned to the allocator.
+     * @notice Get the address assigned to be the debt allocator if any.
+     * @return The address assigned to be the debt allocator if any.
+     */
+    function getDebtAllocator() external view virtual returns (address) {
+        return getPositionHolder(DEBT_ALLOCATOR);
+    }
+
+    /**
+     * @notice Get the address assigned to the allocator factory.
      * @return The address assigned to the allocator factory.
      */
     function getAllocatorFactory() external view virtual returns (address) {
