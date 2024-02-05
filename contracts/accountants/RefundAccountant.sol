@@ -14,20 +14,11 @@ contract RefundAccountant is HealthCheckAccountant {
     event UpdateRefund(
         address indexed vault,
         address indexed strategy,
-        bool refund,
         uint256 amount
     );
 
-    /// @notice Struct to hold refund info for a strategy.
-    struct Refund {
-        // If the accountant should refund on the report.
-        bool refund;
-        // The amount if any to refund.
-        uint248 amount;
-    }
-
-    /// @notice Mapping of vault => strategy => struct if there is a reward refund to give.
-    mapping(address => mapping(address => Refund)) public refund;
+    /// @notice Mapping of vault => strategy => amount if there is a reward refund to give.
+    mapping(address => mapping(address => uint256)) public refund;
 
     constructor(
         address _feeManager,
@@ -72,11 +63,11 @@ contract RefundAccountant is HealthCheckAccountant {
     {
         (totalFees, totalRefunds) = super.report(strategy, gain, loss);
 
-        Refund memory refundConfig = refund[msg.sender][strategy];
+        uint256 _refund = refund[msg.sender][strategy];
         // Check if the strategy is being given a refund.
-        if (refundConfig.refund) {
+        if (_refund != 0) {
             // Add it to the existing refunds.
-            totalRefunds += uint256(refundConfig.amount);
+            totalRefunds += _refund;
 
             // Make sure the vault is approved correctly.
             _checkAllowance(
@@ -96,13 +87,11 @@ contract RefundAccountant is HealthCheckAccountant {
      *
      * @param _vault Address of the vault to refund.
      * @param _strategy Address of the strategy to refund during the report.
-     * @param _refund Bool to turn it on or off.
-     * @param _amount Amount to refund per report.
+     * @param _amount Amount to refund on the next report.
      */
     function setRefund(
         address _vault,
         address _strategy,
-        bool _refund,
         uint256 _amount
     ) external virtual onlyFeeManager {
         require(vaults[_vault], "not added");
@@ -110,13 +99,9 @@ contract RefundAccountant is HealthCheckAccountant {
             IVault(_vault).strategies(_strategy).activation != 0,
             "!active"
         );
-        require(_refund || _amount == 0, "no refund and non zero amount");
 
-        refund[_vault][_strategy] = Refund({
-            refund: _refund,
-            amount: uint248(_amount)
-        });
+        refund[_vault][_strategy] = _amount;
 
-        emit UpdateRefund(_vault, _strategy, _refund, uint256(_amount));
+        emit UpdateRefund(_vault, _strategy, _amount);
     }
 }
