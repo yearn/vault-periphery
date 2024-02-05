@@ -281,9 +281,18 @@ contract DebtAllocator {
             }
             // If current debt is greater than our max.
         } else if (maxDebt < params.current_debt) {
+            uint256 toPull = params.current_debt - targetDebt;
+
+            uint256 currentIdle = _vault.totalIdle();
+            uint256 minIdle = _vault.minimum_total_idle();
+            if (minIdle > currentIdle) {
+                // Pull at least the amount needed for minIdle.
+                toPull = Math.max(toPull, minIdle - currentIdle);
+            }
+
             // Find out by how much. Aim for the target.
-            uint256 toPull = Math.min(
-                params.current_debt - targetDebt,
+            toPull = Math.min(
+                toPull,
                 // Account for the current liquidity constraints.
                 // Use max redeem to match vault logic.
                 IVault(_strategy).convertToAssets(

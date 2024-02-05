@@ -152,6 +152,9 @@ contract HealthCheckAccountant {
         require(_feeManager != address(0), "ZERO ADDRESS");
         require(_feeRecipient != address(0), "ZERO ADDRESS");
 
+        feeManager = _feeManager;
+        feeRecipient = _feeRecipient;
+
         _updateDefaultConfig(
             defaultManagement,
             defaultPerformance,
