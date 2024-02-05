@@ -583,8 +583,8 @@ contract HealthCheckAccountant {
         uint256 _amount
     ) internal {
         if (ERC20(_token).allowance(address(this), _contract) < _amount) {
-            ERC20(_token).approve(_contract, 0);
-            ERC20(_token).approve(_contract, _amount);
+            ERC20(_token).safeApprove(_contract, 0);
+            ERC20(_token).safeApprove(_contract, _amount);
         }
     }
 
