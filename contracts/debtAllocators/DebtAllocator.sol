@@ -107,11 +107,11 @@ contract DebtAllocator {
 
     uint256 internal constant MAX_BPS = 10_000;
 
+    /// @notice Address to get permissioned roles from.
+    address public immutable factory;
+
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
-
-    /// @notice Address to get permissioned roles from.
-    address public factory;
 
     /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
@@ -134,6 +134,10 @@ contract DebtAllocator {
     mapping(address => Config) internal _configs;
 
     constructor(address _vault, uint256 _minimumChange) {
+        // Set the factory to retrieve roles from. Will be the same for all clones so can use immutable.
+        factory = msg.sender;
+
+        // Initialize original version.
         initialize(_vault, _minimumChange);
     }
 
@@ -145,8 +149,7 @@ contract DebtAllocator {
      */
     function initialize(address _vault, uint256 _minimumChange) public virtual {
         require(address(vault) == address(0), "!initialized");
-        // Set the factory to retrieve roles from.
-        factory = msg.sender;
+
         // Set initial variables.
         vault = _vault;
         minimumChange = _minimumChange;

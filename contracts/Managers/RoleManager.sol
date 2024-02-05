@@ -600,7 +600,7 @@ contract RoleManager is Governance2Step {
         address[] calldata _vaults,
         address _holder,
         uint256 _role
-    ) external virtual onlyPositionHolder(DADDY) {
+    ) external virtual onlyGovernance {
         address _vault;
         for (uint256 i = 0; i < _vaults.length; ++i) {
             _vault = _vaults[i];
