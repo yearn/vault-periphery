@@ -589,6 +589,29 @@ contract RoleManager is Governance2Step {
         emit RemovedVault(_vault);
     }
 
+    /**
+     * @notice Removes a specific role(s) for a `_holder` from the `_vaults`.
+     * @dev Can be used to remove one specific role or multiple.
+     * @param _vaults Array of vaults to adjust.
+     * @param _holder Address who's having a role removed.
+     * @param _role The role or roles to remove from the `_holder`.
+     */
+    function removeRoles(
+        address[] calldata _vaults,
+        address _holder,
+        uint256 _role
+    ) external virtual onlyPositionHolder(DADDY) {
+        address _vault;
+        for (uint256 i = 0; i < _vaults.length; ++i) {
+            _vault = _vaults[i];
+            // Make sure the vault is added to this Role Manager.
+            require(vaultConfig[_vault].asset != address(0), "vault not added");
+
+            // Remove the role.
+            IVault(_vault).remove_role(_holder, _role);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                             SETTERS
     //////////////////////////////////////////////////////////////*/

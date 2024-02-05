@@ -1441,3 +1441,111 @@ def test_remove_vault(
     vault.accept_role_manager(sender=daddy)
 
     assert vault.role_manager() == daddy
+
+
+def test_remove_role(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    strategy,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    rating = int(2)
+
+    assert role_manager.getAllVaults() == []
+    assert (
+        role_manager.getVault(asset, vault_factory.apiVersion(), rating) == ZERO_ADDRESS
+    )
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    # Deploy a vault
+    tx = role_manager.newVault(asset, rating, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
+    debt_allocator = project.DebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.getVault(asset, vault_factory.apiVersion(), rating) == vault
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+
+    # Remove 1 role and see if the rest remain the same.
+    new_roles = daddy_roles & ~ROLES.ADD_STRATEGY_MANAGER
+
+    with ape.reverts("vault not added"):
+        role_manager.removeRoles(
+            [strategy], daddy, ROLES.ADD_STRATEGY_MANAGER, sender=daddy
+        )
+
+    with ape.reverts("!allowed"):
+        role_manager.removeRoles(
+            [vault], daddy, ROLES.ADD_STRATEGY_MANAGER, sender=user
+        )
+
+    tx = role_manager.removeRoles(
+        [vault], daddy, ROLES.ADD_STRATEGY_MANAGER, sender=daddy
+    )
+
+    event = list(tx.decode_logs(vault.RoleSet))
+
+    assert len(event) == 1
+    assert event[0].account == daddy
+    assert event[0].role == new_roles
+    assert vault.roles(daddy) == new_roles
+
+    with ape.reverts("not allowed"):
+        vault.add_strategy(strategy, sender=daddy)
+
+    # Remove two roles at once
+    to_remove = ROLES.REVOKE_STRATEGY_MANAGER | ROLES.FORCE_REVOKE_MANAGER
+
+    new_roles = new_roles & ~to_remove
+
+    tx = role_manager.removeRoles([vault], daddy, to_remove, sender=daddy)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+
+    assert len(event) == 1
+    assert event[0].account == daddy
+    assert event[0].role == new_roles
+    assert vault.roles(daddy) == new_roles
+
+    with ape.reverts("not allowed"):
+        vault.revoke_strategy(strategy, sender=daddy)
+
+    with ape.reverts("not allowed"):
+        vault.force_revoke_strategy(strategy, sender=daddy)
