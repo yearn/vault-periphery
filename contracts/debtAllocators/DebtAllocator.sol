@@ -127,7 +127,7 @@ contract DebtAllocator {
     /// @notice Max loss to accept on debt updates in basis points.
     uint256 public maxDebtUpdateLoss;
 
-    /// @notice Mapping of addresses that are allowed to update debt.
+    /// @notice Mapping of addresses that are allowed to update debt ratios.
     mapping(address => bool) public managers;
 
     /// @notice Mapping of strategy => its config.
@@ -158,10 +158,9 @@ contract DebtAllocator {
     /**
      * @notice Debt update wrapper for the vault.
      * @dev This can be used if a minimum time between debt updates
-     *   is desired to be enforced and to enforce a max loss.
+     *   is desired to be used for the trigger and to enforce a max loss.
      *
-     *   This contract and the msg.sender must have the DEBT_MANAGER
-     *   role assigned to them.
+     *   This contract must have the DEBT_MANAGER role assigned to them.
      *
      *   The function signature matches the vault so no update to the
      *   call data is required.
