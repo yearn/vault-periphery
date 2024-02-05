@@ -153,7 +153,7 @@ contract RoleManager is Governance2Step {
             )
         });
 
-        // Security cna set the max debt for strategies to have.
+        // Security can set the max debt for strategies to have.
         _positions[SECURITY] = Position({
             holder: _security,
             roles: uint96(Roles.MAX_DEBT_MANAGER)

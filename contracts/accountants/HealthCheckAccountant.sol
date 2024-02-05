@@ -75,7 +75,7 @@ contract HealthCheckAccountant {
         _;
     }
 
-    modifier onlyVaultOrFeeManagers() {
+    modifier onlyVaultOrFeeManager() {
         _checkVaultOrFeeManager();
         _;
     }
@@ -261,7 +261,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external virtual onlyVaultOrFeeManagers {
+    function addVault(address vault) external virtual onlyVaultOrFeeManager {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -274,9 +274,7 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(
-        address vault
-    ) external virtual onlyVaultOrFeeManagers {
+    function removeVault(address vault) external virtual onlyVaultOrFeeManager {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
 

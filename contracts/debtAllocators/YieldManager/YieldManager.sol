@@ -152,7 +152,7 @@ contract YieldManager is Governance {
                     _accountedFor -= _loss;
                 }
 
-                // Make sure we the vault can withdraw that amount.
+                // Make sure the vault can withdraw that amount.
                 require(
                     _maxWithdraw(_vault, _strategy) >= _currentDebt - _newDebt,
                     "max withdraw"
@@ -358,7 +358,7 @@ contract YieldManager is Governance {
                     _totalAssets -= _loss;
                 }
 
-                // Make sure we the vault can withdraw that amount.
+                // Make sure the vault can withdraw that amount.
                 require(
                     _maxWithdraw(_vault, _strategy) >= _currentDebt - _newDebt,
                     "max withdraw"

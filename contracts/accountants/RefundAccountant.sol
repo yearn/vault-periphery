@@ -92,7 +92,7 @@ contract RefundAccountant is HealthCheckAccountant {
 
     /**
      * @notice Set a strategy to use to refund a reward amount for
-     * aut compounding reward tokens.
+     * auto compounding reward tokens.
      *
      * @param _vault Address of the vault to refund.
      * @param _strategy Address of the strategy to refund during the report.

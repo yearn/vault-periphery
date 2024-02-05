@@ -293,7 +293,7 @@ contract DebtAllocator {
 
             // Check if it's over the threshold.
             if (toPull > minimumChange) {
-                // Can't lower debt if there is unrealised losses.
+                // Can't lower debt if there are unrealised losses.
                 if (
                     _vault.assess_share_of_unrealised_losses(
                         _strategy,
@@ -410,7 +410,7 @@ contract DebtAllocator {
 
     /**
      * @notice Set the minimum change variable for a strategy.
-     * @dev This is the amount of debt that will needed to be
+     * @dev This is the minimum amount of debt that will have to be
      * added or pulled for it to trigger an update.
      *
      * @param _minimumChange The new minimum to set for the strategy.
