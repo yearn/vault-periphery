@@ -120,7 +120,7 @@ contract RoleManager is Governance2Step {
     mapping(address => VaultConfig) public vaultConfig;
     /// @notice Mapping of underlying asset, api version and rating to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
-        public _assetToVault;
+        internal _assetToVault;
 
     constructor(
         address _governance,
