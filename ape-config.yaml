@@ -21,20 +21,27 @@ dependencies:
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
     ref: v3.0.1
+    config_override:
+      dependencies:
+        - name: tokenized-strategy
+          github: yearn/tokenized-strategy
+          ref: v3.0.1
+          contracts_folder: src
     exclude: 
-     - test/
+     - test/**/*
+     
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
     ref: v3.0.1
     contracts_folder: src
     exclude:
-     - test/
+     - test/**/*
   - name: periphery
     github: yearn/tokenized-strategy-periphery
     ref: master
     contracts_folder: src
     exclude: 
-     - test/
+     - test/**/*
 
 solidity:
   import_remapping:
