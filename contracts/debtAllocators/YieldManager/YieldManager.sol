@@ -219,7 +219,7 @@ contract YieldManager is Governance {
      */
     function validateAllocation(
         address _vault,
-        Allocation[] memory _newAllocations
+        Allocation[] calldata _newAllocations
     ) external view virtual returns (bool) {
         // Get the total assets the vault has.
         uint256 _totalAssets = IVault(_vault).totalAssets();
@@ -253,7 +253,7 @@ contract YieldManager is Governance {
      */
     function getCurrentAndExpectedRate(
         address _vault,
-        Allocation[] memory _newAllocations
+        Allocation[] calldata _newAllocations
     )
         external
         view
@@ -319,7 +319,7 @@ contract YieldManager is Governance {
      */
     function updateAllocationPermissioned(
         address _vault,
-        Allocation[] memory _newAllocations
+        Allocation[] calldata _newAllocations
     ) external virtual onlyGovernance {
         address allocator = vaultAllocator[_vault];
         require(allocator != address(0), "vault not added");

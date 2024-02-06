@@ -1511,7 +1511,7 @@ def test_remove_role(
             [strategy], daddy, ROLES.ADD_STRATEGY_MANAGER, sender=daddy
         )
 
-    with ape.reverts("!allowed"):
+    with ape.reverts("!governance"):
         role_manager.removeRoles(
             [vault], daddy, ROLES.ADD_STRATEGY_MANAGER, sender=user
         )
