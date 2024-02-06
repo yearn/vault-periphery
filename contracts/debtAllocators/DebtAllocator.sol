@@ -421,7 +421,7 @@ contract DebtAllocator {
 
     /**
      * @notice Set the minimum change variable for a strategy.
-     * @dev This is the minimum amount of debt that will have to be
+     * @dev This is the minimum amount of debt to be
      * added or pulled for it to trigger an update.
      *
      * @param _minimumChange The new minimum to set for the strategy.
