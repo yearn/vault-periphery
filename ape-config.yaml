@@ -27,7 +27,9 @@ dependencies:
           github: yearn/tokenized-strategy
           ref: v3.0.1
           contracts_folder: src
-
+    exclude: 
+     - test/**/*
+     
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
     ref: v3.0.1
