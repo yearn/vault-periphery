@@ -18,15 +18,10 @@ dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
     ref: 4.8.2
+    
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
     ref: v3.0.1
-    config_override:
-      dependencies:
-        - name: tokenized-strategy
-          github: yearn/tokenized-strategy
-          ref: v3.0.1
-          contracts_folder: src
     exclude: 
      - test/**/*
      
@@ -36,6 +31,7 @@ dependencies:
     contracts_folder: src
     exclude:
      - test/**/*
+
   - name: periphery
     github: yearn/tokenized-strategy-periphery
     ref: master
