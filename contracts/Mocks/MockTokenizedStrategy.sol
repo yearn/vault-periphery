@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.18;
 
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.18;
-
 import {TokenizedStrategy, ERC20} from "@tokenized-strategy/TokenizedStrategy.sol";
 
 contract MockTokenizedStrategy is TokenizedStrategy {
