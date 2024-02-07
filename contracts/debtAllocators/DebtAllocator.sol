@@ -107,11 +107,11 @@ contract DebtAllocator {
 
     uint256 internal constant MAX_BPS = 10_000;
 
+    /// @notice Address to get permissioned roles from.
+    address public immutable factory;
+
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
-
-    /// @notice Address to get permissioned roles from.
-    address public factory;
 
     /// @notice Time to wait between debt updates in seconds.
     uint256 public minimumWait;
@@ -127,13 +127,17 @@ contract DebtAllocator {
     /// @notice Max loss to accept on debt updates in basis points.
     uint256 public maxDebtUpdateLoss;
 
-    /// @notice Mapping of addresses that are allowed to update debt.
+    /// @notice Mapping of addresses that are allowed to update debt ratios.
     mapping(address => bool) public managers;
 
     /// @notice Mapping of strategy => its config.
     mapping(address => Config) internal _configs;
 
     constructor(address _vault, uint256 _minimumChange) {
+        // Set the factory to retrieve roles from. Will be the same for all clones so can use immutable.
+        factory = msg.sender;
+
+        // Initialize original version.
         initialize(_vault, _minimumChange);
     }
 
@@ -145,8 +149,7 @@ contract DebtAllocator {
      */
     function initialize(address _vault, uint256 _minimumChange) public virtual {
         require(address(vault) == address(0), "!initialized");
-        // Set the factory to retrieve roles from.
-        factory = msg.sender;
+
         // Set initial variables.
         vault = _vault;
         minimumChange = _minimumChange;
@@ -158,10 +161,9 @@ contract DebtAllocator {
     /**
      * @notice Debt update wrapper for the vault.
      * @dev This can be used if a minimum time between debt updates
-     *   is desired to be enforced and to enforce a max loss.
+     *   is desired to be used for the trigger and to enforce a max loss.
      *
-     *   This contract and the msg.sender must have the DEBT_MANAGER
-     *   role assigned to them.
+     *   This contract must have the DEBT_MANAGER role assigned to them.
      *
      *   The function signature matches the vault so no update to the
      *   call data is required.
@@ -281,9 +283,18 @@ contract DebtAllocator {
             }
             // If current debt is greater than our max.
         } else if (maxDebt < params.current_debt) {
+            uint256 toPull = params.current_debt - targetDebt;
+
+            uint256 currentIdle = _vault.totalIdle();
+            uint256 minIdle = _vault.minimum_total_idle();
+            if (minIdle > currentIdle) {
+                // Pull at least the amount needed for minIdle.
+                toPull = Math.max(toPull, minIdle - currentIdle);
+            }
+
             // Find out by how much. Aim for the target.
-            uint256 toPull = Math.min(
-                params.current_debt - targetDebt,
+            toPull = Math.min(
+                toPull,
                 // Account for the current liquidity constraints.
                 // Use max redeem to match vault logic.
                 IVault(_strategy).convertToAssets(
@@ -293,7 +304,7 @@ contract DebtAllocator {
 
             // Check if it's over the threshold.
             if (toPull > minimumChange) {
-                // Can't lower debt if there is unrealised losses.
+                // Can't lower debt if there are unrealised losses.
                 if (
                     _vault.assess_share_of_unrealised_losses(
                         _strategy,
@@ -410,7 +421,7 @@ contract DebtAllocator {
 
     /**
      * @notice Set the minimum change variable for a strategy.
-     * @dev This is the amount of debt that will needed to be
+     * @dev This is the minimum amount of debt to be
      * added or pulled for it to trigger an update.
      *
      * @param _minimumChange The new minimum to set for the strategy.

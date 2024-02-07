@@ -75,7 +75,7 @@ contract HealthCheckAccountant {
         _;
     }
 
-    modifier onlyVaultOrFeeManagers() {
+    modifier onlyVaultOrFeeManager() {
         _checkVaultOrFeeManager();
         _;
     }
@@ -151,29 +151,18 @@ contract HealthCheckAccountant {
     ) {
         require(_feeManager != address(0), "ZERO ADDRESS");
         require(_feeRecipient != address(0), "ZERO ADDRESS");
-        require(
-            defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
-        );
-        require(
-            defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
-        );
-        require(defaultMaxLoss <= MAX_BPS, "too high");
 
         feeManager = _feeManager;
         feeRecipient = _feeRecipient;
 
-        defaultConfig = Fee({
-            managementFee: defaultManagement,
-            performanceFee: defaultPerformance,
-            refundRatio: defaultRefund,
-            maxFee: defaultMaxFee,
-            maxGain: defaultMaxGain,
-            maxLoss: defaultMaxLoss
-        });
-
-        emit UpdateDefaultFeeConfig(defaultConfig);
+        _updateDefaultConfig(
+            defaultManagement,
+            defaultPerformance,
+            defaultRefund,
+            defaultMaxFee,
+            defaultMaxGain,
+            defaultMaxLoss
+        );
     }
 
     /**
@@ -275,7 +264,7 @@ contract HealthCheckAccountant {
      * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
      * @param vault The address of a vault to allow to use this accountant.
      */
-    function addVault(address vault) external virtual onlyVaultOrFeeManagers {
+    function addVault(address vault) external virtual onlyVaultOrFeeManager {
         // Ensure the vault has not already been added.
         require(!vaults[vault], "already added");
 
@@ -288,9 +277,7 @@ contract HealthCheckAccountant {
      * @notice Function to remove a vault from this accountant's fee charging list.
      * @param vault The address of the vault to be removed from this accountant.
      */
-    function removeVault(
-        address vault
-    ) external virtual onlyVaultOrFeeManagers {
+    function removeVault(address vault) external virtual onlyVaultOrFeeManager {
         // Ensure the vault has been previously added.
         require(vaults[vault], "not added");
 
@@ -323,14 +310,36 @@ contract HealthCheckAccountant {
         uint16 defaultMaxGain,
         uint16 defaultMaxLoss
     ) external virtual onlyFeeManager {
+        _updateDefaultConfig(
+            defaultManagement,
+            defaultPerformance,
+            defaultRefund,
+            defaultMaxFee,
+            defaultMaxGain,
+            defaultMaxLoss
+        );
+    }
+
+    /**
+     * @dev Updates the Accountant's default fee config.
+     *   Is used during deployment and during any future updates.
+     */
+    function _updateDefaultConfig(
+        uint16 defaultManagement,
+        uint16 defaultPerformance,
+        uint16 defaultRefund,
+        uint16 defaultMaxFee,
+        uint16 defaultMaxGain,
+        uint16 defaultMaxLoss
+    ) internal virtual {
         // Check for threshold and limit conditions.
         require(
             defaultManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
+            "management fee threshold"
         );
         require(
             defaultPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
+            "performance fee threshold"
         );
         require(defaultMaxLoss <= MAX_BPS, "too high");
 
@@ -373,11 +382,11 @@ contract HealthCheckAccountant {
         // Check for threshold and limit conditions.
         require(
             customManagement <= MANAGEMENT_FEE_THRESHOLD,
-            "exceeds management fee threshold"
+            "management fee threshold"
         );
         require(
             customPerformance <= PERFORMANCE_FEE_THRESHOLD,
-            "exceeds performance fee threshold"
+            "performance fee threshold"
         );
         require(customMaxLoss <= MAX_BPS, "too high");
 
@@ -583,8 +592,8 @@ contract HealthCheckAccountant {
         uint256 _amount
     ) internal {
         if (ERC20(_token).allowance(address(this), _contract) < _amount) {
-            ERC20(_token).approve(_contract, 0);
-            ERC20(_token).approve(_contract, _amount);
+            ERC20(_token).safeApprove(_contract, 0);
+            ERC20(_token).safeApprove(_contract, _amount);
         }
     }
 

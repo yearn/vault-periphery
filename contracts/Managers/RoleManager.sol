@@ -120,7 +120,7 @@ contract RoleManager is Governance2Step {
     mapping(address => VaultConfig) public vaultConfig;
     /// @notice Mapping of underlying asset, api version and rating to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
-        public _assetToVault;
+        internal _assetToVault;
 
     constructor(
         address _governance,
@@ -153,7 +153,7 @@ contract RoleManager is Governance2Step {
             )
         });
 
-        // Security cna set the max debt for strategies to have.
+        // Security can set the max debt for strategies to have.
         _positions[SECURITY] = Position({
             holder: _security,
             roles: uint96(Roles.MAX_DEBT_MANAGER)
@@ -393,20 +393,23 @@ contract RoleManager is Governance2Step {
      * @param _vault Address of the vault to set up the accountant for.
      */
     function _setAccountant(address _vault) internal virtual {
-        // Temporarily give this contract the ability to set the accountant.
-        IVault(_vault).add_role(address(this), Roles.ACCOUNTANT_MANAGER);
-
         // Get the current accountant.
         address accountant = getPositionHolder(ACCOUNTANT);
 
-        // Set the account on the vault.
-        IVault(_vault).set_accountant(accountant);
+        // If there is an accountant set.
+        if (accountant != address(0)) {
+            // Temporarily give this contract the ability to set the accountant.
+            IVault(_vault).add_role(address(this), Roles.ACCOUNTANT_MANAGER);
 
-        // Take away the role.
-        IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
+            // Set the account on the vault.
+            IVault(_vault).set_accountant(accountant);
 
-        // Whitelist the vault in the accountant.
-        HealthCheckAccountant(accountant).addVault(_vault);
+            // Take away the role.
+            IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
+
+            // Whitelist the vault in the accountant.
+            HealthCheckAccountant(accountant).addVault(_vault);
+        }
     }
 
     /**
@@ -584,6 +587,29 @@ contract RoleManager is Governance2Step {
         delete vaultConfig[_vault];
 
         emit RemovedVault(_vault);
+    }
+
+    /**
+     * @notice Removes a specific role(s) for a `_holder` from the `_vaults`.
+     * @dev Can be used to remove one specific role or multiple.
+     * @param _vaults Array of vaults to adjust.
+     * @param _holder Address who's having a role removed.
+     * @param _role The role or roles to remove from the `_holder`.
+     */
+    function removeRoles(
+        address[] calldata _vaults,
+        address _holder,
+        uint256 _role
+    ) external virtual onlyGovernance {
+        address _vault;
+        for (uint256 i = 0; i < _vaults.length; ++i) {
+            _vault = _vaults[i];
+            // Make sure the vault is added to this Role Manager.
+            require(vaultConfig[_vault].asset != address(0), "vault not added");
+
+            // Remove the role.
+            IVault(_vault).remove_role(_holder, _role);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -799,7 +825,15 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address assigned to the allocator.
+     * @notice Get the address assigned to be the debt allocator if any.
+     * @return The address assigned to be the debt allocator if any.
+     */
+    function getDebtAllocator() external view virtual returns (address) {
+        return getPositionHolder(DEBT_ALLOCATOR);
+    }
+
+    /**
+     * @notice Get the address assigned to the allocator factory.
      * @return The address assigned to the allocator factory.
      */
     function getAllocatorFactory() external view virtual returns (address) {
