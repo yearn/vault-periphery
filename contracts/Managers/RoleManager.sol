@@ -149,7 +149,8 @@ contract RoleManager is Governance2Step {
             roles: uint96(
                 Roles.REPORTING_MANAGER |
                     Roles.DEBT_MANAGER |
-                    Roles.QUEUE_MANAGER
+                    Roles.QUEUE_MANAGER |
+                    Roles.DEBT_PURCHASER
             )
         });
 
@@ -162,7 +163,7 @@ contract RoleManager is Governance2Step {
         // The keeper can process reports and update debt.
         _positions[KEEPER] = Position({
             holder: _keeper,
-            roles: uint96(Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER)
+            roles: uint96(Roles.REPORTING_MANAGER)
         });
 
         // Set just the roles for a debt allocator.
@@ -255,9 +256,14 @@ contract RoleManager is Governance2Step {
 
         // Create the name and symbol to be standardized based on rating.
         string memory ratingString = ratingToString[_rating];
-        // Name is "{SYMBOL} yVault-{RATING}"
+        // Name is "{SYMBOL}-{RATING} yVault"
         string memory _name = string(
-            abi.encodePacked(ERC20(_asset).symbol(), " yVault-", ratingString)
+            abi.encodePacked(
+                ERC20(_asset).symbol(),
+                "-",
+                ratingString,
+                " yVault"
+            )
         );
         // Symbol is "yv{SYMBOL}-{RATING}".
         string memory _symbol = string(
