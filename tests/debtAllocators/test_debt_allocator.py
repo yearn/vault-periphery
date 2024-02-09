@@ -162,7 +162,7 @@ def test_set_ratios(
     event = list(tx.decode_logs(debt_allocator.StrategyChanged))[0]
 
     assert event.strategy == strategy
-    assert event.status == 0
+    assert event.status == 1
 
     event = list(tx.decode_logs(debt_allocator.UpdateStrategyDebtRatio))[0]
 
@@ -330,7 +330,7 @@ def test_remove_strategy(
     event = list(tx.decode_logs(debt_allocator.StrategyChanged))[0]
 
     assert event.strategy == strategy
-    assert event.status == 0
+    assert event.status == 1
 
     event = list(tx.decode_logs(debt_allocator.UpdateStrategyDebtRatio))[0]
 
@@ -355,7 +355,7 @@ def test_remove_strategy(
 
     assert len(event) == 1
     assert event[0].strategy == strategy
-    assert event[0].status == 1
+    assert event[0].status == 2
     assert debt_allocator.totalDebtRatio() == 0
     assert debt_allocator.getConfig(strategy) == (False, 0, 0, 0, 0)
     assert debt_allocator.shouldUpdateDebt(strategy)[0] == False

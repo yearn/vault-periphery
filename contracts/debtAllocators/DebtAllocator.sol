@@ -54,6 +54,7 @@ contract DebtAllocator {
 
     /// @notice Status when a strategy is added or removed from the allocator.
     enum Status {
+        NULL,
         ADDED,
         REMOVED
     }
