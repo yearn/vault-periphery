@@ -149,7 +149,8 @@ contract RoleManager is Governance2Step {
             roles: uint96(
                 Roles.REPORTING_MANAGER |
                     Roles.DEBT_MANAGER |
-                    Roles.QUEUE_MANAGER
+                    Roles.QUEUE_MANAGER |
+                    Roles.DEBT_PURCHASER
             )
         });
 
@@ -162,7 +163,7 @@ contract RoleManager is Governance2Step {
         // The keeper can process reports and update debt.
         _positions[KEEPER] = Position({
             holder: _keeper,
-            roles: uint96(Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER)
+            roles: uint96(Roles.REPORTING_MANAGER)
         });
 
         // Set just the roles for a debt allocator.
@@ -255,9 +256,14 @@ contract RoleManager is Governance2Step {
 
         // Create the name and symbol to be standardized based on rating.
         string memory ratingString = ratingToString[_rating];
-        // Name is "{SYMBOL} yVault-{RATING}"
+        // Name is "{SYMBOL}-{RATING} yVault"
         string memory _name = string(
-            abi.encodePacked(ERC20(_asset).symbol(), " yVault-", ratingString)
+            abi.encodePacked(
+                ERC20(_asset).symbol(),
+                "-",
+                ratingString,
+                " yVault"
+            )
         );
         // Symbol is "yv{SYMBOL}-{RATING}".
         string memory _symbol = string(
@@ -345,46 +351,44 @@ contract RoleManager is Governance2Step {
         address _vault,
         address _debtAllocator
     ) internal virtual {
-        // Cache positionInfo to be reused for each setter.
-        Position memory positionInfo = _positions[DADDY];
-
         // Set the roles for daddy.
-        IVault(_vault).set_role(
-            positionInfo.holder,
-            uint256(positionInfo.roles)
-        );
+        _setRole(_vault, _positions[DADDY]);
 
         // Set the roles for Brain.
-        positionInfo = _positions[BRAIN];
-        IVault(_vault).set_role(
-            positionInfo.holder,
-            uint256(positionInfo.roles)
-        );
+        _setRole(_vault, _positions[BRAIN]);
 
         // Set the roles for Security.
-        positionInfo = _positions[SECURITY];
-        IVault(_vault).set_role(
-            positionInfo.holder,
-            uint256(positionInfo.roles)
-        );
+        _setRole(_vault, _positions[SECURITY]);
 
         // Set the roles for the Keeper.
-        positionInfo = _positions[KEEPER];
-        IVault(_vault).set_role(
-            positionInfo.holder,
-            uint256(positionInfo.roles)
-        );
+        _setRole(_vault, _positions[KEEPER]);
 
         // Set the roles for the Strategy Manager.
-        positionInfo = _positions[STRATEGY_MANAGER];
-        IVault(_vault).set_role(
-            positionInfo.holder,
-            uint256(positionInfo.roles)
-        );
+        _setRole(_vault, _positions[STRATEGY_MANAGER]);
 
         // Give the specific debt allocator its roles.
-        positionInfo = _positions[DEBT_ALLOCATOR];
-        IVault(_vault).set_role(_debtAllocator, uint256(positionInfo.roles));
+        _setRole(
+            _vault,
+            Position(_debtAllocator, _positions[DEBT_ALLOCATOR].roles)
+        );
+    }
+
+    /**
+     * @dev Used internally to set the roles on a vault for a given position.
+     *   Will not set the roles if the position holder is address(0).
+     *   This does not check that the roles are !=0 because it is expected that
+     *   the holder will be set to 0 if the position is not being used.
+     *
+     * @param _vault Address of the vault.
+     * @param _position Holder address and roles to set.
+     */
+    function _setRole(
+        address _vault,
+        Position memory _position
+    ) internal virtual {
+        if (_position.holder != address(0)) {
+            IVault(_vault).set_role(_position.holder, uint256(_position.roles));
+        }
     }
 
     /**
@@ -537,12 +541,12 @@ contract RoleManager is Governance2Step {
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
         // Remove the roles from the old allocator.
-        IVault(_vault).set_role(vaultConfig[_vault].debtAllocator, 0);
+        _setRole(_vault, Position(vaultConfig[_vault].debtAllocator, 0));
 
         // Give the new debt allocator the relevant roles.
-        IVault(_vault).set_role(
-            _debtAllocator,
-            getPositionRoles(DEBT_ALLOCATOR)
+        _setRole(
+            _vault,
+            Position(_debtAllocator, _positions[DEBT_ALLOCATOR].roles)
         );
 
         // Update the vaults config.

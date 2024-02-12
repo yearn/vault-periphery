@@ -5,9 +5,14 @@ import pytest
 from utils.helpers import to_bytes32
 
 daddy_roles = ROLES.ALL
-brain_roles = ROLES.REPORTING_MANAGER | ROLES.DEBT_MANAGER | ROLES.QUEUE_MANAGER
+brain_roles = (
+    ROLES.REPORTING_MANAGER
+    | ROLES.DEBT_MANAGER
+    | ROLES.QUEUE_MANAGER
+    | ROLES.DEBT_PURCHASER
+)
 security_roles = ROLES.MAX_DEBT_MANAGER
-keeper_roles = ROLES.REPORTING_MANAGER | ROLES.DEBT_MANAGER
+keeper_roles = ROLES.REPORTING_MANAGER
 debt_allocator_roles = ROLES.REPORTING_MANAGER | ROLES.DEBT_MANAGER
 strategy_manager_roles = ROLES.ADD_STRATEGY_MANAGER | ROLES.REVOKE_STRATEGY_MANAGER
 
@@ -366,7 +371,7 @@ def test_deploy_new_vault(
 
     symbol = asset.symbol()
     assert vault.symbol() == f"yv{symbol}-A"
-    assert vault.name() == f"{symbol} yVault-A"
+    assert vault.name() == f"{symbol}-A yVault"
 
     # Check debt allocator
     assert debt_allocator.vault() == vault
@@ -543,7 +548,7 @@ def test_deploy_new_vault__default_values(
 
     symbol = asset.symbol()
     assert vault.symbol() == f"yv{symbol}-B"
-    assert vault.name() == f"{symbol} yVault-B"
+    assert vault.name() == f"{symbol}-B yVault"
 
     # Check debt allocator
     assert debt_allocator.vault() == vault

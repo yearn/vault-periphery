@@ -37,6 +37,9 @@ contract DebtAllocator {
         uint256 newTotalDebtRatio
     );
 
+    /// @notice An event emitted when a strategy is added or removed.
+    event StrategyChanged(address indexed strategy, Status status);
+
     /// @notice An event emitted when the minimum time to wait is updated.
     event UpdateMinimumWait(uint256 newMinimumWait);
 
@@ -49,8 +52,17 @@ contract DebtAllocator {
     /// @notice An event emitted when the max debt update loss is updated.
     event UpdateMaxDebtUpdateLoss(uint256 newMaxDebtUpdateLoss);
 
+    /// @notice Status when a strategy is added or removed from the allocator.
+    enum Status {
+        NULL,
+        ADDED,
+        REMOVED
+    }
+
     /// @notice Struct for each strategies info.
     struct Config {
+        // Flag to set when a strategy is added.
+        bool added;
         // The ideal percent in Basis Points the strategy should have.
         uint16 targetRatio;
         // The max percent of assets the strategy should hold.
@@ -58,11 +70,11 @@ contract DebtAllocator {
         // Timestamp of the last time debt was updated.
         // The debt updates must be done through this allocator
         // for this to be used.
-        uint128 lastUpdate;
-        // We have an extra 96 bits in the slot.
+        uint96 lastUpdate;
+        // We have an extra 120 bits in the slot.
         // So we declare the variable in the struct so it can be
         // used if this contract is inherited.
-        uint96 open;
+        uint120 open;
     }
 
     /// @notice Make sure the caller is governance.
@@ -200,7 +212,7 @@ contract DebtAllocator {
         }
 
         // Update the last time the strategies debt was updated.
-        _configs[_strategy].lastUpdate = uint128(block.timestamp);
+        _configs[_strategy].lastUpdate = uint96(block.timestamp);
     }
 
     /**
@@ -215,6 +227,12 @@ contract DebtAllocator {
     function shouldUpdateDebt(
         address _strategy
     ) public view virtual returns (bool, bytes memory) {
+        // Get the strategy specific debt config.
+        Config memory config = getConfig(_strategy);
+
+        // Make sure the strategy has been added to the allocator.
+        if (!config.added) return (false, bytes("!added"));
+
         // Check the base fee isn't too high.
         if (!DebtAllocatorFactory(factory).isCurrentBaseFeeAcceptable()) {
             return (false, bytes("Base Fee"));
@@ -226,9 +244,6 @@ contract DebtAllocator {
         IVault.StrategyParams memory params = _vault.strategies(_strategy);
         // Make sure its an active strategy.
         require(params.activation != 0, "!active");
-
-        // Get the strategy specific debt config.
-        Config memory config = getConfig(_strategy);
 
         if (block.timestamp - config.lastUpdate <= minimumWait) {
             return (false, bytes("min wait"));
@@ -395,6 +410,12 @@ contract DebtAllocator {
         // Get the current config.
         Config memory config = getConfig(_strategy);
 
+        // Set added flag if not set yet.
+        if (!config.added) {
+            config.added = true;
+            emit StrategyChanged(_strategy, Status.ADDED);
+        }
+
         // Get what will be the new total debt ratio.
         uint256 newTotalDebtRatio = totalDebtRatio -
             config.targetRatio +
@@ -417,6 +438,30 @@ contract DebtAllocator {
             _maxRatio,
             newTotalDebtRatio
         );
+    }
+
+    /**
+     * @notice Remove a strategy from this debt allocator.
+     * @dev Will delete the full config for the strategy
+     * @param _strategy Address of the address ro remove.
+     */
+    function removeStrategy(address _strategy) external virtual onlyManagers {
+        Config memory config = getConfig(_strategy);
+        require(config.added, "!added");
+
+        uint256 target = config.targetRatio;
+
+        // Remove any debt ratio the strategy holds.
+        if (target != 0) {
+            totalDebtRatio -= target;
+            emit UpdateStrategyDebtRatio(_strategy, 0, 0, totalDebtRatio);
+        }
+
+        // Remove the full config including the `added` flag.
+        delete _configs[_strategy];
+
+        // Emit Event.
+        emit StrategyChanged(_strategy, Status.REMOVED);
     }
 
     /**
