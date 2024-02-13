@@ -80,6 +80,11 @@ contract HealthCheckAccountant {
         _;
     }
 
+    modifier onlyFeeManagerOrRecipient() {
+        _checkFeeManagerOrRecipient();
+        _;
+    }
+
     modifier onlyAddedVaults() {
         _checkVaultIsAdded();
         _;
@@ -93,6 +98,13 @@ contract HealthCheckAccountant {
         require(
             msg.sender == feeManager || msg.sender == vaultManager,
             "!vault manager"
+        );
+    }
+
+    function _checkFeeManagerOrRecipient() internal view virtual {
+        require(
+            msg.sender == feeRecipient || msg.sender == feeManager,
+            "!recipient"
         );
     }
 
@@ -518,7 +530,7 @@ contract HealthCheckAccountant {
     function distribute(
         address token,
         uint256 amount
-    ) public virtual onlyFeeManager {
+    ) public virtual onlyFeeManagerOrRecipient {
         ERC20(token).safeTransfer(feeRecipient, amount);
 
         emit DistributeRewards(token, amount);
