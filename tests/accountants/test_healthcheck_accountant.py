@@ -641,7 +641,7 @@ def test_distribute(
     assert vault.balanceOf(daddy.address) == 0
     assert vault.balanceOf(fee_recipient.address) == 0
 
-    with ape.reverts("!fee manager"):
+    with ape.reverts("!recipient"):
         accountant.distribute(vault.address, sender=user)
 
     tx = accountant.distribute(vault.address, sender=daddy)
