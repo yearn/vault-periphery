@@ -6,6 +6,18 @@ interface IVault:
     def redeem(shares: uint256, receiver: address, owner: address, max_loss: uint256) -> uint256: nonpayable
     def transfer(receiver: address, amount: uint256) -> bool: nonpayable
 
+event UpdateManagerRecipient:
+    newManagerRecipient: indexed(address)
+
+event UpdateSplitee:
+    newSplitee: indexed(address)
+
+event UpdateSplit:
+    newSplit: uint256
+
+event UpdateMaxLoss:
+    newMaxLoss: uint256
+
 MAX_BPS: constant(uint256) = 10_000
 MAX_ARRAY_SIZE: public(constant(uint256)) = 20
 
@@ -46,7 +58,7 @@ def initialize(
     self.maxLoss = 1
 
 
-####### UNWRAP VAULT TOKENS ######
+###### UNWRAP VAULT TOKENS ######
 
 @external
 def unwrapVault(vault: address):
@@ -98,6 +110,25 @@ def _distribute(token: address, split: uint256, manager_recipient: address, spli
 
 ###### SETTERS ######
 
+# update recipients
+@external
+def setMangerRecipient(new_recipient: address):
+    assert msg.sender == self.manager, "!manager"
+    assert new_recipient != empty(address), "ZERO_ADDRESS"
+
+    self.managerRecipient = new_recipient
+
+    log UpdateManagerRecipient(new_recipient)
+
+@external
+def setSplitee(new_splitee: address):
+    assert msg.sender == self.splitee, "!splitee"
+    assert new_splitee != empty(address), "ZERO_ADDRESS"
+
+    self.splitee = new_splitee
+
+    log UpdateSplitee(new_splitee)
+
 # Update Split
 @external
 def setSplit(new_split: uint256):
@@ -107,20 +138,7 @@ def setSplit(new_split: uint256):
 
     self.split = new_split
 
-# update recipients
-@external
-def setMangerRecipient(new_recipient: address):
-    assert msg.sender == self.manager, "!manager"
-    assert new_recipient != empty(address), "ZERO_ADDRESS"
-
-    self.managerRecipient = new_recipient
-
-@external
-def setSplitee(new_splitee: address):
-    assert msg.sender == self.splitee, "!splitee"
-    assert new_splitee != empty(address), "ZERO_ADDRESS"
-
-    self.splitee = new_splitee
+    log UpdateSplit(new_split)
 
 # Set max loss
 @external
@@ -129,3 +147,5 @@ def setMaxLoss(new_max_loss: uint256):
     assert new_max_loss <= MAX_BPS, "MAX_BPS"
 
     self.maxLoss = new_max_loss
+
+    log UpdateMaxLoss(new_max_loss)

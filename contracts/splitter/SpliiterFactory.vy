@@ -12,7 +12,8 @@ interface ISplitter:
 event NewSplitter:
     splitter: indexed(address)
     manager: indexed(address)
-    splitee: indexed(address)
+    manager_recipient: indexed(address)
+    splitee: address
 
 # The address that all newly deployed vaults are based from.
 ORIGINAL: immutable(address)
@@ -45,5 +46,5 @@ def newSplitter(
         original_split
     )
         
-    log NewSplitter(new_splitter, manager, splitee)
+    log NewSplitter(new_splitter, manager, manager_recipient, splitee)
     return new_splitter
