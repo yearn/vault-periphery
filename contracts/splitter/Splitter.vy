@@ -6,6 +6,10 @@ interface IVault:
     def redeem(shares: uint256, receiver: address, owner: address, max_loss: uint256) -> uint256: nonpayable
     def transfer(receiver: address, amount: uint256) -> bool: nonpayable
 
+interface IAuction:
+    def getAuctionId(from_token: address) -> bytes32: view
+    def auctionInfo(auction_id: bytes32) -> (address, address, uint256, uint256): view
+
 event UpdateManagerRecipient:
     newManagerRecipient: indexed(address)
 
@@ -17,6 +21,9 @@ event UpdateSplit:
 
 event UpdateMaxLoss:
     newMaxLoss: uint256
+
+event UpdateAuction:
+    newAuction: address
 
 MAX_BPS: constant(uint256) = 10_000
 MAX_ARRAY_SIZE: public(constant(uint256)) = 20
@@ -34,6 +41,9 @@ splitee: public(address)
 split: public(uint256)
 # Max loss to use on vault redeems
 maxLoss: public(uint256)
+
+# Address of the contract to conduct dutch auctions for token sales
+auction: public(address)
 
 @external
 def initialize(
@@ -108,6 +118,37 @@ def _distribute(token: address, split: uint256, manager_recipient: address, spli
     assert IVault(token).transfer(manager_recipient, manager_split, default_return_value=True), "transfer failed"
     assert IVault(token).transfer(splitee, unsafe_sub(current_balance, manager_split), default_return_value=True), "transfer failed"
 
+
+###### AUCTION INITIATORS ######
+
+@external
+def fundAuctions(tokens: DynArray[address, MAX_ARRAY_SIZE]):
+    assert msg.sender == self.splitee or msg.sender == self.manager, "!allowed"
+    auction: address = self.auction
+
+    for token in tokens:
+        amount: uint256 = IVault(token).balanceOf(self)
+        self._fundAuction(token, auction, amount)
+
+@external
+def fundAuction(token: address, amount: uint256 = max_value(uint256)):
+    assert msg.sender == self.splitee or msg.sender == self.manager, "!allowed"
+
+    to_send: uint256 = amount
+    if(amount == max_value(uint256)):
+        to_send = IVault(token).balanceOf(self)
+
+    self._fundAuction(token, self.auction, to_send)
+
+@internal
+def _fundAuction(token: address, auction: address, amount: uint256):
+    # Make sure the auction is set is enabled for this token
+    from_token: address = IAuction(auction).auctionInfo(IAuction(auction).getAuctionId(token))[0]
+    assert from_token == token, "not enabled"
+
+    # Send tokens to the auction contract.
+    assert IVault(token).transfer(auction, amount, default_return_value=True), "transfer failed"
+
 ###### SETTERS ######
 
 # update recipients
@@ -149,3 +190,9 @@ def setMaxLoss(new_max_loss: uint256):
     self.maxLoss = new_max_loss
 
     log UpdateMaxLoss(new_max_loss)
+
+@external
+def setAuction(new_auction: address):
+    assert msg.sender == self.manager, "!manager"
+
+    self.auction = new_auction
