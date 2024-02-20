@@ -557,6 +557,30 @@ contract RoleManager is Governance2Step {
     }
 
     /**
+     * @notice Update a `_vault`s keeper to a specified `_keeper`.
+     * @param _vault Address of the vault to update the keeper for.
+     * @param _keeper Address of the new keeper.
+     */
+    function updateKeeper(
+        address _vault,
+        address _keeper
+    ) external virtual onlyPositionHolder(BRAIN) {
+        // Make sure the vault has been added to the role manager.
+        require(vaultConfig[_vault].asset != address(0), "vault not added");
+
+        // Remove the roles from the old keeper if active.
+        address defaultKeeper = getPositionHolder(KEEPER);
+        if (
+            _keeper != defaultKeeper && IVault(_vault).roles(defaultKeeper) != 0
+        ) {
+            _setRole(_vault, Position(defaultKeeper, 0));
+        }
+
+        // Give the new keeper the relevant roles.
+        _setRole(_vault, Position(_keeper, _positions[KEEPER].roles));
+    }
+
+    /**
      * @notice Removes a vault from the RoleManager.
      * @dev This will NOT un-endorse the vault from the registry.
      * @param _vault Address of the vault to be removed.
@@ -629,8 +653,11 @@ contract RoleManager is Governance2Step {
         bytes32 _position,
         uint256 _newRoles
     ) external virtual onlyGovernance {
-        // Cannot change the debt allocator roles since it can be updated
-        require(_position != DEBT_ALLOCATOR, "cannot update");
+        // Cannot change the debt allocator or keeper roles since holder can be updated.
+        require(
+            _position != DEBT_ALLOCATOR && _position != KEEPER,
+            "cannot update"
+        );
         _positions[_position].roles = uint96(_newRoles);
 
         emit UpdatePositionRoles(_position, _newRoles);

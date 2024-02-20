@@ -129,7 +129,6 @@ def test__positions(
         "Daddy": (daddy, daddy_roles),
         "Brain": (brain, brain_roles),
         "Security": (security, security_roles),
-        "Keeper": (keeper, keeper_roles),
         "Strategy Manager": (strategy_manager, strategy_manager_roles),
         "Registry": (registry, 0),
         "Accountant": (healthcheck_accountant, 0),
@@ -163,8 +162,20 @@ def test__positions(
         assert role_manager.getPositionRoles(id) == new_role
         assert role_manager.getPosition(id) == (user, new_role)
 
-    # Cannot update the debt allocator roles.
+    # Cannot update the debt allocator or keeper roles.
     id = to_bytes32("Debt Allocator")
+    with ape.reverts("cannot update"):
+        role_manager.setPositionRoles(id, 1, sender=daddy)
+
+    # But can update the holder since it is not used
+    tx = role_manager.setPositionHolder(id, user, sender=daddy)
+
+    event = list(tx.decode_logs(role_manager.UpdatePositionHolder))[0]
+
+    assert event.position == id
+    assert event.newAddress == user
+
+    id = to_bytes32("Keeper")
     with ape.reverts("cannot update"):
         role_manager.setPositionRoles(id, 1, sender=daddy)
 
@@ -197,13 +208,13 @@ def test__positions(
     assert role_manager.getDaddyRoles() == new_role
     assert role_manager.getBrainRoles() == new_role
     assert role_manager.getSecurityRoles() == new_role
-    assert role_manager.getKeeperRoles() == new_role
+    assert role_manager.getKeeperRoles() == keeper_roles
     assert role_manager.getDebtAllocatorRoles() == debt_allocator_roles
     assert role_manager.getStrategyManagerRoles() == new_role
     assert role_manager.getPositionRoles(role_manager.DADDY()) == new_role
     assert role_manager.getPositionRoles(role_manager.BRAIN()) == new_role
     assert role_manager.getPositionRoles(role_manager.SECURITY()) == new_role
-    assert role_manager.getPositionRoles(role_manager.KEEPER()) == new_role
+    assert role_manager.getPositionRoles(role_manager.KEEPER()) == keeper_roles
     assert (
         role_manager.getPositionRoles(role_manager.DEBT_ALLOCATOR())
         == debt_allocator_roles
@@ -1322,6 +1333,113 @@ def test_new_debt_allocator__already_deployed(
     assert vault.roles(keeper) == keeper_roles
     assert vault.roles(debt_allocator) == 0
     assert vault.roles(new_debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+
+def test_new_keeper(
+    role_manager,
+    daddy,
+    brain,
+    security,
+    keeper,
+    strategy_manager,
+    asset,
+    user,
+    healthcheck_accountant,
+    registry,
+    release_registry,
+    vault_factory,
+    debt_allocator_factory,
+):
+    setup_role_manager(
+        role_manager=role_manager,
+        release_registry=release_registry,
+        registry=registry,
+        vault_factory=vault_factory,
+        accountant=healthcheck_accountant,
+        daddy=daddy,
+    )
+
+    rating = int(2)
+
+    assert role_manager.getAllVaults() == []
+    assert registry.numAssets() == 0
+    assert registry.numEndorsedVaults(asset) == 0
+
+    # Deploy a vault
+    tx = role_manager.newVault(asset, rating, sender=daddy)
+
+    event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
+    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+
+    event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
+    debt_allocator = project.DebtAllocator.at(event.allocator)
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert vault_debt_allocator == debt_allocator
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.getVault(asset, vault_factory.apiVersion(), rating) == vault
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getDebtAllocator(vault) == debt_allocator
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
+    assert vault.roles(debt_allocator) == debt_allocator_roles
+    assert vault.roles(strategy_manager) == strategy_manager_roles
+    assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
+
+    new_keeper = user
+
+    assert vault.roles(keeper) == keeper_roles
+    assert vault.roles(new_keeper) == 0
+
+    # Update to a new debt allocator
+    with ape.reverts("!allowed"):
+        role_manager.updateKeeper(vault, new_keeper, sender=user)
+
+    with ape.reverts("vault not added"):
+        role_manager.updateKeeper(user, new_keeper, sender=brain)
+
+    tx = role_manager.updateKeeper(vault, new_keeper, sender=brain)
+
+    assert vault.roles(new_keeper) == keeper_roles
+    assert vault.roles(keeper) == 0
+
+    (vault_asset, vault_rating, vault_debt_allocator, index) = role_manager.vaultConfig(
+        vault
+    )
+
+    assert vault_asset == asset
+    assert vault_rating == rating
+    assert index == 0
+    assert role_manager.getAllVaults() == [vault]
+    assert role_manager.vaults(index) == vault
+    assert role_manager.isVaultsRoleManager(vault) == True
+    assert role_manager.getRating(vault) == rating
+    assert registry.numAssets() == 1
+    assert registry.numEndorsedVaults(asset) == 1
+    assert registry.getAllEndorsedVaults() == [[vault]]
+
+    # Check roles
+    assert vault.roles(role_manager) == 0
+    assert vault.roles(daddy) == daddy_roles
+    assert vault.roles(brain) == brain_roles
+    assert vault.roles(security) == security_roles
     assert vault.roles(strategy_manager) == strategy_manager_roles
     assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
 
