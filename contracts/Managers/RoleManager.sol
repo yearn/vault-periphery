@@ -143,13 +143,14 @@ contract RoleManager is Governance2Step {
             roles: uint96(Roles.ALL)
         });
 
-        // Brain can process reports, update debt and adjust the queue.
+        // Setup default roles for Brain.
         _positions[BRAIN] = Position({
             holder: _brain,
             roles: uint96(
                 Roles.REPORTING_MANAGER |
                     Roles.DEBT_MANAGER |
                     Roles.QUEUE_MANAGER |
+                    Roles.DEPOSIT_LIMIT_MANAGER |
                     Roles.DEBT_PURCHASER
             )
         });
@@ -160,13 +161,13 @@ contract RoleManager is Governance2Step {
             roles: uint96(Roles.MAX_DEBT_MANAGER)
         });
 
-        // The keeper can process reports and update debt.
+        // The keeper can process reports.
         _positions[KEEPER] = Position({
             holder: _keeper,
             roles: uint96(Roles.REPORTING_MANAGER)
         });
 
-        // Set just the roles for a debt allocator.
+        // Debt allocators manage debt and also need to process reports.
         _positions[DEBT_ALLOCATOR].roles = uint96(
             Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER
         );
