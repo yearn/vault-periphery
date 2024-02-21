@@ -36,11 +36,6 @@ def fee_recipient(accounts):
 
 
 @pytest.fixture(scope="session")
-def keeper(accounts):
-    yield accounts[5]
-
-
-@pytest.fixture(scope="session")
 def user(accounts):
     return accounts[6]
 
@@ -460,3 +455,8 @@ def role_manager(
     )
 
     return role_manager
+
+
+@pytest.fixture(scope="session")
+def keeper(daddy):
+    yield daddy.deploy(project.Keeper)
