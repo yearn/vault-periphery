@@ -127,7 +127,8 @@ contract RoleManager is Governance2Step {
         address _brain,
         address _security,
         address _keeper,
-        address _strategyManager
+        address _strategyManager,
+        address _registry
     ) Governance2Step(_governance) {
         require(_daddy != address(0), "ZERO ADDRESS");
         // Set the immutable address that will take over role manager
@@ -178,6 +179,9 @@ contract RoleManager is Governance2Step {
                 Roles.ADD_STRATEGY_MANAGER | Roles.REVOKE_STRATEGY_MANAGER
             )
         });
+
+        // Set the registry
+        _positions[REGISTRY].holder = _registry;
     }
 
     /*//////////////////////////////////////////////////////////////
