@@ -34,7 +34,7 @@ dependencies:
 
   - name: periphery
     github: yearn/tokenized-strategy-periphery
-    ref: master
+    ref: v3.0.1
     contracts_folder: src
     exclude: 
      - test/**/*
@@ -44,7 +44,7 @@ solidity:
     - "@openzeppelin/contracts=openzeppelin/v4.7.3"
     - "@yearn-vaults=yearn-vaults/v3.0.1"
     - "@tokenized-strategy=tokenized-strategy/v3.0.1"
-    - "@periphery=periphery/master"
+    - "@periphery=periphery/v3.0.1"
 
 ethereum:
   local:
