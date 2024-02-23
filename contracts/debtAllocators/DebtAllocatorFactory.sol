@@ -5,6 +5,10 @@ import {DebtAllocator} from "./DebtAllocator.sol";
 import {Clonable} from "@periphery/utils/Clonable.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 
+interface IBaseFee {
+    function basefee_global() external view returns (uint256);
+}
+
 /**
  * @title YearnV3  Debt Allocator Factory
  * @author yearn.finance
@@ -15,6 +19,9 @@ contract DebtAllocatorFactory is Governance, Clonable {
     /// @notice Revert message for when a debt allocator already exists.
     error AlreadyDeployed(address _allocator);
 
+    /// @notice An event emitted when the base fee provider is set.
+    event UpdatedBaseFeeProvider(address baseFeeProvider);
+
     /// @notice An event emitted when a keeper is added or removed.
     event UpdateKeeper(address indexed keeper, bool allowed);
 
@@ -23,6 +30,9 @@ contract DebtAllocatorFactory is Governance, Clonable {
 
     /// @notice An event emitted when a new debt allocator is added or deployed.
     event NewDebtAllocator(address indexed allocator, address indexed vault);
+
+    /// @notice Provider to read current block's base fee.
+    address public baseFeeProvider;
 
     /// @notice Max the chains base fee can be during debt update.
     // Will default to max uint256 and need to be set to be used.
@@ -78,6 +88,22 @@ contract DebtAllocatorFactory is Governance, Clonable {
     }
 
     /**
+     * @notice
+     *  Used to set our baseFeeProvider, which checks the network's current base
+     *  fee price to determine whether it is an optimal time to harvest or tend.
+     *
+     *  This may only be called by governance.
+     * @param _baseFeeProvider Address of our baseFeeProvider
+     */
+    function setBaseFeeOracle(
+        address _baseFeeProvider
+    ) external virtual onlyGovernance {
+        baseFeeProvider = _baseFeeProvider;
+
+        emit UpdatedBaseFeeProvider(_baseFeeProvider);
+    }
+
+    /**
      * @notice Set the max acceptable base fee.
      * @dev This defaults to max uint256 and will need to
      * be set for it to be used.
@@ -114,6 +140,9 @@ contract DebtAllocatorFactory is Governance, Clonable {
      * @return . If the current base fee is acceptable.
      */
     function isCurrentBaseFeeAcceptable() external view virtual returns (bool) {
-        return maxAcceptableBaseFee >= block.basefee;
+        address _baseFeeProvider = baseFeeProvider;
+        if (_baseFeeProvider == address(0)) return true;
+        return
+            maxAcceptableBaseFee >= IBaseFee(_baseFeeProvider).basefee_global();
     }
 }

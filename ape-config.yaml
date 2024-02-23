@@ -17,7 +17,7 @@ default_ecosystem: ethereum
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    ref: 4.8.2
+    ref: 4.7.3
     
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
@@ -41,7 +41,7 @@ dependencies:
 
 solidity:
   import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.8.2"
+    - "@openzeppelin/contracts=openzeppelin/v4.7.3"
     - "@yearn-vaults=yearn-vaults/v3.0.1"
     - "@tokenized-strategy=tokenized-strategy/v3.0.1"
     - "@periphery=periphery/master"

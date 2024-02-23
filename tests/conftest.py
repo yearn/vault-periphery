@@ -36,11 +36,6 @@ def fee_recipient(accounts):
 
 
 @pytest.fixture(scope="session")
-def keeper(accounts):
-    yield accounts[5]
-
-
-@pytest.fixture(scope="session")
 def user(accounts):
     return accounts[6]
 
@@ -423,16 +418,19 @@ def debt_allocator(debt_allocator_factory, project, vault, daddy):
 
 
 @pytest.fixture(scope="session")
-def deploy_role_manager(project, daddy, brain, security, keeper, strategy_manager):
+def deploy_role_manager(
+    project, daddy, brain, security, keeper, strategy_manager, registry
+):
     def deploy_role_manager(
         gov=daddy,
         sms=brain,
         sec=security,
         keep=keeper,
         strategy_manage=strategy_manager,
+        reg=registry,
     ):
         role_manager = daddy.deploy(
-            project.RoleManager, gov, daddy, sms, sec, keep, strategy_manage
+            project.RoleManager, gov, daddy, sms, sec, keep, strategy_manage, reg
         )
 
         return role_manager
@@ -442,21 +440,20 @@ def deploy_role_manager(project, daddy, brain, security, keeper, strategy_manage
 
 @pytest.fixture(scope="session")
 def role_manager(
-    deploy_role_manager,
-    daddy,
-    brain,
-    healthcheck_accountant,
-    debt_allocator_factory,
-    registry,
+    deploy_role_manager, daddy, brain, healthcheck_accountant, debt_allocator_factory
 ):
     role_manager = deploy_role_manager()
 
     role_manager.setPositionHolder(
         role_manager.ACCOUNTANT(), healthcheck_accountant, sender=daddy
     )
-    role_manager.setPositionHolder(role_manager.REGISTRY(), registry, sender=daddy)
     role_manager.setPositionHolder(
         role_manager.ALLOCATOR_FACTORY(), debt_allocator_factory, sender=daddy
     )
 
     return role_manager
+
+
+@pytest.fixture(scope="session")
+def keeper(daddy):
+    yield daddy.deploy(project.Keeper)

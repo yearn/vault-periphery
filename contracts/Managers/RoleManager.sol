@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {Roles} from "../libraries/Roles.sol";
 import {Registry} from "../registry/Registry.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
@@ -18,7 +19,7 @@ contract RoleManager is Governance2Step {
     event AddedNewVault(
         address indexed vault,
         address indexed debtAllocator,
-        uint256 rating
+        uint256 category
     );
 
     /// @notice Emitted when a vaults debt allocator is updated.
@@ -51,7 +52,7 @@ contract RoleManager is Governance2Step {
     /// @notice Config that holds all vault info.
     struct VaultConfig {
         address asset;
-        uint256 rating;
+        uint256 category;
         address debtAllocator;
         uint256 index;
     }
@@ -112,13 +113,11 @@ contract RoleManager is Governance2Step {
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 10 days;
 
-    /// @notice Mapping of a numerical rating to its string equivalent.
-    mapping(uint256 => string) public ratingToString;
     /// @notice Mapping of position ID to position information.
     mapping(bytes32 => Position) internal _positions;
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
-    /// @notice Mapping of underlying asset, api version and rating to vault.
+    /// @notice Mapping of underlying asset, api version and category to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
         internal _assetToVault;
 
@@ -128,7 +127,8 @@ contract RoleManager is Governance2Step {
         address _brain,
         address _security,
         address _keeper,
-        address _strategyManager
+        address _strategyManager,
+        address _registry
     ) Governance2Step(_governance) {
         require(_daddy != address(0), "ZERO ADDRESS");
         // Set the immutable address that will take over role manager
@@ -143,13 +143,14 @@ contract RoleManager is Governance2Step {
             roles: uint96(Roles.ALL)
         });
 
-        // Brain can process reports, update debt and adjust the queue.
+        // Setup default roles for Brain.
         _positions[BRAIN] = Position({
             holder: _brain,
             roles: uint96(
                 Roles.REPORTING_MANAGER |
                     Roles.DEBT_MANAGER |
                     Roles.QUEUE_MANAGER |
+                    Roles.DEPOSIT_LIMIT_MANAGER |
                     Roles.DEBT_PURCHASER
             )
         });
@@ -160,13 +161,13 @@ contract RoleManager is Governance2Step {
             roles: uint96(Roles.MAX_DEBT_MANAGER)
         });
 
-        // The keeper can process reports and update debt.
+        // The keeper can process reports.
         _positions[KEEPER] = Position({
             holder: _keeper,
             roles: uint96(Roles.REPORTING_MANAGER)
         });
 
-        // Set just the roles for a debt allocator.
+        // Debt allocators manage debt and also need to process reports.
         _positions[DEBT_ALLOCATOR].roles = uint96(
             Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER
         );
@@ -179,12 +180,8 @@ contract RoleManager is Governance2Step {
             )
         });
 
-        // Set up the ratingToString mapping.
-        ratingToString[1] = "A";
-        ratingToString[2] = "B";
-        ratingToString[3] = "C";
-        ratingToString[4] = "D";
-        ratingToString[5] = "F";
+        // Set the registry
+        _positions[REGISTRY].holder = _registry;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -195,79 +192,78 @@ contract RoleManager is Governance2Step {
      * @notice Creates a new endorsed vault with default profit max
      *      unlock time and doesn't set the deposit limit.
      * @param _asset Address of the underlying asset.
-     * @param _rating Rating of the vault.
+     * @param _category Category of the vault.
      * @return _vault Address of the newly created vault.
      */
     function newVault(
         address _asset,
-        uint256 _rating
+        uint256 _category
     ) external virtual onlyPositionHolder(DADDY) returns (address) {
-        return _newVault(_asset, _rating, 0, defaultProfitMaxUnlock);
+        return _newVault(_asset, _category, 0, defaultProfitMaxUnlock);
     }
 
     /**
      * @notice Creates a new endorsed vault with default profit max unlock time.
      * @param _asset Address of the underlying asset.
-     * @param _rating Rating of the vault.
+     * @param _category Category of the vault.
      * @param _depositLimit The deposit limit to start the vault with.
      * @return _vault Address of the newly created vault.
      */
     function newVault(
         address _asset,
-        uint256 _rating,
+        uint256 _category,
         uint256 _depositLimit
     ) external virtual onlyPositionHolder(DADDY) returns (address) {
         return
-            _newVault(_asset, _rating, _depositLimit, defaultProfitMaxUnlock);
+            _newVault(_asset, _category, _depositLimit, defaultProfitMaxUnlock);
     }
 
     /**
      * @notice Creates a new endorsed vault.
      * @param _asset Address of the underlying asset.
-     * @param _rating Rating of the vault.
+     * @param _category Category of the vault.
      * @param _depositLimit The deposit limit to start the vault with.
      * @param _profitMaxUnlockTime Time until profits are fully unlocked.
      * @return _vault Address of the newly created vault.
      */
     function newVault(
         address _asset,
-        uint256 _rating,
+        uint256 _category,
         uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
     ) external virtual onlyPositionHolder(DADDY) returns (address) {
-        return _newVault(_asset, _rating, _depositLimit, _profitMaxUnlockTime);
+        return
+            _newVault(_asset, _category, _depositLimit, _profitMaxUnlockTime);
     }
 
     /**
      * @notice Creates a new endorsed vault.
      * @param _asset Address of the underlying asset.
-     * @param _rating Rating of the vault.
+     * @param _category Category of the vault.
      * @param _depositLimit The deposit limit to start the vault with.
      * @param _profitMaxUnlockTime Time until profits are fully unlocked.
      * @return _vault Address of the newly created vault.
      */
     function _newVault(
         address _asset,
-        uint256 _rating,
+        uint256 _category,
         uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
     ) internal virtual returns (address _vault) {
-        require(_rating > 0 && _rating < 6, "rating out of range");
+        string memory _categoryString = Strings.toString(_category);
 
-        // Create the name and symbol to be standardized based on rating.
-        string memory ratingString = ratingToString[_rating];
-        // Name is "{SYMBOL}-{RATING} yVault"
+        // Name is "{SYMBOL}-{CATEGORY} yVault"
         string memory _name = string(
             abi.encodePacked(
                 ERC20(_asset).symbol(),
                 "-",
-                ratingString,
+                _categoryString,
                 " yVault"
             )
         );
-        // Symbol is "yv{SYMBOL}-{RATING}".
+        // Symbol is "yv{SYMBOL}-{CATEGORY}".
         string memory _symbol = string(
-            abi.encodePacked("yv", ERC20(_asset).symbol(), "-", ratingString)
+            abi.encodePacked("yv", ERC20(_asset).symbol(), "-", _categoryString)
         );
 
         // Deploy through the registry so it is automatically endorsed.
@@ -279,11 +275,13 @@ contract RoleManager is Governance2Step {
             _profitMaxUnlockTime
         );
 
-        // Check that a vault does not exist for that asset, api and rating.
+        // Check that a vault does not exist for that asset, api and category.
         // This reverts late to not waste gas when used correctly.
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_rating] != address(0))
-            revert AlreadyDeployed(_assetToVault[_asset][_apiVersion][_rating]);
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+            revert AlreadyDeployed(
+                _assetToVault[_asset][_apiVersion][_category]
+            );
 
         // Deploy a new debt allocator for the vault.
         address _debtAllocator = _deployAllocator(_vault);
@@ -301,19 +299,19 @@ contract RoleManager is Governance2Step {
         // Add the vault config to the mapping.
         vaultConfig[_vault] = VaultConfig({
             asset: _asset,
-            rating: _rating,
+            category: _category,
             debtAllocator: _debtAllocator,
             index: vaults.length
         });
 
         // Add the vault to the mapping.
-        _assetToVault[_asset][_apiVersion][_rating] = _vault;
+        _assetToVault[_asset][_apiVersion][_category] = _vault;
 
         // Add the vault to the array.
         vaults.push(_vault);
 
         // Emit event for new vault.
-        emit AddedNewVault(_vault, _debtAllocator, _rating);
+        emit AddedNewVault(_vault, _debtAllocator, _category);
     }
 
     /**
@@ -442,36 +440,36 @@ contract RoleManager is Governance2Step {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Adds a new vault to the RoleManager with the specified rating.
+     * @notice Adds a new vault to the RoleManager with the specified category.
      * @dev If not already endorsed this function will endorse the vault.
      *  A new debt allocator will be deployed and configured.
      * @param _vault Address of the vault to be added.
-     * @param _rating Rating associated with the vault.
+     * @param _category Category associated with the vault.
      */
-    function addNewVault(address _vault, uint256 _rating) external virtual {
+    function addNewVault(address _vault, uint256 _category) external virtual {
         address _debtAllocator = _deployAllocator(_vault);
-        addNewVault(_vault, _rating, _debtAllocator);
+        addNewVault(_vault, _category, _debtAllocator);
     }
 
     /**
-     * @notice Adds a new vault to the RoleManager with the specified rating and debt allocator.
+     * @notice Adds a new vault to the RoleManager with the specified category and debt allocator.
      * @dev If not already endorsed this function will endorse the vault.
      * @param _vault Address of the vault to be added.
-     * @param _rating Rating associated with the vault.
+     * @param _category Category associated with the vault.
      * @param _debtAllocator Address of the debt allocator for the vault.
      */
     function addNewVault(
         address _vault,
-        uint256 _rating,
+        uint256 _category,
         address _debtAllocator
     ) public virtual onlyPositionHolder(DADDY) {
-        require(_rating > 0 && _rating < 6, "rating out of range");
-
-        // Check that a vault does not exist for that asset, api and rating.
+        // Check that a vault does not exist for that asset, api and category.
         address _asset = IVault(_vault).asset();
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_rating] != address(0))
-            revert AlreadyDeployed(_assetToVault[_asset][_apiVersion][_rating]);
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+            revert AlreadyDeployed(
+                _assetToVault[_asset][_apiVersion][_category]
+            );
 
         // If not the current role manager.
         if (IVault(_vault).role_manager() != address(this)) {
@@ -500,19 +498,19 @@ contract RoleManager is Governance2Step {
         // Add the vault config to the mapping.
         vaultConfig[_vault] = VaultConfig({
             asset: _asset,
-            rating: _rating,
+            category: _category,
             debtAllocator: _debtAllocator,
             index: vaults.length
         });
 
         // Add the vault to the mapping.
-        _assetToVault[_asset][_apiVersion][_rating] = _vault;
+        _assetToVault[_asset][_apiVersion][_category] = _vault;
 
         // Add the vault to the array.
         vaults.push(_vault);
 
         // Emit event.
-        emit AddedNewVault(_vault, _debtAllocator, _rating);
+        emit AddedNewVault(_vault, _debtAllocator, _category);
     }
 
     /**
@@ -557,6 +555,30 @@ contract RoleManager is Governance2Step {
     }
 
     /**
+     * @notice Update a `_vault`s keeper to a specified `_keeper`.
+     * @param _vault Address of the vault to update the keeper for.
+     * @param _keeper Address of the new keeper.
+     */
+    function updateKeeper(
+        address _vault,
+        address _keeper
+    ) external virtual onlyPositionHolder(BRAIN) {
+        // Make sure the vault has been added to the role manager.
+        require(vaultConfig[_vault].asset != address(0), "vault not added");
+
+        // Remove the roles from the old keeper if active.
+        address defaultKeeper = getPositionHolder(KEEPER);
+        if (
+            _keeper != defaultKeeper && IVault(_vault).roles(defaultKeeper) != 0
+        ) {
+            _setRole(_vault, Position(defaultKeeper, 0));
+        }
+
+        // Give the new keeper the relevant roles.
+        _setRole(_vault, Position(_keeper, _positions[KEEPER].roles));
+    }
+
+    /**
      * @notice Removes a vault from the RoleManager.
      * @dev This will NOT un-endorse the vault from the registry.
      * @param _vault Address of the vault to be removed.
@@ -584,7 +606,7 @@ contract RoleManager is Governance2Step {
 
         // Delete the vault from the mapping.
         delete _assetToVault[config.asset][IVault(_vault).apiVersion()][
-            config.rating
+            config.category
         ];
 
         // Delete the config for `_vault`.
@@ -629,8 +651,11 @@ contract RoleManager is Governance2Step {
         bytes32 _position,
         uint256 _newRoles
     ) external virtual onlyGovernance {
-        // Cannot change the debt allocator roles since it can be updated
-        require(_position != DEBT_ALLOCATOR, "cannot update");
+        // Cannot change the debt allocator or keeper roles since holder can be updated.
+        require(
+            _position != DEBT_ALLOCATOR && _position != KEEPER,
+            "cannot update"
+        );
         _positions[_position].roles = uint96(_newRoles);
 
         emit UpdatePositionRoles(_position, _newRoles);
@@ -682,20 +707,20 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the vault for a specific asset, api and rating.
+     * @notice Get the vault for a specific asset, api and category.
      * @dev This will return address(0) if one has not been added or deployed.
      *
      * @param _asset The underlying asset used.
      * @param _apiVersion The version of the vault.
-     * @param _rating The rating of the vault.
-     * @return The vault for the specified `_asset`, `_apiVersion` and `_rating`.
+     * @param _category The category of the vault.
+     * @return The vault for the specified `_asset`, `_apiVersion` and `_category`.
      */
     function getVault(
         address _asset,
         string memory _apiVersion,
-        uint256 _rating
+        uint256 _category
     ) external view virtual returns (address) {
-        return _assetToVault[_asset][_apiVersion][_rating];
+        return _assetToVault[_asset][_apiVersion][_category];
     }
 
     /**
@@ -728,13 +753,15 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the rating for a specific vault.
+     * @notice Get the category for a specific vault.
      * @dev Will return 0 if the vault is not managed by this contract.
      * @param _vault Address of the vault.
-     * @return . The rating of the vault if any.
+     * @return . The category of the vault if any.
      */
-    function getRating(address _vault) external view virtual returns (uint256) {
-        return vaultConfig[_vault].rating;
+    function getCategory(
+        address _vault
+    ) external view virtual returns (uint256) {
+        return vaultConfig[_vault].category;
     }
 
     /**

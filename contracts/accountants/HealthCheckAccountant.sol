@@ -35,17 +35,10 @@ contract HealthCheckAccountant {
     );
 
     /// @notice An event emitted when a custom fee configuration is updated.
-    event UpdateCustomFeeConfig(
-        address indexed vault,
-        address indexed strategy,
-        Fee custom_config
-    );
+    event UpdateCustomFeeConfig(address indexed vault, Fee custom_config);
 
     /// @notice An event emitted when a custom fee configuration is removed.
-    event RemovedCustomFeeConfig(
-        address indexed vault,
-        address indexed strategy
-    );
+    event RemovedCustomFeeConfig(address indexed vault);
 
     /// @notice An event emitted when the `maxLoss` parameter is updated.
     event UpdateMaxLoss(uint256 maxLoss);
@@ -80,6 +73,11 @@ contract HealthCheckAccountant {
         _;
     }
 
+    modifier onlyFeeManagerOrRecipient() {
+        _checkFeeManagerOrRecipient();
+        _;
+    }
+
     modifier onlyAddedVaults() {
         _checkVaultIsAdded();
         _;
@@ -96,6 +94,13 @@ contract HealthCheckAccountant {
         );
     }
 
+    function _checkFeeManagerOrRecipient() internal view virtual {
+        require(
+            msg.sender == feeRecipient || msg.sender == feeManager,
+            "!recipient"
+        );
+    }
+
     function _checkVaultIsAdded() internal view virtual {
         require(vaults[msg.sender], "vault not added");
     }
@@ -106,38 +111,41 @@ contract HealthCheckAccountant {
     /// @notice Constant defining the number of seconds in a year.
     uint256 internal constant SECS_PER_YEAR = 31_556_952;
 
-    /// @notice Constant defining the performance fee threshold.
-    uint16 internal constant PERFORMANCE_FEE_THRESHOLD = 5_000;
-
     /// @notice Constant defining the management fee threshold.
-    uint16 internal constant MANAGEMENT_FEE_THRESHOLD = 200;
+    uint16 public constant MANAGEMENT_FEE_THRESHOLD = 200;
 
-    /// @notice The address of the fee manager.
-    address public feeManager;
-
-    /// @notice The address of the future fee manager.
-    address public futureFeeManager;
-
-    /// @notice The address of the fee recipient.
-    address public feeRecipient;
+    /// @notice Constant defining the performance fee threshold.
+    uint16 public constant PERFORMANCE_FEE_THRESHOLD = 5_000;
 
     /// @notice The amount of max loss to use when redeeming from vaults.
     uint256 public maxLoss;
 
+    /// @notice The address of the fee manager.
+    address public feeManager;
+
+    /// @notice The address of the fee recipient.
+    address public feeRecipient;
+
     /// @notice An address that can add or remove vaults.
     address public vaultManager;
 
-    /// @notice Mapping to track added vaults.
-    mapping(address => bool) public vaults;
+    /// @notice The address of the future fee manager.
+    address public futureFeeManager;
 
     /// @notice The default fee configuration.
     Fee public defaultConfig;
 
-    /// @notice Mapping vault => strategy => custom Fee config if any.
-    mapping(address => mapping(address => Fee)) public customConfig;
+    /// @notice Mapping to track added vaults.
+    mapping(address => bool) public vaults;
 
-    /// @notice Mapping vault => strategy => flag to use a custom config.
-    mapping(address => mapping(address => uint256)) internal _useCustomConfig;
+    /// @notice Mapping vault => custom Fee config if any.
+    mapping(address => Fee) public customConfig;
+
+    /// @notice Mapping vault => flag to use a custom config.
+    mapping(address => uint256) internal _useCustomConfig;
+
+    /// @notice Mapping vault => strategy => flag for one time healthcheck skips.
+    mapping(address => mapping(address => bool)) skipHealthCheck;
 
     constructor(
         address _feeManager,
@@ -188,8 +196,8 @@ contract HealthCheckAccountant {
         Fee memory fee;
 
         // Check if there is a custom config to use.
-        if (_useCustomConfig[msg.sender][strategy] != 0) {
-            fee = customConfig[msg.sender][strategy];
+        if (_useCustomConfig[msg.sender] != 0) {
+            fee = customConfig[msg.sender];
         } else {
             // Otherwise use the default.
             fee = defaultConfig;
@@ -213,8 +221,13 @@ contract HealthCheckAccountant {
 
         // Only charge performance fees if there is a gain.
         if (gain > 0) {
-            // Setting `maxGain` to 0 will disable the healthcheck on profits.
-            if (fee.maxGain > 0) {
+            // If we are skipping the healthcheck this report
+            if (skipHealthCheck[msg.sender][strategy]) {
+                // Make sure it is reset for the next one.
+                skipHealthCheck[msg.sender][strategy] = false;
+
+                // Setting `maxGain` to 0 will disable the healthcheck on profits.
+            } else if (fee.maxGain > 0) {
                 require(
                     gain <=
                         (strategyParams.current_debt * (fee.maxGain)) / MAX_BPS,
@@ -224,8 +237,13 @@ contract HealthCheckAccountant {
 
             totalFees += (gain * (fee.performanceFee)) / MAX_BPS;
         } else {
-            // Setting `maxLoss` to 10_000 will disable the healthcheck on losses.
-            if (fee.maxLoss < MAX_BPS) {
+            // If we are skipping the healthcheck this report
+            if (skipHealthCheck[msg.sender][strategy]) {
+                // Make sure it is reset for the next one.
+                skipHealthCheck[msg.sender][strategy] = false;
+
+                // Setting `maxLoss` to 10_000 will disable the healthcheck on losses.
+            } else if (fee.maxLoss < MAX_BPS) {
                 require(
                     loss <=
                         (strategyParams.current_debt * (fee.maxLoss)) / MAX_BPS,
@@ -357,9 +375,8 @@ contract HealthCheckAccountant {
     }
 
     /**
-     * @notice Function to set a custom fee configuration for a specific strategy in a specific vault.
+     * @notice Function to set a custom fee configuration for a specific vault.
      * @param vault The vault the strategy is hooked up to.
-     * @param strategy The strategy to customize.
      * @param customManagement Custom annual management fee to charge.
      * @param customPerformance Custom performance fee to charge.
      * @param customRefund Custom refund ratio to give back on losses.
@@ -369,7 +386,6 @@ contract HealthCheckAccountant {
      */
     function setCustomConfig(
         address vault,
-        address strategy,
         uint16 customManagement,
         uint16 customPerformance,
         uint16 customRefund,
@@ -390,8 +406,8 @@ contract HealthCheckAccountant {
         );
         require(customMaxLoss <= MAX_BPS, "too high");
 
-        // Set the strategy's custom config.
-        customConfig[vault][strategy] = Fee({
+        // Create the vault's custom config.
+        Fee memory _config = Fee({
             managementFee: customManagement,
             performanceFee: customPerformance,
             refundRatio: customRefund,
@@ -400,36 +416,47 @@ contract HealthCheckAccountant {
             maxLoss: customMaxLoss
         });
 
-        // Set the custom flag.
-        _useCustomConfig[vault][strategy] = 1;
+        // Store the config.
+        customConfig[vault] = _config;
 
-        emit UpdateCustomFeeConfig(
-            vault,
-            strategy,
-            customConfig[vault][strategy]
-        );
+        // Set the custom flag.
+        _useCustomConfig[vault] = 1;
+
+        emit UpdateCustomFeeConfig(vault, _config);
     }
 
     /**
-     * @notice Function to remove a previously set custom fee configuration for a strategy.
+     * @notice Function to remove a previously set custom fee configuration for a vault.
      * @param vault The vault to remove custom setting for.
-     * @param strategy The strategy to remove custom setting for.
      */
-    function removeCustomConfig(
+    function removeCustomConfig(address vault) external virtual onlyFeeManager {
+        // Ensure custom fees are set for the specified vault.
+        require(_useCustomConfig[vault] != 0, "No custom fees set");
+
+        // Set all the vaults's custom fees to 0.
+        delete customConfig[vault];
+
+        // Clear the custom flag.
+        _useCustomConfig[vault] = 0;
+
+        // Emit relevant event.
+        emit RemovedCustomFeeConfig(vault);
+    }
+
+    /**
+     * @notice Turn off the health check for a specific `vault` `strategy` combo.
+     * @dev This will only last for one report and get automatically turned back on.
+     * @param vault Address of the vault.
+     * @param strategy Address of the strategy.
+     */
+    function turnOffHealthCheck(
         address vault,
         address strategy
     ) external virtual onlyFeeManager {
-        // Ensure custom fees are set for the specified vault and strategy.
-        require(_useCustomConfig[vault][strategy] != 0, "No custom fees set");
+        // Ensure the vault has been added.
+        require(vaults[vault], "vault not added");
 
-        // Set all the strategy's custom fees to 0.
-        delete customConfig[vault][strategy];
-
-        // Clear the custom flag.
-        _useCustomConfig[vault][strategy] = 0;
-
-        // Emit relevant event.
-        emit RemovedCustomFeeConfig(vault, strategy);
+        skipHealthCheck[vault][strategy] = true;
     }
 
     /**
@@ -438,29 +465,25 @@ contract HealthCheckAccountant {
      *   will convert it to a bool for easy view functions.
      *
      * @param vault Address of the vault.
-     * @param strategy Address of the strategy
      * @return If a custom fee config is set.
      */
     function useCustomConfig(
-        address vault,
-        address strategy
+        address vault
     ) external view virtual returns (bool) {
-        return _useCustomConfig[vault][strategy] != 0;
+        return _useCustomConfig[vault] != 0;
     }
 
     /**
-     * @notice Get the full config used for a specific `strategy` and `vault` combo.
+     * @notice Get the full config used for a specific `vault`.
      * @param vault Address of the vault.
-     * @param strategy Address of the strategy.
      * @return fee The config that would be used during the report.
      */
-    function getStrategyConfig(
-        address vault,
-        address strategy
+    function getVaultConfig(
+        address vault
     ) external view returns (Fee memory fee) {
         // Check if custom config is set.
-        if (_useCustomConfig[vault][strategy] != 0) {
-            fee = customConfig[vault][strategy];
+        if (_useCustomConfig[vault] != 0) {
+            fee = customConfig[vault];
         } else {
             // Otherwise use the default.
             fee = defaultConfig;
@@ -518,7 +541,7 @@ contract HealthCheckAccountant {
     function distribute(
         address token,
         uint256 amount
-    ) public virtual onlyFeeManager {
+    ) public virtual onlyFeeManagerOrRecipient {
         ERC20(token).safeTransfer(feeRecipient, amount);
 
         emit DistributeRewards(token, amount);
@@ -595,23 +618,5 @@ contract HealthCheckAccountant {
             ERC20(_token).safeApprove(_contract, 0);
             ERC20(_token).safeApprove(_contract, _amount);
         }
-    }
-
-    /**
-     * @notice View function to get the max a performance fee can be.
-     * @dev This function provides the maximum performance fee that the accountant can charge.
-     * @return The maximum performance fee.
-     */
-    function performanceFeeThreshold() external pure virtual returns (uint16) {
-        return PERFORMANCE_FEE_THRESHOLD;
-    }
-
-    /**
-     * @notice View function to get the max a management fee can be.
-     * @dev This function provides the maximum management fee that the accountant can charge.
-     * @return The maximum management fee.
-     */
-    function managementFeeThreshold() external pure virtual returns (uint16) {
-        return MANAGEMENT_FEE_THRESHOLD;
     }
 }
