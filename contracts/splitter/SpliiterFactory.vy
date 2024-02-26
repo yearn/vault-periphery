@@ -32,7 +32,7 @@ def newSplitter(
     original_split: uint256
 ) -> address:
 
-    # Clone a new version of the vault using create2.
+    # Clone a new version of the splitter
     new_splitter: address = create_minimal_proxy_to(
             ORIGINAL, 
             value=0

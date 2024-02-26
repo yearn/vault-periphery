@@ -6,10 +6,6 @@ interface IVault:
     def redeem(shares: uint256, receiver: address, owner: address, max_loss: uint256) -> uint256: nonpayable
     def transfer(receiver: address, amount: uint256) -> bool: nonpayable
 
-interface IAuction:
-    def getAuctionId(from_token: address) -> bytes32: view
-    def auctionInfo(auction_id: bytes32) -> (address, address, uint256, uint256): view
-
 event UpdateManagerRecipient:
     newManagerRecipient: indexed(address)
 
@@ -57,7 +53,6 @@ def initialize(
     assert manager != empty(address), "ZERO_ADDRESS"
     assert manager_recipient != empty(address), "ZERO_ADDRESS"
     assert splitee != empty(address), "ZERO_ADDRESS"
-    assert original_split <= MAX_BPS, "MAX_BPS"
     assert original_split != 0, "zero split"
 
     self.name = name
@@ -114,10 +109,13 @@ def distributeTokens(tokens: DynArray[address, MAX_ARRAY_SIZE]):
 @internal
 def _distribute(token: address, split: uint256, manager_recipient: address, splitee: address):
     current_balance: uint256 = IVault(token).balanceOf(self)
-    manager_split: uint256 = unsafe_div(unsafe_mul(current_balance, split), MAX_BPS)
-    assert IVault(token).transfer(manager_recipient, manager_split, default_return_value=True), "transfer failed"
-    assert IVault(token).transfer(splitee, unsafe_sub(current_balance, manager_split), default_return_value=True), "transfer failed"
+    manager_split: uint256 = current_balance
+    
+    if split != MAX_BPS:
+        manager_split = unsafe_div(unsafe_mul(current_balance, split), MAX_BPS)
+        self._transferERC20(token, splitee, unsafe_sub(current_balance, manager_split))
 
+    self._transferERC20(token, manager_recipient, manager_split)
 
 ###### AUCTION INITIATORS ######
 
@@ -128,7 +126,7 @@ def fundAuctions(tokens: DynArray[address, MAX_ARRAY_SIZE]):
 
     for token in tokens:
         amount: uint256 = IVault(token).balanceOf(self)
-        self._fundAuction(token, auction, amount)
+        self._transferERC20(token, auction, amount)
 
 @external
 def fundAuction(token: address, amount: uint256 = max_value(uint256)):
@@ -138,16 +136,12 @@ def fundAuction(token: address, amount: uint256 = max_value(uint256)):
     if(amount == max_value(uint256)):
         to_send = IVault(token).balanceOf(self)
 
-    self._fundAuction(token, self.auction, to_send)
+    self._transferERC20(token, self.auction, to_send)
 
 @internal
-def _fundAuction(token: address, auction: address, amount: uint256):
-    # Make sure the auction is set is enabled for this token
-    from_token: address = IAuction(auction).auctionInfo(IAuction(auction).getAuctionId(token))[0]
-    assert from_token == token, "not enabled"
-
+def _transferERC20(token: address, recipient: address, amount: uint256):
     # Send tokens to the auction contract.
-    assert IVault(token).transfer(auction, amount, default_return_value=True), "transfer failed"
+    assert IVault(token).transfer(recipient, amount, default_return_value=True), "transfer failed"
 
 ###### SETTERS ######
 
@@ -174,7 +168,6 @@ def setSplitee(new_splitee: address):
 @external
 def setSplit(new_split: uint256):
     assert msg.sender == self.manager, "!manager"
-    assert new_split <= MAX_BPS, "MAX_BPS"
     assert new_split != 0, "zero split"
 
     self.split = new_split
