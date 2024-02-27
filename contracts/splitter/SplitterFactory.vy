@@ -16,7 +16,7 @@ event NewSplitter:
     splitee: address
 
 # The address that all newly deployed vaults are based from.
-ORIGINAL: immutable(address)
+ORIGINAL: public(immutable(address))
 
 @external
 def __init__(original: address):
