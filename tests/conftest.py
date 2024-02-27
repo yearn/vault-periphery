@@ -455,10 +455,10 @@ def splitter_factory(deploy_splitter_factory):
 
 @pytest.fixture(scope="session")
 def splitter(daddy, management, brain, splitter_factory):
-    splitter = splitter_factory.newSplitter(
+    tx = splitter_factory.newSplitter(
         "Test Splitter", daddy, management, brain, 5_000, sender=daddy
     )
-
-    splitter = project.Splitter.at(splitter)
+    event = list(tx.decode_logs(splitter_factory.NewSplitter))[0]
+    splitter = project.Splitter.at(event.splitter)
 
     yield splitter
