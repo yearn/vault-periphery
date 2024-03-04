@@ -43,7 +43,7 @@ contract DebtAllocatorFactory is Governance, Clonable {
 
     constructor(address _governance) Governance(_governance) {
         // Deploy a dummy allocator as the original.
-        original = address(new DebtAllocator(address(1), 0));
+        original = address(new DebtAllocator());
 
         // Default max base fee to uint max.
         maxAcceptableBaseFee = type(uint256).max;

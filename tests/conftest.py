@@ -52,16 +52,10 @@ def strategy_manager(accounts):
 
 @pytest.fixture(scope="session")
 def create_token(project, daddy, user, amount):
-    def create_token(
-        name="Test Token", symbol="yTest", initialUser=user, initialAmount=amount
-    ):
-        token = daddy.deploy(
-            project.MockERC20,
-            name,
-            symbol,
-            initialUser,
-            initialAmount,
-        )
+    def create_token(initialUser=user, initialAmount=amount):
+        token = daddy.deploy(project.MockERC20)
+
+        token.mint(initialUser, initialAmount, sender=daddy)
 
         return token
 
@@ -79,31 +73,17 @@ def amount():
 
 
 @pytest.fixture(scope="session")
-def vault_blueprint(project, daddy):
-    blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
-        project.dependencies["yearn-vaults"][
-            "v3.0.1"
-        ].VaultV3.contract_type.deployment_bytecode.bytecode
-    )  # ERC5202
-    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
-    deploy_bytecode = HexBytes(
-        b"\x61" + len_bytes + b"\x3d\x81\x60\x0a\x3d\x39\xf3" + blueprint_bytecode
-    )
-
-    c = w3.eth.contract(abi=[], bytecode=deploy_bytecode)
-    deploy_transaction = c.constructor()
-    tx_info = {"from": daddy.address, "value": 0, "gasPrice": 0}
-    tx_hash = deploy_transaction.transact(tx_info)
-
-    return w3.eth.get_transaction_receipt(tx_hash)["contractAddress"]
+def vault_original(project, daddy):
+    vault = daddy.deploy(project.dependencies["yearn-vaults"]["master"].VaultV3)
+    return vault.address
 
 
 @pytest.fixture(scope="session")
-def vault_factory(project, daddy, vault_blueprint):
+def vault_factory(project, daddy, vault_original):
     vault_factory = daddy.deploy(
-        project.dependencies["yearn-vaults"]["v3.0.1"].VaultFactory,
+        project.dependencies["yearn-vaults"]["master"].VaultFactory,
         "Vault V3 Factory",
-        vault_blueprint,
+        vault_original,
         daddy.address,
     )
     return vault_factory
@@ -161,7 +141,7 @@ def create_vault(project, daddy, vault_factory):
         )
 
         event = list(tx.decode_logs(vault_factory.NewVault))
-        vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+        vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
             event[0].vault_address
         )
 
@@ -187,7 +167,7 @@ def vault(asset, create_vault):
 
 @pytest.fixture(scope="session")
 def create_strategy(project, management, asset):
-    def create_strategy(token=asset, apiVersion="3.0.1"):
+    def create_strategy(token=asset, apiVersion="3.0.2"):
         strategy = management.deploy(project.MockStrategy, token.address, apiVersion)
 
         return strategy

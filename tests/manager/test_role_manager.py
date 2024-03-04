@@ -264,7 +264,7 @@ def test_setters_with_zeros(
     tx = role_manager.newVault(asset, int(1), sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     assert vault != ZERO_ADDRESS
 
@@ -326,7 +326,7 @@ def test_deploy_new_vault(
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
 
@@ -421,7 +421,7 @@ def test_deploy_new_vault__duplicate_reverts(
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -509,7 +509,7 @@ def test_deploy_new_vault__default_values(
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(role_manager.AddedNewVault))[0]
 
@@ -616,7 +616,7 @@ def test_add_new_vault__endorsed(
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, 100, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     assert registry.numAssets() == 1
     assert registry.numEndorsedVaults(asset) == 1
@@ -716,7 +716,7 @@ def test_add_new_vault__not_endorsed(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
         event.vault_address
     )
 
@@ -825,7 +825,7 @@ def test_add_new_vault__with_debt_allocator(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
         event.vault_address
     )
 
@@ -934,7 +934,7 @@ def test_add_new_vault__with_accountant(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
         event.vault_address
     )
 
@@ -1054,7 +1054,7 @@ def test_add_new_vault__duplicate_reverts(
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
 
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -1086,7 +1086,7 @@ def test_add_new_vault__duplicate_reverts(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, 100, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))[0]
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
         event.vault_address
     )
 
@@ -1131,7 +1131,7 @@ def test_new_debt_allocator__deploys_one(
     tx = role_manager.newVault(asset, category, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
     debt_allocator = project.DebtAllocator.at(event.allocator)
@@ -1256,7 +1256,7 @@ def test_new_debt_allocator__already_deployed(
     tx = role_manager.newVault(asset, category, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
     debt_allocator = project.DebtAllocator.at(event.allocator)
@@ -1381,7 +1381,7 @@ def test_new_keeper(
     tx = role_manager.newVault(asset, category, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
     debt_allocator = project.DebtAllocator.at(event.allocator)
@@ -1498,7 +1498,7 @@ def test_remove_vault(
     tx = role_manager.newVault(asset, category, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
     debt_allocator = project.DebtAllocator.at(event.allocator)
@@ -1629,7 +1629,7 @@ def test_remove_role(
     tx = role_manager.newVault(asset, category, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))[0]
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event.vault)
+    vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(event.vault)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
     debt_allocator = project.DebtAllocator.at(event.allocator)

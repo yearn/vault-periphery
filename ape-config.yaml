@@ -2,26 +2,21 @@ name: yearn-v3-vault-periphery
 
 plugins:
   - name: solidity
-    version: 0.6.11
   - name: vyper
-    version: 0.6.13
   - name: etherscan
-    version: 0.6.11
   - name: hardhat
-    version: 0.6.13
   - name: infura
-    version: 0.6.5
 
 default_ecosystem: ethereum
 
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    ref: 4.7.3
+    ref: 4.9.5
     
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
-    ref: v3.0.1
+    ref: master
     exclude: 
      - test/**/*
      
@@ -34,17 +29,17 @@ dependencies:
 
   - name: periphery
     github: yearn/tokenized-strategy-periphery
-    ref: v3.0.1
+    ref: master
     contracts_folder: src
     exclude: 
      - test/**/*
 
 solidity:
   import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.7.3"
-    - "@yearn-vaults=yearn-vaults/v3.0.1"
+    - "@openzeppelin/contracts=openzeppelin/v4.9.5"
+    - "@yearn-vaults=yearn-vaults/master"
     - "@tokenized-strategy=tokenized-strategy/v3.0.1"
-    - "@periphery=periphery/v3.0.1"
+    - "@periphery=periphery/master"
 
 ethereum:
   local:

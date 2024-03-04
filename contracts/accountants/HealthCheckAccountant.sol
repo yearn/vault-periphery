@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
 /// @title Health Check Accountant.
 /// @dev Will charge fees, issue refunds, and run health check on any reported
