@@ -6,10 +6,10 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title Health Check Accountant.
+/// @title Accountant.
 /// @dev Will charge fees, issue refunds, and run health check on any reported
 ///     gains or losses during a strategy's report.
-contract HealthCheckAccountant {
+contract Accountant {
     using SafeERC20 for ERC20;
 
     /// @notice An event emitted when a vault is added or removed.
@@ -60,6 +60,7 @@ contract HealthCheckAccountant {
         uint16 maxFee; // Max fee allowed as a percent of gain.
         uint16 maxGain; // Max percent gain a strategy can report.
         uint16 maxLoss; // Max percent loss a strategy can report.
+        bool custom; // Flag to set for custom configs.
     }
 
     modifier onlyFeeManager() {
@@ -140,9 +141,6 @@ contract HealthCheckAccountant {
     /// @notice Mapping vault => custom Fee config if any.
     mapping(address => Fee) public customConfig;
 
-    /// @notice Mapping vault => flag to use a custom config.
-    mapping(address => uint256) internal _useCustomConfig;
-
     /// @notice Mapping vault => strategy => flag for one time healthcheck skips.
     mapping(address => mapping(address => bool)) skipHealthCheck;
 
@@ -191,13 +189,11 @@ contract HealthCheckAccountant {
         onlyAddedVaults
         returns (uint256 totalFees, uint256 totalRefunds)
     {
-        // Declare the config to use
-        Fee memory fee;
+        // Declare the config to use as the custom.
+        Fee memory fee = customConfig[msg.sender];
 
         // Check if there is a custom config to use.
-        if (_useCustomConfig[msg.sender] != 0) {
-            fee = customConfig[msg.sender];
-        } else {
+        if (!fee.custom) {
             // Otherwise use the default.
             fee = defaultConfig;
         }
@@ -367,7 +363,8 @@ contract HealthCheckAccountant {
             refundRatio: defaultRefund,
             maxFee: defaultMaxFee,
             maxGain: defaultMaxGain,
-            maxLoss: defaultMaxLoss
+            maxLoss: defaultMaxLoss,
+            custom: false
         });
 
         emit UpdateDefaultFeeConfig(defaultConfig);
@@ -412,14 +409,12 @@ contract HealthCheckAccountant {
             refundRatio: customRefund,
             maxFee: customMaxFee,
             maxGain: customMaxGain,
-            maxLoss: customMaxLoss
+            maxLoss: customMaxLoss,
+            custom: true
         });
 
         // Store the config.
         customConfig[vault] = _config;
-
-        // Set the custom flag.
-        _useCustomConfig[vault] = 1;
 
         emit UpdateCustomFeeConfig(vault, _config);
     }
@@ -430,13 +425,10 @@ contract HealthCheckAccountant {
      */
     function removeCustomConfig(address vault) external virtual onlyFeeManager {
         // Ensure custom fees are set for the specified vault.
-        require(_useCustomConfig[vault] != 0, "No custom fees set");
+        require(customConfig[vault].custom, "No custom fees set");
 
         // Set all the vaults's custom fees to 0.
         delete customConfig[vault];
-
-        // Clear the custom flag.
-        _useCustomConfig[vault] = 0;
 
         // Emit relevant event.
         emit RemovedCustomFeeConfig(vault);
@@ -469,7 +461,7 @@ contract HealthCheckAccountant {
     function useCustomConfig(
         address vault
     ) external view virtual returns (bool) {
-        return _useCustomConfig[vault] != 0;
+        return customConfig[vault].custom;
     }
 
     /**
@@ -480,10 +472,10 @@ contract HealthCheckAccountant {
     function getVaultConfig(
         address vault
     ) external view returns (Fee memory fee) {
-        // Check if custom config is set.
-        if (_useCustomConfig[vault] != 0) {
-            fee = customConfig[vault];
-        } else {
+        fee = customConfig[vault];
+
+        // Check if there is a custom config to use.
+        if (!fee.custom) {
             // Otherwise use the default.
             fee = defaultConfig;
         }

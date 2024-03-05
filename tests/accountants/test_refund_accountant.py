@@ -22,6 +22,7 @@ def test_setup(daddy, vault, strategy, refund_accountant, fee_recipient):
     assert accountant.customConfig(vault.address).maxFee == 0
     assert accountant.customConfig(vault.address).maxGain == 0
     assert accountant.customConfig(vault.address).maxLoss == 0
+    assert accountant.customConfig(vault.address).custom == False
     assert accountant.refund(vault.address, strategy.address) == 0
 
 
@@ -442,14 +443,7 @@ def test_set_custom_config(daddy, vault, strategy, refund_accountant):
     accountant = refund_accountant
     accountant.addVault(vault.address, sender=daddy)
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
     new_management = 20
     new_performance = 2_000
@@ -490,6 +484,7 @@ def test_set_custom_config(daddy, vault, strategy, refund_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
+        True,
     )
 
 
@@ -497,14 +492,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
     accountant = refund_accountant
     accountant.addVault(vault.address, sender=daddy)
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
     with ape.reverts("No custom fees set"):
         accountant.removeCustomConfig(vault.address, sender=daddy)
@@ -536,6 +524,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
+        True,
     )
 
     tx = accountant.removeCustomConfig(vault.address, sender=daddy)
@@ -545,14 +534,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
     assert event[0].vault == vault.address
     assert len(event) == 1
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
 
 def test_set_fee_manager(refund_accountant, daddy, user):

@@ -7,7 +7,7 @@ import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
-import {HealthCheckAccountant} from "../accountants/HealthCheckAccountant.sol";
+import {Accountant} from "../accountants/Accountant.sol";
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
@@ -410,7 +410,7 @@ contract RoleManager is Governance2Step {
             IVault(_vault).remove_role(address(this), Roles.ACCOUNTANT_MANAGER);
 
             // Whitelist the vault in the accountant.
-            HealthCheckAccountant(accountant).addVault(_vault);
+            Accountant(accountant).addVault(_vault);
         }
     }
 

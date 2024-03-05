@@ -255,8 +255,8 @@ def deploy_generic_accountant(project, daddy, fee_recipient):
 
 
 @pytest.fixture(scope="session")
-def deploy_healthcheck_accountant(project, daddy, fee_recipient):
-    def deploy_healthcheck_accountant(
+def deploy_accountant(project, daddy, fee_recipient):
+    def deploy_accountant(
         manager=daddy,
         fee_recipient=fee_recipient,
         management_fee=100,
@@ -267,7 +267,7 @@ def deploy_healthcheck_accountant(project, daddy, fee_recipient):
         max_loss=0,
     ):
         accountant = daddy.deploy(
-            project.HealthCheckAccountant,
+            project.Accountant,
             manager,
             fee_recipient,
             management_fee,
@@ -280,7 +280,7 @@ def deploy_healthcheck_accountant(project, daddy, fee_recipient):
 
         return accountant
 
-    yield deploy_healthcheck_accountant
+    yield deploy_accountant
 
 
 @pytest.fixture(scope="session")
@@ -320,10 +320,10 @@ def generic_accountant(deploy_generic_accountant):
 
 
 @pytest.fixture(scope="session")
-def healthcheck_accountant(deploy_healthcheck_accountant):
-    healthcheck_accountant = deploy_healthcheck_accountant()
+def accountant(deploy_accountant):
+    accountant = deploy_accountant()
 
-    yield healthcheck_accountant
+    yield accountant
 
 
 @pytest.fixture(scope="session")
@@ -419,14 +419,10 @@ def deploy_role_manager(
 
 
 @pytest.fixture(scope="session")
-def role_manager(
-    deploy_role_manager, daddy, brain, healthcheck_accountant, debt_allocator_factory
-):
+def role_manager(deploy_role_manager, daddy, brain, accountant, debt_allocator_factory):
     role_manager = deploy_role_manager()
 
-    role_manager.setPositionHolder(
-        role_manager.ACCOUNTANT(), healthcheck_accountant, sender=daddy
-    )
+    role_manager.setPositionHolder(role_manager.ACCOUNTANT(), accountant, sender=daddy)
     role_manager.setPositionHolder(
         role_manager.ALLOCATOR_FACTORY(), debt_allocator_factory, sender=daddy
     )

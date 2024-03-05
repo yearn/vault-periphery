@@ -25,7 +25,7 @@ def test_role_manager_setup(
     security,
     keeper,
     strategy_manager,
-    healthcheck_accountant,
+    accountant,
     registry,
     debt_allocator_factory,
     release_registry,
@@ -42,7 +42,7 @@ def test_role_manager_setup(
     assert role_manager.getKeeper() == keeper
     assert role_manager.getStrategyManager() == strategy_manager
     assert role_manager.getRegistry() == registry
-    assert role_manager.getAccountant() == healthcheck_accountant
+    assert role_manager.getAccountant() == accountant
     assert role_manager.getAllocatorFactory() == debt_allocator_factory
     assert role_manager.isVaultsRoleManager(vault) == False
     assert role_manager.getDebtAllocator(vault) == ZERO_ADDRESS
@@ -61,7 +61,7 @@ def test__positions(
     security,
     keeper,
     strategy_manager,
-    healthcheck_accountant,
+    accountant,
     registry,
     debt_allocator_factory,
     user,
@@ -72,7 +72,7 @@ def test__positions(
     assert role_manager.getKeeper() == keeper
     assert role_manager.getStrategyManager() == strategy_manager
     assert role_manager.getRegistry() == registry
-    assert role_manager.getAccountant() == healthcheck_accountant
+    assert role_manager.getAccountant() == accountant
     assert role_manager.getAllocatorFactory() == debt_allocator_factory
     assert role_manager.getPositionHolder(role_manager.DADDY()) == daddy
     assert role_manager.getPositionHolder(role_manager.BRAIN()) == brain
@@ -83,10 +83,7 @@ def test__positions(
         == strategy_manager
     )
     assert role_manager.getPositionHolder(role_manager.REGISTRY()) == registry
-    assert (
-        role_manager.getPositionHolder(role_manager.ACCOUNTANT())
-        == healthcheck_accountant
-    )
+    assert role_manager.getPositionHolder(role_manager.ACCOUNTANT()) == accountant
     assert (
         role_manager.getPositionHolder(role_manager.ALLOCATOR_FACTORY())
         == debt_allocator_factory
@@ -125,7 +122,7 @@ def test__positions(
         "Security": (security, security_roles),
         "Strategy Manager": (strategy_manager, strategy_manager_roles),
         "Registry": (registry, 0),
-        "Accountant": (healthcheck_accountant, 0),
+        "Accountant": (accountant, 0),
         "Allocator Factory": (debt_allocator_factory, 0),
     }
 
@@ -240,7 +237,7 @@ def test_setters_with_zeros(
     release_registry,
     registry,
     vault_factory,
-    healthcheck_accountant,
+    accountant,
 ):
     id = to_bytes32("Security")
 
@@ -256,7 +253,7 @@ def test_setters_with_zeros(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -278,7 +275,7 @@ def test_deploy_new_vault(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -318,7 +315,7 @@ def test_deploy_new_vault(
             asset, category, deposit_limit, profit_unlock, sender=daddy
         )
 
-    healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
+    accountant.setVaultManager(role_manager, sender=daddy)
 
     tx = role_manager.newVault(
         asset, category, deposit_limit, profit_unlock, sender=daddy
@@ -372,8 +369,8 @@ def test_deploy_new_vault(
     assert vault.profitMaxUnlockTime() == profit_unlock
 
     # Check accountant
-    assert vault.accountant() == healthcheck_accountant
-    assert healthcheck_accountant.vaults(vault) == True
+    assert vault.accountant() == accountant
+    assert accountant.vaults(vault) == True
 
     # Check deposit limit
     assert vault.maxDeposit(user) == deposit_limit
@@ -390,7 +387,7 @@ def test_deploy_new_vault__duplicate_reverts(
     role_manager,
     daddy,
     asset,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -413,7 +410,7 @@ def test_deploy_new_vault__duplicate_reverts(
     registry.setEndorser(role_manager, True, sender=daddy)
     assert registry.endorsers(role_manager)
 
-    healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
+    accountant.setVaultManager(role_manager, sender=daddy)
 
     tx = role_manager.newVault(
         asset, category, deposit_limit, profit_unlock, sender=daddy
@@ -470,7 +467,7 @@ def test_deploy_new_vault__default_values(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -502,7 +499,7 @@ def test_deploy_new_vault__default_values(
     with ape.reverts("!vault manager"):
         role_manager.newVault(asset, category, sender=daddy)
 
-    healthcheck_accountant.setVaultManager(role_manager, sender=daddy)
+    accountant.setVaultManager(role_manager, sender=daddy)
 
     # User can now deploy
     tx = role_manager.newVault(asset, category, sender=daddy)
@@ -553,8 +550,8 @@ def test_deploy_new_vault__default_values(
     assert vault.profitMaxUnlockTime() == role_manager.defaultProfitMaxUnlock()
 
     # Check accountant
-    assert vault.accountant() == healthcheck_accountant
-    assert healthcheck_accountant.vaults(vault) == True
+    assert vault.accountant() == accountant
+    assert accountant.vaults(vault) == True
 
     # Check deposit limit
     assert vault.maxDeposit(user) == 0
@@ -586,7 +583,7 @@ def test_add_new_vault__endorsed(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -597,7 +594,7 @@ def test_add_new_vault__endorsed(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -672,8 +669,8 @@ def test_add_new_vault__endorsed(
     assert vault.profitMaxUnlockTime() == 100
 
     # Check accountant
-    assert vault.accountant() == healthcheck_accountant
-    assert healthcheck_accountant.vaults(vault) == True
+    assert vault.accountant() == accountant
+    assert accountant.vaults(vault) == True
 
     # Check deposit limit
     assert vault.maxDeposit(user) == 0
@@ -694,7 +691,7 @@ def test_add_new_vault__not_endorsed(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -705,7 +702,7 @@ def test_add_new_vault__not_endorsed(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -781,8 +778,8 @@ def test_add_new_vault__not_endorsed(
     assert vault.profitMaxUnlockTime() == 100
 
     # Check accountant
-    assert vault.accountant() == healthcheck_accountant
-    assert healthcheck_accountant.vaults(vault) == True
+    assert vault.accountant() == accountant
+    assert accountant.vaults(vault) == True
 
     # Check deposit limit
     assert vault.maxDeposit(user) == 0
@@ -803,7 +800,7 @@ def test_add_new_vault__with_debt_allocator(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -814,7 +811,7 @@ def test_add_new_vault__with_debt_allocator(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -891,8 +888,8 @@ def test_add_new_vault__with_debt_allocator(
     assert vault.profitMaxUnlockTime() == 100
 
     # Check accountant
-    assert vault.accountant() == healthcheck_accountant
-    assert healthcheck_accountant.vaults(vault) == True
+    assert vault.accountant() == accountant
+    assert accountant.vaults(vault) == True
 
     # Check deposit limit
     assert vault.maxDeposit(user) == 0
@@ -913,7 +910,7 @@ def test_add_new_vault__with_accountant(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -924,7 +921,7 @@ def test_add_new_vault__with_accountant(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1005,7 +1002,7 @@ def test_add_new_vault__with_accountant(
 
     # Check accountant
     assert vault.accountant() == user
-    assert healthcheck_accountant.vaults(vault) == False
+    assert accountant.vaults(vault) == False
 
     # Check deposit limit
     assert vault.maxDeposit(user) == 0
@@ -1021,7 +1018,7 @@ def test_add_new_vault__duplicate_reverts(
     role_manager,
     daddy,
     asset,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1032,7 +1029,7 @@ def test_add_new_vault__duplicate_reverts(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1106,7 +1103,7 @@ def test_new_debt_allocator__deploys_one(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1117,7 +1114,7 @@ def test_new_debt_allocator__deploys_one(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1231,7 +1228,7 @@ def test_new_debt_allocator__already_deployed(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1242,7 +1239,7 @@ def test_new_debt_allocator__already_deployed(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1356,7 +1353,7 @@ def test_new_keeper(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1367,7 +1364,7 @@ def test_new_keeper(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1469,7 +1466,7 @@ def test_remove_vault(
     strategy_manager,
     asset,
     user,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1480,7 +1477,7 @@ def test_remove_vault(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
@@ -1600,7 +1597,7 @@ def test_remove_role(
     asset,
     user,
     strategy,
-    healthcheck_accountant,
+    accountant,
     registry,
     release_registry,
     vault_factory,
@@ -1611,7 +1608,7 @@ def test_remove_role(
         release_registry=release_registry,
         registry=registry,
         vault_factory=vault_factory,
-        accountant=healthcheck_accountant,
+        accountant=accountant,
         daddy=daddy,
     )
 
