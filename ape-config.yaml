@@ -16,13 +16,13 @@ dependencies:
     
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
-    ref: master
+    ref: v3.0.2
     exclude: 
      - test/**/*
      
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    ref: v3.0.1
+    ref: v3.0.2
     contracts_folder: src
     exclude:
      - test/**/*
@@ -37,8 +37,8 @@ dependencies:
 solidity:
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.9.5"
-    - "@yearn-vaults=yearn-vaults/master"
-    - "@tokenized-strategy=tokenized-strategy/v3.0.1"
+    - "@yearn-vaults=yearn-vaults/v3.0.2"
+    - "@tokenized-strategy=tokenized-strategy/v3.0.2"
     - "@periphery=periphery/master"
 
 ethereum:

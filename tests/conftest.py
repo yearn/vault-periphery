@@ -74,14 +74,14 @@ def amount():
 
 @pytest.fixture(scope="session")
 def vault_original(project, daddy):
-    vault = daddy.deploy(project.dependencies["yearn-vaults"]["master"].VaultV3)
+    vault = daddy.deploy(project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3)
     return vault.address
 
 
 @pytest.fixture(scope="session")
 def vault_factory(project, daddy, vault_original):
     vault_factory = daddy.deploy(
-        project.dependencies["yearn-vaults"]["master"].VaultFactory,
+        project.dependencies["yearn-vaults"]["v3.0.2"].VaultFactory,
         "Vault V3 Factory",
         vault_original,
         daddy.address,
@@ -114,7 +114,7 @@ def registry_factory(daddy, project, release_registry):
 
 
 @pytest.fixture(scope="session")
-def registry(new_registry, registry_factory, daddy):
+def registry(new_registry, daddy):
     return new_registry(daddy)
 
 
@@ -141,7 +141,7 @@ def create_vault(project, daddy, vault_factory):
         )
 
         event = list(tx.decode_logs(vault_factory.NewVault))
-        vault = project.dependencies["yearn-vaults"]["master"].VaultV3.at(
+        vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
             event[0].vault_address
         )
 
@@ -182,10 +182,10 @@ def strategy(asset, create_strategy):
 
 
 @pytest.fixture(scope="session")
-def deploy_mock_tokenized(project, daddy, asset, management, keeper):
+def deploy_mock_tokenized(project, daddy, vault_factory, asset, management, keeper):
     def deploy_mock_tokenized(name="name", apr=0):
         mock_tokenized = daddy.deploy(
-            project.MockTokenized, asset, name, management, keeper, apr
+            project.MockTokenized, vault_factory, asset, name, management, keeper, apr
         )
         return mock_tokenized
 

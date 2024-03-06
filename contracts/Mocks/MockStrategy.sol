@@ -3,10 +3,6 @@ pragma solidity 0.8.18;
 
 import {ERC4626Mock} from "@openzeppelin/contracts/mocks/ERC4626Mock.sol";
 
-interface IRegistry {
-    function newStrategy(address, address) external;
-}
-
 contract MockStrategy is ERC4626Mock {
     string public apiVersion;
 
