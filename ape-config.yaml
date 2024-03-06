@@ -1,5 +1,11 @@
 name: yearn-v3-vault-periphery
 
+plugins:
+  - name: solidity
+  - name: vyper
+  - name: etherscan
+  - name: hardhat
+
 default_ecosystem: ethereum
 
 dependencies:

@@ -6,4 +6,3 @@ ape-vyper
 ape-etherscan
 ape-hardhat
 ape-infura
-ape-foundry
