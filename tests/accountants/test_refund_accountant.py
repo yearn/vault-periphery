@@ -22,6 +22,7 @@ def test_setup(daddy, vault, strategy, refund_accountant, fee_recipient):
     assert accountant.customConfig(vault.address).maxFee == 0
     assert accountant.customConfig(vault.address).maxGain == 0
     assert accountant.customConfig(vault.address).maxLoss == 0
+    assert accountant.customConfig(vault.address).custom == False
     assert accountant.refund(vault.address, strategy.address) == 0
 
 
@@ -122,7 +123,8 @@ def test_reward_refund(
 def test_reward_refund__with_gain(
     daddy,
     vault,
-    strategy,
+    mock_tokenized,
+    management,
     refund_accountant,
     user,
     asset,
@@ -132,10 +134,10 @@ def test_reward_refund__with_gain(
     accountant = refund_accountant
     # Set performance fee to 10% and 0 management fee
     accountant.updateDefaultConfig(0, 1_000, 0, 10_000, 10_000, 0, sender=daddy)
-    assert accountant.refund(vault.address, strategy.address) == 0
+    assert accountant.refund(vault.address, mock_tokenized.address) == 0
 
     accountant.addVault(vault, sender=daddy)
-    vault.add_strategy(strategy, sender=daddy)
+    vault.add_strategy(mock_tokenized, sender=daddy)
 
     user_balance = asset.balanceOf(user)
     to_deposit = user_balance // 2
@@ -144,23 +146,24 @@ def test_reward_refund__with_gain(
     gain = to_deposit // 10
     loss = 0
 
-    tx = accountant.setRefund(vault, strategy, refund, sender=daddy)
+    tx = accountant.setRefund(vault, mock_tokenized, refund, sender=daddy)
 
     event = list(tx.decode_logs(accountant.UpdateRefund))
     assert len(event) == 1
     assert event[0].vault == vault.address
-    assert event[0].strategy == strategy.address
+    assert event[0].strategy == mock_tokenized.address
     assert event[0].amount == refund
-    assert accountant.refund(vault.address, strategy.address) == refund
+    assert accountant.refund(vault.address, mock_tokenized.address) == refund
 
     vault.set_accountant(accountant, sender=daddy)
 
     # Deposit into vault
     deposit_into_vault(vault, to_deposit)
     # Give strategy debt.
-    provide_strategy_with_debt(daddy, strategy, vault, int(to_deposit))
+    provide_strategy_with_debt(daddy, mock_tokenized, vault, int(to_deposit))
     # simulate profit.
-    asset.transfer(strategy, gain, sender=user)
+    asset.transfer(mock_tokenized, gain, sender=user)
+    mock_tokenized.report(sender=management)
 
     # Fund the accountant for a refund. Over fund to make sure it only sends amount.
     asset.transfer(accountant, refund, sender=user)
@@ -171,11 +174,11 @@ def test_reward_refund__with_gain(
     assert vault.profitUnlockingRate() == 0
     assert vault.fullProfitUnlockDate() == 0
 
-    tx = vault.process_report(strategy, sender=daddy)
+    tx = vault.process_report(mock_tokenized, sender=daddy)
 
     event = list(tx.decode_logs(vault.StrategyReported))[0]
 
-    assert event.strategy == strategy.address
+    assert event.strategy == mock_tokenized.address
     assert event.total_fees == gain // 10
     assert event.gain == gain
     assert event.loss == 0
@@ -188,8 +191,8 @@ def test_reward_refund__with_gain(
     assert vault.fullProfitUnlockDate() > 0
 
     # Make sure the amounts got reset.
-    assert accountant.refund(vault.address, strategy.address) == 0
-    tx = accountant.report(strategy, 0, 0, sender=vault)
+    assert accountant.refund(vault.address, mock_tokenized.address) == 0
+    tx = accountant.report(mock_tokenized, 0, 0, sender=vault)
     assert tx.return_value == (0, 0)
 
 
@@ -440,14 +443,7 @@ def test_set_custom_config(daddy, vault, strategy, refund_accountant):
     accountant = refund_accountant
     accountant.addVault(vault.address, sender=daddy)
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
     new_management = 20
     new_performance = 2_000
@@ -488,6 +484,7 @@ def test_set_custom_config(daddy, vault, strategy, refund_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
+        True,
     )
 
 
@@ -495,14 +492,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
     accountant = refund_accountant
     accountant.addVault(vault.address, sender=daddy)
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
     with ape.reverts("No custom fees set"):
         accountant.removeCustomConfig(vault.address, sender=daddy)
@@ -534,6 +524,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
         new_max_fee,
         new_max_gain,
         new_max_loss,
+        True,
     )
 
     tx = accountant.removeCustomConfig(vault.address, sender=daddy)
@@ -543,14 +534,7 @@ def test_remove_custom_config(daddy, vault, strategy, refund_accountant):
     assert event[0].vault == vault.address
     assert len(event) == 1
 
-    assert accountant.customConfig(vault.address) == (
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    )
+    assert accountant.customConfig(vault.address) == (0, 0, 0, 0, 0, 0, False)
 
 
 def test_set_fee_manager(refund_accountant, daddy, user):

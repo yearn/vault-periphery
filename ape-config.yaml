@@ -17,34 +17,34 @@ default_ecosystem: ethereum
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    ref: 4.7.3
+    ref: 4.9.5
     
   - name: yearn-vaults
     github: yearn/yearn-vaults-v3
-    ref: v3.0.1
+    ref: v3.0.2
     exclude: 
      - test/**/*
      
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    ref: v3.0.1
+    ref: v3.0.2
     contracts_folder: src
     exclude:
      - test/**/*
 
   - name: periphery
     github: yearn/tokenized-strategy-periphery
-    ref: v3.0.1
+    ref: master
     contracts_folder: src
     exclude: 
      - test/**/*
 
 solidity:
   import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.7.3"
-    - "@yearn-vaults=yearn-vaults/v3.0.1"
-    - "@tokenized-strategy=tokenized-strategy/v3.0.1"
-    - "@periphery=periphery/v3.0.1"
+    - "@openzeppelin/contracts=openzeppelin/v4.9.5"
+    - "@yearn-vaults=yearn-vaults/v3.0.2"
+    - "@tokenized-strategy=tokenized-strategy/v3.0.2"
+    - "@periphery=periphery/master"
 
 ethereum:
   local:

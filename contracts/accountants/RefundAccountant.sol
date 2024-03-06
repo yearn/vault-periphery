@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity 0.8.18;
 
-import {HealthCheckAccountant, ERC20, SafeERC20, IVault} from "./HealthCheckAccountant.sol";
+import {Accountant, ERC20, SafeERC20, IVault} from "./Accountant.sol";
 
 /// @title Refund Accountant
 /// @dev Allows for configurable refunds to be given to specific strategies for a vault.
 ///     This can be used to auto compound reward into vault or provide retroactive refunds
 ///     from a previous loss.
-contract RefundAccountant is HealthCheckAccountant {
+contract RefundAccountant is Accountant {
     using SafeERC20 for ERC20;
 
     /// @notice An event emitted when a refund is added for a strategy.
@@ -30,7 +30,7 @@ contract RefundAccountant is HealthCheckAccountant {
         uint16 defaultMaxGain,
         uint16 defaultMaxLoss
     )
-        HealthCheckAccountant(
+        Accountant(
             _feeManager,
             _feeRecipient,
             defaultManagement,
