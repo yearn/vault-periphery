@@ -36,11 +36,11 @@ def test__deploy_new_vault(registry, asset, release_registry, vault_factory, dad
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
 
     # address = tx.return_value
-    # new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(address)
+    # new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(address)
     block = tx.timestamp
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -93,7 +93,7 @@ def test__endorse_deployed_vault(
     block = tx.timestamp
 
     event = list(tx.decode_logs(vault_factory.NewVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault_address
     )
 
@@ -145,7 +145,7 @@ def test__endorse_deployed_vault__default_values(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, WEEK, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault_address
     )
 
@@ -278,11 +278,11 @@ def test__deploy_vault_with_new_release(
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
 
     # address = tx.return_value
-    # new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(address)
+    # new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(address)
     block = tx.timestamp
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -341,11 +341,11 @@ def test__deploy_vault_with_old_release(
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 1, sender=daddy)
 
     # address = tx.return_value
-    # new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(address)
+    # new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(address)
     block = tx.timestamp
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -404,7 +404,7 @@ def test__endorse_deployed_vault_wrong_api__reverts(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, WEEK, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault_address
     )
 
@@ -456,7 +456,7 @@ def test__tag_vault(registry, asset, release_registry, vault_factory, daddy, str
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(event[0].vault)
+    vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(event[0].vault)
 
     # Make sure it is endorsed but not tagged.
     assert registry.vaultInfo(vault.address).asset == asset.address
@@ -508,11 +508,11 @@ def test__remove_vault(registry, asset, release_registry, vault_factory, daddy):
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
 
     # address = tx.return_value
-    # new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(address)
+    # new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(address)
     block = tx.timestamp
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -582,7 +582,7 @@ def test__remove_vault__two_vaults(
     tx = registry.newEndorsedVault(asset, name, symbol, daddy, WEEK, 0, sender=daddy)
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -591,7 +591,7 @@ def test__remove_vault__two_vaults(
     )
 
     event = list(tx.decode_logs(registry.NewEndorsedVault))
-    second_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    second_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault
     )
 
@@ -820,7 +820,7 @@ def test__access(
     tx = vault_factory.deploy_new_vault(asset, name, symbol, daddy, WEEK, sender=daddy)
 
     event = list(tx.decode_logs(vault_factory.NewVault))
-    new_vault = project.dependencies["yearn-vaults"]["v3.0.1"].VaultV3.at(
+    new_vault = project.dependencies["yearn-vaults"]["v3.0.2"].VaultV3.at(
         event[0].vault_address
     )
 

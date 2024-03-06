@@ -30,12 +30,6 @@
     
     ape test
     
-### Set your environment Variables
-
-    export WEB3_INFURA_PROJECT_ID=your_infura_api_key
-
-    export ETHERSCAN_API_KEY=your_api_key
-
 ### Deployment
 
 Deployment of periphery contracts such as the [Registry Factory](https://github.com/yearn/vault-periphery/blob/master/contracts/registry/RegistryFactory.sol) or [Address Provider](https://github.com/yearn/vault-periphery/blob/master/contracts/AddressProvider.vy) are done using a create2 factory in order to get a deterministic address that is the same on each EVM chain.

@@ -145,12 +145,12 @@ contract DebtAllocator {
     /// @notice Mapping of strategy => its config.
     mapping(address => Config) internal _configs;
 
-    constructor(address _vault, uint256 _minimumChange) {
+    constructor() {
         // Set the factory to retrieve roles from. Will be the same for all clones so can use immutable.
         factory = msg.sender;
 
-        // Initialize original version.
-        initialize(_vault, _minimumChange);
+        // Don't allow for original version to be initialized.
+        vault = address(1);
     }
 
     /**
@@ -195,21 +195,8 @@ contract DebtAllocator {
             _vault.process_report(_strategy);
         }
 
-        // Cache initial values in case of loss.
-        uint256 initialDebt = _vault.strategies(_strategy).current_debt;
-        uint256 initialAssets = _vault.totalAssets();
-        _vault.update_debt(_strategy, _targetDebt);
-        uint256 afterAssets = _vault.totalAssets();
-
-        // If a loss was realized.
-        if (afterAssets < initialAssets) {
-            // Make sure its within the range.
-            require(
-                initialAssets - afterAssets <=
-                    (initialDebt * maxDebtUpdateLoss) / MAX_BPS,
-                "too much loss"
-            );
-        }
+        // Update debt with the default max loss.
+        _vault.update_debt(_strategy, _targetDebt, maxDebtUpdateLoss);
 
         // Update the last time the strategies debt was updated.
         _configs[_strategy].lastUpdate = uint96(block.timestamp);
@@ -290,9 +277,10 @@ contract DebtAllocator {
                 // Return true and the calldata.
                 return (
                     true,
-                    abi.encodeCall(
-                        _vault.update_debt,
-                        (_strategy, params.current_debt + toAdd)
+                    abi.encodeWithSignature(
+                        "update_debt(address,uint256)",
+                        _strategy,
+                        params.current_debt + toAdd
                     )
                 );
             }
@@ -332,9 +320,10 @@ contract DebtAllocator {
                 // If so return true and the calldata.
                 return (
                     true,
-                    abi.encodeCall(
-                        _vault.update_debt,
-                        (_strategy, params.current_debt - toPull)
+                    abi.encodeWithSignature(
+                        "update_debt(address,uint256)",
+                        _strategy,
+                        params.current_debt - toPull
                     )
                 );
             }
