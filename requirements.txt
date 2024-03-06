@@ -1,3 +1,9 @@
 black==22.3.0
 eth-ape==0.7.9
 pysha3==1.0.2
+ape-solidity
+ape-vyper
+ape-etherscan
+ape-hardhat
+ape-infura
+ape-foundry
