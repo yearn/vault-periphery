@@ -20,73 +20,47 @@ def deploy_accountant():
     print("Init balance:", deployer.balance / 1e18)
 
     version = input(
-        "Would you like to deploy a Generic Accountant, HealthCheck Accountant or a Refund Accountant? g/h/r "
+        "Would you like to deploy a normal Accountant a Refund Accountant? g/r "
     ).lower()
 
     if version == "g":
-        print("Deploying a Generic accountant.")
-        print("Enter the default amounts to use in Base Points. (100% == 10_000)")
-
-        management_fee = input("Default management fee? ")
-        assert int(management_fee) <= 200
-
-        performance_fee = input("Default performance fee? ")
-        assert int(performance_fee) <= 5_000
-
-        refund_ratio = input("Default refund ratio? ")
-        assert int(refund_ratio) <= 2**16 - 1
-
-        max_fee = input("Default max fee? ")
-        assert int(max_fee) <= 2**16 - 1
-
-        constructor = accountant.constructor.encode_input(
-            deployer.address,
-            deployer.address,
-            management_fee,
-            performance_fee,
-            refund_ratio,
-            max_fee,
-        )
+        print("Deploying an Accountant.")
+        accountant = project.Accountant
 
     else:
-        if version == "h":
-            print("Deploying a HealthCheck accountant.")
-            accountant = project.HealthCheckAccountant
+        print("Deploying a Refund accountant.")
+        accountant = project.RefundAccountant
 
-        else:
-            print("Deploying a Refund accountant.")
-            accountant = project.RefundAccountant
+    print("Enter the default amounts to use in Base Points. (100% == 10_000)")
 
-        print("Enter the default amounts to use in Base Points. (100% == 10_000)")
+    management_fee = input("Default management fee? ")
+    assert int(management_fee) <= 200
 
-        management_fee = input("Default management fee? ")
-        assert int(management_fee) <= 200
+    performance_fee = input("Default performance fee? ")
+    assert int(performance_fee) <= 5_000
 
-        performance_fee = input("Default performance fee? ")
-        assert int(performance_fee) <= 5_000
+    refund_ratio = input("Default refund ratio? ")
+    assert int(refund_ratio) <= 2**16 - 1
 
-        refund_ratio = input("Default refund ratio? ")
-        assert int(refund_ratio) <= 2**16 - 1
+    max_fee = input("Default max fee? ")
+    assert int(max_fee) <= 2**16 - 1
 
-        max_fee = input("Default max fee? ")
-        assert int(max_fee) <= 2**16 - 1
+    max_gain = input("Default max gain? ")
+    assert int(max_gain) <= 2**16 - 1
 
-        max_gain = input("Default max gain? ")
-        assert int(max_gain) <= 2**16 - 1
+    max_loss = input("Default max loss? ")
+    assert int(max_loss) <= 10_000
 
-        max_loss = input("Default max loss? ")
-        assert int(max_loss) <= 10_000
-
-        constructor = accountant.constructor.encode_input(
-            deployer.address,
-            deployer.address,
-            management_fee,
-            performance_fee,
-            refund_ratio,
-            max_fee,
-            max_gain,
-            max_loss,
-        )
+    constructor = accountant.constructor.encode_input(
+        deployer.address,
+        deployer.address,
+        management_fee,
+        performance_fee,
+        refund_ratio,
+        max_fee,
+        max_gain,
+        max_loss,
+    )
 
     # generate and deploy
     deploy_bytecode = HexBytes(
