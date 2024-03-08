@@ -189,3 +189,5 @@ def setAuction(new_auction: address):
     assert msg.sender == self.manager, "!manager"
 
     self.auction = new_auction
+
+    log UpdateAuction(new_auction)

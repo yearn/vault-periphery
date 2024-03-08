@@ -27,3 +27,5 @@ def deploy_contract(init_code, salt, deployer):
 
     print("------------------")
     print(f"Deployed the contract to {address}")
+
+    return address
