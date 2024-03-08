@@ -29,9 +29,10 @@ def deploy_role_manager():
     security = input("Security? ")
     keeper = input("Keeper? ")
     strategy_manager = input("Strategy manager? ")
+    registry = input("Registry? ")
 
     constructor = role_manager.constructor.encode_input(
-        gov, daddy, brain, security, keeper, strategy_manager
+        gov, daddy, brain, security, keeper, strategy_manager, registry
     )
 
     deploy_bytecode = HexBytes(
