@@ -433,3 +433,32 @@ def role_manager(deploy_role_manager, daddy, brain, accountant, debt_allocator_f
 @pytest.fixture(scope="session")
 def keeper(daddy):
     yield daddy.deploy(project.Keeper)
+
+
+@pytest.fixture(scope="session")
+def deploy_splitter_factory(project, daddy):
+    def deploy_splitter_factory():
+        original = daddy.deploy(project.Splitter)
+
+        splitter_factory = daddy.deploy(project.SplitterFactory, original)
+
+        return splitter_factory
+
+    yield deploy_splitter_factory
+
+
+@pytest.fixture(scope="session")
+def splitter_factory(deploy_splitter_factory):
+    splitter_factory = deploy_splitter_factory()
+    return splitter_factory
+
+
+@pytest.fixture(scope="session")
+def splitter(daddy, management, brain, splitter_factory):
+    tx = splitter_factory.newSplitter(
+        "Test Splitter", daddy, management, brain, 5_000, sender=daddy
+    )
+    event = list(tx.decode_logs(splitter_factory.NewSplitter))[0]
+    splitter = project.Splitter.at(event.splitter)
+
+    yield splitter
