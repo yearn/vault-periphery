@@ -355,7 +355,7 @@ def set_fees_for_strategy():
 @pytest.fixture(scope="session")
 def deploy_address_provider(project, daddy):
     def deploy_address_provider(gov=daddy):
-        address_provider = gov.deploy(project.AddressProvider, gov)
+        address_provider = gov.deploy(project.ProtocolAddressProvider, gov)
 
         return address_provider
 
