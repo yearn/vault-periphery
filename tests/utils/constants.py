@@ -44,6 +44,7 @@ class ChangeType(IntFlag):
 
 class AddressIds:
     ROUTER = to_bytes32("ROUTER")
+    KEEPER = to_bytes32("KEEPER")
     APR_ORACLE = to_bytes32("APR ORACLE")
     RELEASE_REGISTRY = to_bytes32("RELEASE REGISTRY")
     BASE_FEE_PROVIDER = to_bytes32("BASE FEE PROVIDER")
@@ -51,4 +52,5 @@ class AddressIds:
     AUCTION_FACTORY = to_bytes32("AUCTION FACTORY")
     SPLITTER_FACTORY = to_bytes32("SPLITTER FACTORY")
     REGISTRY_FACTORY = to_bytes32("REGISTRY FACTORY")
+    ALLOCATOR_FACTORY = to_bytes32("ALLOCATOR FACTORY")
     ACCOUNTANT_FACTORY = to_bytes32("ACCOUNTANT FACTORY")

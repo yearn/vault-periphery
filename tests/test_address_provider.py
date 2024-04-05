@@ -11,12 +11,14 @@ def test_address_provider_setup(deploy_address_provider, daddy):
     assert address_provider.governance() == daddy
     assert address_provider.pendingGovernance() == ZERO_ADDRESS
     assert address_provider.getRouter() == ZERO_ADDRESS
+    assert address_provider.getKeeper() == ZERO_ADDRESS
     assert address_provider.getAprOracle() == ZERO_ADDRESS
     assert address_provider.getReleaseRegistry() == ZERO_ADDRESS
     assert address_provider.getCommonReportTrigger() == ZERO_ADDRESS
     assert address_provider.getAuctionFactory() == ZERO_ADDRESS
     assert address_provider.getSplitterFactory() == ZERO_ADDRESS
     assert address_provider.getRegistryFactory() == ZERO_ADDRESS
+    assert address_provider.getAllocatorFactory() == ZERO_ADDRESS
     assert address_provider.getAccountantFactory() == ZERO_ADDRESS
     assert address_provider.getAddress(("random").encode("utf-8")) == ZERO_ADDRESS
 
@@ -68,6 +70,32 @@ def test__set_router(address_provider, daddy, user):
 
     assert address_provider.getAddress(id) == address
     assert address_provider.getRouter() == address
+
+
+def test__set_keeper(address_provider, daddy, user, keeper):
+    id = AddressIds.KEEPER
+    address = keeper.address
+
+    assert address_provider.getAddress(id) == ZERO_ADDRESS
+    assert address_provider.getKeeper() == ZERO_ADDRESS
+
+    with ape.reverts("!governance"):
+        address_provider.setKeeper(address, sender=user)
+
+    assert address_provider.getAddress(id) == ZERO_ADDRESS
+    assert address_provider.getKeeper() == ZERO_ADDRESS
+
+    tx = address_provider.setKeeper(address, sender=daddy)
+
+    logs = list(tx.decode_logs(address_provider.UpdatedAddress))
+
+    assert len(logs) == 1
+    assert logs[0].addressId == id
+    assert logs[0].oldAddress == ZERO_ADDRESS
+    assert logs[0].newAddress == address
+
+    assert address_provider.getAddress(id) == address
+    assert address_provider.getKeeper() == address
 
 
 def test__set_release_registry(address_provider, daddy, user, release_registry):
@@ -250,6 +278,32 @@ def test__set_registry_factory(address_provider, daddy, user, registry_factory):
 
     assert address_provider.getAddress(id) == address
     assert address_provider.getRegistryFactory() == address
+
+
+def test__set_allocator_factory(address_provider, daddy, user):
+    id = AddressIds.ALLOCATOR_FACTORY
+    address = user
+
+    assert address_provider.getAddress(id) == ZERO_ADDRESS
+    assert address_provider.getAllocatorFactory() == ZERO_ADDRESS
+
+    with ape.reverts("!governance"):
+        address_provider.setAllocatorFactory(address, sender=user)
+
+    assert address_provider.getAddress(id) == ZERO_ADDRESS
+    assert address_provider.getAllocatorFactory() == ZERO_ADDRESS
+
+    tx = address_provider.setAllocatorFactory(address, sender=daddy)
+
+    logs = list(tx.decode_logs(address_provider.UpdatedAddress))
+
+    assert len(logs) == 1
+    assert logs[0].addressId == id
+    assert logs[0].oldAddress == ZERO_ADDRESS
+    assert logs[0].newAddress == address
+
+    assert address_provider.getAddress(id) == address
+    assert address_provider.getAllocatorFactory() == address
 
 
 def test__set_accountant_factory(address_provider, daddy, user, registry_factory):

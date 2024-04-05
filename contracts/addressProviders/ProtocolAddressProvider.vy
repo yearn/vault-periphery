@@ -5,7 +5,7 @@
 @license GNU AGPLv3
 @author yearn.finance
 @notice
-    Protocol Address provider for the periphery contracts for Yearn V3.
+    Protocol Address provider for the periphery contracts for the Yearn V3 system.
 """
 #### EVENTS ####
 
@@ -25,6 +25,7 @@ event UpdateGovernance:
 
 # General Periphery Contracts.
 ROUTER: constant(bytes32) = keccak256("ROUTER")
+KEEPER: constant(bytes32) = keccak256("KEEPER")
 APR_ORACLE: constant(bytes32) = keccak256("APR ORACLE")
 RELEASE_REGISTRY: constant(bytes32) = keccak256("RELEASE REGISTRY")
 BASE_FEE_PROVIDER: constant(bytes32) = keccak256("BASE FEE PROVIDER")
@@ -34,6 +35,7 @@ COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("COMMON REPORT TRIGGER")
 AUCTION_FACTORY: constant(bytes32) = keccak256("AUCTION FACTORY")
 SPLITTER_FACTORY: constant(bytes32) = keccak256("SPLITTER FACTORY")
 REGISTRY_FACTORY: constant(bytes32) = keccak256("REGISTRY FACTORY")
+ALLOCATOR_FACTORY: constant(bytes32) = keccak256("ALLOCATOR FACTORY")
 ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("ACCOUNTANT FACTORY")
 
 name: public(constant(String[34])) = "Yearn V3 Protocol Address Provider"
@@ -84,6 +86,15 @@ def getRouter() -> address:
     @return Current Yearn 4626 Router
     """
     return self._get_address(ROUTER)
+
+@view
+@external
+def getKeeper() -> address:
+    """
+    @notice Get the current generic Keeper.
+    @return Current generic Keeper.
+    """
+    return self._get_address(KEEPER)
 
 @view
 @external
@@ -150,6 +161,15 @@ def getRegistryFactory() -> address:
 
 @view
 @external
+def getAllocatorFactory() -> address:
+    """
+    @notice Get the current Debt Allocator Factory.
+    @return Current Debt Allocator Factory address.
+    """
+    return self._get_address(ALLOCATOR_FACTORY)
+
+@view
+@external
 def getAccountantFactory() -> address:
     """
     @notice Get the current Accountant Factory.
@@ -192,6 +212,15 @@ def setRouter(new_address: address):
     @param new_address The new Router.
     """
     self._set_address(ROUTER, new_address)
+
+@external
+def setKeeper(new_address: address):
+    """
+    @notice Sets a new address for the generic Keeper.
+    @dev Must be called by the governance.
+    @param new_address The new Keeper.
+    """
+    self._set_address(KEEPER, new_address)
 
 @external
 def setAprOracle(new_address: address):
@@ -255,6 +284,15 @@ def setRegistryFactory(new_address: address):
     @param new_address The new Registry Factory.
     """
     self._set_address(REGISTRY_FACTORY, new_address)
+
+@external
+def setAllocatorFactory(new_address: address):
+    """
+    @notice Sets a new address for the Debt Allocator Factory.
+    @dev Must be called by the governance.
+    @param new_address The new Debt Allocator Factory.
+    """
+    self._set_address(ALLOCATOR_FACTORY, new_address)
 
 @external
 def setAccountantFactory(new_address: address):
