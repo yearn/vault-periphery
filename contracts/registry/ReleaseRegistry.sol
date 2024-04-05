@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GNU AGPLv3
-pragma solidity 0.8.18;
+pragma solidity >=0.8.18;
 
 import {Governance} from "@periphery/utils/Governance.sol";
 
