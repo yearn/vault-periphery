@@ -3,7 +3,7 @@ from hexbytes import HexBytes
 from scripts.deployments import getSalt, deploy_contract
 
 
-def deploy_accountant():
+def deploy_accountant_factory():
     print("Deploying an Accountant Factory on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
@@ -32,4 +32,4 @@ def deploy_accountant():
 
 
 def main():
-    deploy_accountant()
+    deploy_accountant_factory()

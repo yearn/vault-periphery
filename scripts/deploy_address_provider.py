@@ -9,12 +9,12 @@ def deploy_address_provider():
     if input("Do you want to continue? ") == "n":
         return
 
-    address_provider = project.AddressProvider
+    address_provider = project.ProtocolAddressProvider
 
     deployer = input("Name of account to use? ")
     deployer = accounts.load(deployer)
 
-    salt = getSalt("address provider")
+    salt = getSalt("Protocol Address Provider")
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
