@@ -12,8 +12,7 @@ def deploy_accountant():
     deployer = input("Name of account to use? ")
     deployer = accounts.load(deployer)
 
-    accountant = project.GenericAccountant
-
+    accountant
     salt = getSalt(f"Accountant {chain.pending_timestamp}")
 
     print(f"Salt we are using {salt}")

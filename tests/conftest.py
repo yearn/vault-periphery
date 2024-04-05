@@ -255,7 +255,17 @@ def deploy_generic_accountant(project, daddy, fee_recipient):
 
 
 @pytest.fixture(scope="session")
-def deploy_accountant(project, daddy, fee_recipient):
+def deploy_accountant_factory(project, daddy):
+    def deploy_accountant_factory():
+        accountant_factory = daddy.deploy(project.AccountantFactory)
+
+        return accountant_factory
+
+    yield deploy_accountant_factory
+
+
+@pytest.fixture(scope="session")
+def deploy_accountant(project, accountant_factory, daddy, fee_recipient):
     def deploy_accountant(
         manager=daddy,
         fee_recipient=fee_recipient,
@@ -266,8 +276,7 @@ def deploy_accountant(project, daddy, fee_recipient):
         max_gain=10_000,
         max_loss=0,
     ):
-        accountant = daddy.deploy(
-            project.Accountant,
+        accountant = accountant_factory.newAccountant(
             manager,
             fee_recipient,
             management_fee,
@@ -276,9 +285,10 @@ def deploy_accountant(project, daddy, fee_recipient):
             max_fee,
             max_gain,
             max_loss,
+            sender=daddy,
         )
 
-        return accountant
+        return project.Accountant.at(accountant.return_value)
 
     yield deploy_accountant
 
@@ -317,6 +327,13 @@ def generic_accountant(deploy_generic_accountant):
     generic_accountant = deploy_generic_accountant()
 
     yield generic_accountant
+
+
+@pytest.fixture(scope="session")
+def accountant_factory(deploy_accountant_factory):
+    accountant_factory = deploy_accountant_factory()
+
+    yield accountant_factory
 
 
 @pytest.fixture(scope="session")
