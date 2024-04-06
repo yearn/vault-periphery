@@ -40,6 +40,7 @@ dependencies:
      - test/**/*
 
 solidity:
+  version: 0.8.18
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.9.5"
     - "@yearn-vaults=yearn-vaults/v3.0.2"
