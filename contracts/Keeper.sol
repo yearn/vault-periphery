@@ -24,21 +24,14 @@ contract Keeper {
      * @notice Reports on a strategy.
      */
     function report(address _strategy) external returns (uint256, uint256) {
-        // Call the target with the provided calldata.
-        (bool success, bytes memory result) = _strategy.call(
-            abi.encodeWithSelector(IStrategy.report.selector)
-        );
-
-        if (success) {
-            return abi.decode(result, (uint256, uint256));
-        }
+        return IStrategy(_strategy).report();
     }
 
     /**
      * @notice Tends a strategy.
      */
     function tend(address _strategy) external {
-        _strategy.call(abi.encodeWithSelector(IStrategy.tend.selector));
+        return IStrategy(_strategy).tend();
     }
 
     /**
@@ -48,13 +41,6 @@ contract Keeper {
         address _vault,
         address _strategy
     ) external returns (uint256, uint256) {
-        // Call the target with the provided calldata.
-        (bool success, bytes memory result) = _vault.call(
-            abi.encodeCall(IVault.process_report, _strategy)
-        );
-
-        if (success) {
-            return abi.decode(result, (uint256, uint256));
-        }
+        return IVault(_vault).process_report(_strategy);
     }
 }

@@ -5,15 +5,11 @@ from utils.constants import ZERO_ADDRESS, ROLES, MAX_INT
 
 def test_keeper(daddy, keeper, vault, mock_tokenized, amount, user, asset, management):
     strategy = mock_tokenized
-    # Revert on vault does not cause revert
+    # Revert on vault
     with ape.reverts("not allowed"):
         vault.process_report(strategy, sender=keeper)
-
-    tx = keeper.process_report(vault, strategy, sender=user)
-
-    profit, loss = tx.return_value
-    assert profit == 0
-    assert loss == 0
+    with ape.reverts("not allowed"):
+        keeper.process_report(vault, strategy, sender=user)
 
     vault.add_strategy(strategy, sender=daddy)
     vault.set_role(keeper, ROLES.REPORTING_MANAGER, sender=daddy)
@@ -36,11 +32,8 @@ def test_keeper(daddy, keeper, vault, mock_tokenized, amount, user, asset, manag
     with ape.reverts("!keeper"):
         strategy.report(sender=keeper)
 
-    tx = keeper.report(strategy, sender=user)
-
-    profit, loss = tx.return_value
-    assert profit == 0
-    assert loss == 0
+    with ape.reverts("!keeper"):
+        keeper.report(strategy, sender=user)
 
     strategy.setKeeper(keeper, sender=management)
 
