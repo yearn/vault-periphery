@@ -21,35 +21,6 @@ contract GenericDebtAllocatorFactory is Clonable {
 
     /**
      * @notice Clones a new debt allocator.
-     * @dev defaults to msg.sender as the governance role and 0
-     *  for the `minimumChange`.
-     *
-     * @param _vault The vault for the allocator to be hooked to.
-     * @return Address of the new generic debt allocator
-     */
-    function newGenericDebtAllocator(
-        address _vault
-    ) external virtual returns (address) {
-        return newGenericDebtAllocator(_vault, msg.sender, 0);
-    }
-
-    /**
-     * @notice Clones a new debt allocator.
-     * @dev defaults to 0 for the `minimumChange`.
-     *
-     * @param _vault The vault for the allocator to be hooked to.
-     * @param _governance Address to serve as governance.
-     * @return Address of the new generic debt allocator
-     */
-    function newGenericDebtAllocator(
-        address _vault,
-        address _governance
-    ) external virtual returns (address) {
-        return newGenericDebtAllocator(_vault, _governance, 0);
-    }
-
-    /**
-     * @notice Clones a new debt allocator.
      * @param _vault The vault for the allocator to be hooked to.
      * @param _governance Address to serve as governance.
      * @return newAllocator Address of the new generic debt allocator
