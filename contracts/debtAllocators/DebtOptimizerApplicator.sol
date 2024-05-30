@@ -87,13 +87,13 @@ contract DebtOptimizerApplicator {
             if (_strategyDebtRatios[i].maxRatio == 0) {
                 _debtAllocator.setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
-                    _strategyDebtRatios[i].targetRatio,
-                    _strategyDebtRatios[i].maxRatio
+                    _strategyDebtRatios[i].targetRatio
                 );
             } else {
                 _debtAllocator.setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
-                    _strategyDebtRatios[i].targetRatio
+                    _strategyDebtRatios[i].targetRatio,
+                    _strategyDebtRatios[i].maxRatio
                 );
             }
         }
