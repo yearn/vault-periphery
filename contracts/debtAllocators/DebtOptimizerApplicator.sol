@@ -76,7 +76,7 @@ contract DebtOptimizerApplicator {
     ) external virtual onlyGovernance {
         managers[_address] = _allowed;
 
-        emit UpdateManager(_address, _allowed);
+        // emit UpdateManager(_address, _allowed);
     }
 
     function setStrategyDebtRatios(
