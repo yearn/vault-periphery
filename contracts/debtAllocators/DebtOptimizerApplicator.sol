@@ -71,7 +71,7 @@ contract DebtOptimizerApplicator {
 
     function setStrategyDebtRatios(
         address _debtAllocator,
-        StrategyDebtRatio[] memory _strategyDebtRatios // TODO: use calldata instead of memory?
+        StrategyDebtRatio[] calldata _strategyDebtRatios
     ) public onlyManagers {
         for (uint8 i; i < _strategyDebtRatios.length; ++i) {
             if (_strategyDebtRatios[i].maxRatio == 0) {

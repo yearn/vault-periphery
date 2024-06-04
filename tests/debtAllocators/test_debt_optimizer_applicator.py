@@ -111,5 +111,3 @@ def test_set_ratios(
     assert debt_allocator.totalDebtRatio() == 10_000
     assert debt_allocator.getConfig(strategy) == (True, 8_000, 9_000, 0, 0)
     assert debt_allocator.getConfig(new_strategy) == (True, 2_000, 2_000 * 1.2, 0, 0)
-
-
