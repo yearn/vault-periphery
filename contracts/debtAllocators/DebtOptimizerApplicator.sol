@@ -4,6 +4,16 @@ pragma solidity >=0.8.18;
 import {DebtAllocator, DebtAllocatorFactory} from "./DebtAllocator.sol";
 
 contract DebtOptimizerApplicator {
+    /// @notice An event emitted when a keeper is added or removed.
+    event UpdateManager(address indexed manager, bool allowed);
+
+    /// @notice struct for debt ratio changes
+    struct StrategyDebtRatio {
+        address strategy;
+        uint256 targetRatio;
+        uint256 maxRatio;
+    }
+
     /// @notice Make sure the caller is governance.
     modifier onlyGovernance() {
         _isGovernance();
@@ -13,12 +23,6 @@ contract DebtOptimizerApplicator {
     /// @notice Make sure the caller is governance or a manager.
     modifier onlyManagers() {
         _isManager();
-        _;
-    }
-
-    /// @notice Make sure the caller is a keeper
-    modifier onlyKeepers() {
-        _isKeeper();
         _;
     }
 
@@ -39,20 +43,6 @@ contract DebtOptimizerApplicator {
                 DebtAllocatorFactory(debtAllocatorFactory).governance(),
             "!manager"
         );
-    }
-
-    /// @notice Check is one of the allowed keepers.
-    function _isKeeper() internal view virtual {
-        require(
-            DebtAllocatorFactory(debtAllocatorFactory).keepers(msg.sender),
-            "!keeper"
-        );
-    }
-
-    struct StrategyDebtRatio {
-        address strategy;
-        uint256 targetRatio;
-        uint256 maxRatio;
     }
 
     /// @notice The address of the debt allocator factory to use for some role checks.
@@ -76,21 +66,21 @@ contract DebtOptimizerApplicator {
     ) external virtual onlyGovernance {
         managers[_address] = _allowed;
 
-        // emit UpdateManager(_address, _allowed);
+        emit UpdateManager(_address, _allowed);
     }
 
     function setStrategyDebtRatios(
-        DebtAllocator _debtAllocator,
+        address _debtAllocator,
         StrategyDebtRatio[] memory _strategyDebtRatios // TODO: use calldata instead of memory?
     ) public onlyManagers {
         for (uint8 i; i < _strategyDebtRatios.length; ++i) {
             if (_strategyDebtRatios[i].maxRatio == 0) {
-                _debtAllocator.setStrategyDebtRatio(
+                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio
                 );
             } else {
-                _debtAllocator.setStrategyDebtRatio(
+                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio,
                     _strategyDebtRatios[i].maxRatio
