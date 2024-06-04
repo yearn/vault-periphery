@@ -8,7 +8,7 @@ import {Accountant, ERC20, SafeERC20} from "../accountants/Accountant.sol";
 contract Dumper is TradeFactorySwapper, Governance {
     using SafeERC20 for ERC20;
 
-    address public immutable accountant;
+    Accountant public immutable accountant;
 
     address public immutable splitter;
 
@@ -24,7 +24,7 @@ contract Dumper is TradeFactorySwapper, Governance {
         require(_accountant != address(0), "ZERO ADDRESS");
         require(_splitter != address(0), "ZERO ADDRESS");
         require(_splitToken != address(0), "ZERO ADDRESS");
-        accountant = _accountant;
+        accountant = Accountant(_accountant);
         splitter = _splitter;
         _setTradeFactory(_tf, _splitToken);
         splitToken = _splitToken;
@@ -59,25 +59,33 @@ contract Dumper is TradeFactorySwapper, Governance {
         splitToken = _splitToken;
     }
 
+    // Send the split token to the Splitter contract.
     function distribute() external {
         ERC20(splitToken).safeTransfer(
             splitter,
-            ERC20(splitToken).balanceOf(address(this))
+            ERC20(splitToken).balanceOf(address(this)) - 1
         );
     }
 
     function _claimRewards() internal override {
         address[] memory localRewardTokens = rewardTokens();
         for (uint256 i; i < localRewardTokens.length; ++i) {
-            Accountant(accountant).distribute(localRewardTokens[i]);
+            accountant.distribute(localRewardTokens[i]);
         }
     }
 
+    // Claim the fees from the accountant
     function claim(address _token) external onlyGovernance {
-        Accountant(accountant).distribute(_token);
+        accountant.distribute(_token);
+    }
+
+    function claim(address[] calldata _tokens) external onlyGovernance {
+        for (uint256 i; i < _tokens.length; ++i) {
+            accountant.distribute(_tokens[i]);
+        }
     }
 
     function claim(address _token, uint256 _amount) external onlyGovernance {
-        Accountant(accountant).distribute(_token, _amount);
+        accountant.distribute(_token, _amount);
     }
 }
