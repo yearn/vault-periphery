@@ -67,12 +67,7 @@ contract Dumper is TradeFactorySwapper, Governance {
         );
     }
 
-    function _claimRewards() internal override {
-        address[] memory localRewardTokens = rewardTokens();
-        for (uint256 i; i < localRewardTokens.length; ++i) {
-            accountant.distribute(localRewardTokens[i]);
-        }
-    }
+    function _claimRewards() internal override {}
 
     // Claim the fees from the accountant
     function claim(address _token) external onlyGovernance {
@@ -87,5 +82,13 @@ contract Dumper is TradeFactorySwapper, Governance {
 
     function claim(address _token, uint256 _amount) external onlyGovernance {
         accountant.distribute(_token, _amount);
+    }
+
+    function sweep(address _token) external onlyGovernance {
+        address daddy = accountant.feeManager();
+        ERC20(_token).safeTransfer(
+            daddy,
+            ERC20(_token).balanceOf(address(this))
+        );
     }
 }
