@@ -151,7 +151,8 @@ contract RoleManager is Governance2Step {
                     Roles.DEBT_MANAGER |
                     Roles.QUEUE_MANAGER |
                     Roles.DEPOSIT_LIMIT_MANAGER |
-                    Roles.DEBT_PURCHASER
+                    Roles.DEBT_PURCHASER |
+                    Roles.PROFIT_UNLOCK_MANAGER
             )
         });
 
