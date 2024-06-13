@@ -415,6 +415,12 @@ def debt_allocator(debt_allocator_factory, project, vault, daddy):
 
 
 @pytest.fixture(scope="session")
+def debt_optimizer_applicator(debt_allocator_factory, project, brain):
+
+    yield brain.deploy(project.DebtOptimizerApplicator, debt_allocator_factory.address)
+
+
+@pytest.fixture(scope="session")
 def deploy_role_manager(
     project, daddy, brain, security, keeper, strategy_manager, registry
 ):
