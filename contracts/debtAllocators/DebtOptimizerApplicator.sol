@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity >=0.8.18;
 
-import {DebtAllocator, DebtAllocatorFactory} from "./DebtAllocator.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {IDebtAllocatorFactory} from "./DebtAllocator.sol";
 
-contract DebtOptimizerApplicator {
+interface IDebtAllocator {
+    function setStrategyDebtRatio(
+        address _strategy,
+        uint256 _targetRatio
+    ) external;
+    function setStrategyDebtRatio(
+        address _strategy,
+        uint256 _targetRatio,
+        uint256 _maxRatio
+    ) external;
+}
+
+contract DebtOptimizerApplicator is Multicall {
     /// @notice An event emitted when a keeper is added or removed.
     event UpdateManager(address indexed manager, bool allowed);
 
@@ -30,7 +43,7 @@ contract DebtOptimizerApplicator {
     function _isGovernance() internal view virtual {
         require(
             msg.sender ==
-                DebtAllocatorFactory(debtAllocatorFactory).governance(),
+                IDebtAllocatorFactory(debtAllocatorFactory).governance(),
             "!governance"
         );
     }
@@ -40,7 +53,7 @@ contract DebtOptimizerApplicator {
         require(
             managers[msg.sender] ||
                 msg.sender ==
-                DebtAllocatorFactory(debtAllocatorFactory).governance(),
+                IDebtAllocatorFactory(debtAllocatorFactory).governance(),
             "!manager"
         );
     }
@@ -75,12 +88,12 @@ contract DebtOptimizerApplicator {
     ) public onlyManagers {
         for (uint8 i; i < _strategyDebtRatios.length; ++i) {
             if (_strategyDebtRatios[i].maxRatio == 0) {
-                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
+                IDebtAllocator(_debtAllocator).setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio
                 );
             } else {
-                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
+                IDebtAllocator(_debtAllocator).setStrategyDebtRatio(
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio,
                     _strategyDebtRatios[i].maxRatio
