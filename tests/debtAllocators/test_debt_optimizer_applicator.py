@@ -1,6 +1,7 @@
 import ape
 from ape import chain, project
 from utils.constants import MAX_INT, ROLES
+import itertools
 
 
 def test_setup(debt_optimizer_applicator, debt_allocator_factory, brain):
@@ -111,3 +112,61 @@ def test_set_ratios(
     assert debt_allocator.totalDebtRatio() == 10_000
     assert debt_allocator.getConfig(strategy) == (True, 8_000, 9_000, 0, 0)
     assert debt_allocator.getConfig(new_strategy) == (True, 2_000, 2_000 * 1.2, 0, 0)
+
+
+def test_set_ratios_multicall(
+    debt_optimizer_applicator,
+    debt_allocator,
+    brain,
+    daddy,
+    asset,
+    create_vault,
+    create_strategy,
+    create_debt_allocator,
+    user,
+):
+    debt_allocators: dict[str, list[str]] = {}
+    for _ in range(2):
+        vault = create_vault(asset)
+        debt_allocator = create_debt_allocator(vault)
+        debt_allocator.setManager(debt_optimizer_applicator, True, sender=brain)
+        debt_allocator.setMinimumChange(1, sender=brain)
+        debt_allocators[debt_allocator.address] = []
+        for _ in range(2):
+            debt_allocators[debt_allocator.address].append(create_strategy(asset))
+
+    calldata = [
+        debt_optimizer_applicator.setStrategyDebtRatios.encode_input(
+            allocator, [(strategy, int(5_000), int(0)) for strategy in strategies]
+        )
+        for allocator, strategies in debt_allocators.items()
+    ]
+
+    with ape.reverts("!manager"):
+        debt_optimizer_applicator.multicall(calldata, sender=user)
+
+    tx = debt_optimizer_applicator.multicall(
+        calldata,
+        sender=brain,
+    )
+
+    events = list(tx.decode_logs(debt_allocator.UpdateStrategyDebtRatio))
+    strategies = list(itertools.chain(*debt_allocators.values()))
+
+    assert len(events) == 4
+    for event in events:
+        assert event.strategy in strategies
+        assert event.newTargetRatio == 5_000
+        assert event.newMaxRatio == int(5_000 * 1.2)
+
+    for debt_allocator_addr, strategies in debt_allocators.items():
+        debt_allocator = project.DebtAllocator.at(debt_allocator_addr)
+        assert debt_allocator.totalDebtRatio() == 10_000
+        for strategy in strategies:
+            assert debt_allocator.getConfig(strategy) == (
+                True,
+                5_000,
+                5_000 * 1.2,
+                0,
+                0,
+            )

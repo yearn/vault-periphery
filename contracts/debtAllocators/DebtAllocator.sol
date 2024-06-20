@@ -1,10 +1,15 @@
-// SPDX-License-Identifier: GNU AGPLv3
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-import {DebtAllocatorFactory} from "./DebtAllocatorFactory.sol";
+
+interface IDebtAllocatorFactory {
+    function governance() external view returns (address);
+    function keepers(address) external view returns (bool);
+    function isCurrentBaseFeeAcceptable() external view returns (bool);
+}
 
 /**
  * @title YearnV3 Debt Allocator
@@ -98,7 +103,7 @@ contract DebtAllocator {
     /// @notice Check the Factories governance address.
     function _isGovernance() internal view virtual {
         require(
-            msg.sender == DebtAllocatorFactory(factory).governance(),
+            msg.sender == IDebtAllocatorFactory(factory).governance(),
             "!governance"
         );
     }
@@ -107,14 +112,14 @@ contract DebtAllocator {
     function _isManager() internal view virtual {
         require(
             managers[msg.sender] ||
-                msg.sender == DebtAllocatorFactory(factory).governance(),
+                msg.sender == IDebtAllocatorFactory(factory).governance(),
             "!manager"
         );
     }
 
     /// @notice Check is one of the allowed keepers.
     function _isKeeper() internal view virtual {
-        require(DebtAllocatorFactory(factory).keepers(msg.sender), "!keeper");
+        require(IDebtAllocatorFactory(factory).keepers(msg.sender), "!keeper");
     }
 
     uint256 internal constant MAX_BPS = 10_000;
@@ -221,7 +226,7 @@ contract DebtAllocator {
         if (!config.added) return (false, bytes("!added"));
 
         // Check the base fee isn't too high.
-        if (!DebtAllocatorFactory(factory).isCurrentBaseFeeAcceptable()) {
+        if (!IDebtAllocatorFactory(factory).isCurrentBaseFeeAcceptable()) {
             return (false, bytes("Base Fee"));
         }
 
