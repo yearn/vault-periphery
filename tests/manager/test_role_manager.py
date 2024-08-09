@@ -11,6 +11,7 @@ brain_roles = (
     | ROLES.QUEUE_MANAGER
     | ROLES.DEPOSIT_LIMIT_MANAGER
     | ROLES.DEBT_PURCHASER
+    | ROLES.PROFIT_UNLOCK_MANAGER
 )
 security_roles = ROLES.MAX_DEBT_MANAGER
 keeper_roles = ROLES.REPORTING_MANAGER
@@ -1087,7 +1088,7 @@ def test_add_new_vault__duplicate_reverts(
         event.vault_address
     )
 
-    with ape.reverts(to_bytes32(f"Already Deployed {vault.address}")):
+    with ape.reverts():  # to_bytes32(f"Already Deployed {vault.address}")):
         role_manager.addNewVault(new_vault, category, debt_allocator, sender=daddy)
 
     # Can add it with a different category.

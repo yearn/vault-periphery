@@ -79,7 +79,7 @@ def test_add_vault(
 
     # Should work now
     tx = accountant.report(strategy, 1_000, 0, sender=vault)
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
     assert fees == 100
     assert refunds == 0
 
@@ -134,7 +134,7 @@ def test_remove_vault(
 
     # Should work
     tx = accountant.report(strategy, 1_000, 0, sender=vault)
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
     assert fees == 100
     assert refunds == 0
 
@@ -206,7 +206,7 @@ def test_remove_vault__non_zero_allomance(
 
     # Should work
     tx = accountant.report(strategy, 1_000, 0, sender=vault)
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
     assert fees == 100
     assert refunds == 0
 
@@ -295,7 +295,7 @@ def test_add_vault__vault_manager(
 
     # Should work now
     tx = accountant.report(strategy, 1_000, 0, sender=vault)
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
     assert fees == 100
     assert refunds == 0
 
@@ -362,7 +362,7 @@ def test_remove_vault__vault_manager(
 
     # Should work
     tx = accountant.report(strategy, 1_000, 0, sender=vault)
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
     assert fees == 100
     assert refunds == 0
 
@@ -692,7 +692,7 @@ def test_report_profit(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -738,7 +738,7 @@ def test_report_no_profit(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -786,7 +786,7 @@ def test_report_max_fee(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -839,7 +839,7 @@ def test_report_refund(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -894,7 +894,7 @@ def test_report_refund_not_enough_asset(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -944,7 +944,7 @@ def test_report_profit__custom_config(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -989,7 +989,7 @@ def test_report_no_profit__custom_config(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Managmeent fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -1038,7 +1038,7 @@ def test_report_max_fee__custom_config(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -1175,7 +1175,7 @@ def test_report_refund__custom_config(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
@@ -1238,7 +1238,7 @@ def test_report_refund_not_enough_asset__custom_config(
 
     tx = accountant.report(strategy.address, gain, loss, sender=vault.address)
 
-    fees, refunds = tx.return_value
+    (fees, refunds) = tx.return_value
 
     # Management fees
     expected_management_fees = amount * config[0] // MAX_BPS
