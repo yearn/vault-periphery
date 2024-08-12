@@ -485,3 +485,33 @@ def splitter(daddy, management, brain, splitter_factory):
     splitter = project.Splitter.at(event.splitter)
 
     yield splitter
+
+
+@pytest.fixture(scope="session")
+def deploy_generic_allocator_factory(project, daddy, brain):
+    def deploy_generic_allocator_factory(gov=daddy):
+        generic_allocator_factory = gov.deploy(project.GenericDebtAllocatorFactory)
+
+        return generic_allocator_factory
+
+    yield deploy_generic_allocator_factory
+
+
+@pytest.fixture(scope="session")
+def generic_allocator_factory(deploy_generic_allocator_factory):
+    generic_allocator_factory = deploy_generic_allocator_factory()
+
+    yield generic_allocator_factory
+
+
+@pytest.fixture(scope="session")
+def generic_allocator(generic_allocator_factory, project, vault, daddy, brain):
+    tx = generic_allocator_factory.newGenericDebtAllocator(
+        vault, brain, int(1e18), sender=daddy
+    )
+
+    event = list(tx.decode_logs(generic_allocator_factory.NewDebtAllocator))[0]
+
+    generic_allocator = project.GenericDebtAllocator.at(event.allocator)
+
+    yield generic_allocator
