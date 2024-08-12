@@ -8,6 +8,11 @@ import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
 import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.sol";
 
+// TODO:
+// 1. Initiate new "project"
+// 2. Can deploy using project id
+
+
 contract V3Deployer is Positions {
     bytes32 public constant KEEPER = keccak256("Keeper");
     /// @notice Position ID for the Registry.
