@@ -37,6 +37,9 @@ contract GenericDebtAllocator is Governance {
         uint256 newTotalDebtRatio
     );
 
+    /// @notice An even emitted when the paused status is updated.
+    event UpdatePaused(bool indexed status);
+
     /// @notice An event emitted when the minimum time to wait is updated.
     event UpdateMinimumWait(uint256 newMinimumWait);
 
@@ -104,6 +107,9 @@ contract GenericDebtAllocator is Governance {
     }
 
     uint256 internal constant MAX_BPS = 10_000;
+
+    /// @notice If the allocator is currently in paused state.
+    bool public paused;
 
     /// @notice Address of the vault this serves as allocator for.
     address public vault;
@@ -213,6 +219,8 @@ contract GenericDebtAllocator is Governance {
     function shouldUpdateDebt(
         address _strategy
     ) public view virtual returns (bool, bytes memory) {
+        if (paused) return (false, bytes("paused"));
+
         // Get the strategy specific debt config.
         Config memory config = getConfig(_strategy);
 
@@ -540,6 +548,17 @@ contract GenericDebtAllocator is Governance {
         managers[_address] = _allowed;
 
         emit UpdateManager(_address, _allowed);
+    }
+
+    /**
+     * @notice Allows governance to pause the triggers.
+     * @param _status Status to set the `paused` bool to.
+     */
+    function setPaused(bool _status) external virtual onlyGovernance {
+        require(_status != paused, "already set");
+        paused = _status;
+
+        emit UpdatePaused(_status);
     }
 
     /**

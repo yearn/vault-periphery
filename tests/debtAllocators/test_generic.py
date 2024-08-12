@@ -512,3 +512,62 @@ def test_update_debt(
     assert generic_allocator.getConfig(strategy)[2] != timestamp
     assert vault.totalIdle() == amount
     assert vault.totalDebt() == 0
+
+
+def test_pause(
+    generic_allocator, vault, strategy, brain, daddy, user, deposit_into_vault, amount
+):
+    assert generic_allocator.paused() == False
+    assert generic_allocator.getConfig(strategy.address) == (False, 0, 0, 0, 0)
+    vault.add_role(generic_allocator, ROLES.DEBT_MANAGER, sender=daddy)
+
+    (bool, bytes) = generic_allocator.shouldUpdateDebt(strategy.address)
+    assert bool == False
+    assert bytes == ("!added").encode("utf-8")
+
+    vault.add_strategy(strategy.address, sender=daddy)
+
+    minimum = int(1)
+    target = int(5_000)
+    max = int(5_000)
+
+    generic_allocator.setMinimumChange(minimum, sender=brain)
+    generic_allocator.setStrategyDebtRatio(strategy, target, max, sender=brain)
+    deposit_into_vault(vault, amount)
+    vault.update_max_debt_for_strategy(strategy, MAX_INT, sender=daddy)
+
+    # Should now want to allocate 50%
+    (bool, bytes) = generic_allocator.shouldUpdateDebt(strategy.address)
+    assert bool == True
+    assert bytes == vault.update_debt.encode_input(strategy.address, amount // 2)
+
+    # Pause the allocator
+
+    # with ape.reverts("!governance"):
+    #   generic_allocator.setPaused(True, sender=user)
+
+    tx = generic_allocator.setPaused(True, sender=brain)
+
+    assert generic_allocator.paused() == True
+
+    events = list(tx.decode_logs(generic_allocator.UpdatePaused))
+
+    assert len(events) == 1
+    assert events[0].status == True
+
+    (bool, bytes) = generic_allocator.shouldUpdateDebt(strategy.address)
+    assert bool == False
+    assert bytes == ("paused").encode("utf-8")
+
+    # Unpause
+    tx = generic_allocator.setPaused(False, sender=brain)
+
+    assert generic_allocator.paused() == False
+    events = list(tx.decode_logs(generic_allocator.UpdatePaused))
+
+    assert len(events) == 1
+    assert events[0].status == False
+
+    (bool, bytes) = generic_allocator.shouldUpdateDebt(strategy.address)
+    assert bool == True
+    assert bytes == vault.update_debt.encode_input(strategy.address, amount // 2)
