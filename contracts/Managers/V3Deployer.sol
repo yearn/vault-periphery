@@ -44,6 +44,7 @@ contract V3Deployer is Positions {
                 _symbol,
                 msg.sender,
                 address(0),
+                0,
                 defaultProfitMaxUnlock
             );
     }
@@ -61,6 +62,7 @@ contract V3Deployer is Positions {
                 _symbol,
                 _roleManager,
                 address(0),
+                0,
                 defaultProfitMaxUnlock
             );
     }
@@ -79,6 +81,7 @@ contract V3Deployer is Positions {
                 _symbol,
                 _roleManager,
                 _accountant,
+                0,
                 defaultProfitMaxUnlock
             );
     }
@@ -89,6 +92,27 @@ contract V3Deployer is Positions {
         string calldata _symbol,
         address _roleManager,
         address _accountant,
+        uint256 _depositLimit
+    ) external returns (address, address) {
+        return
+            _newVault(
+                _token,
+                _name,
+                _symbol,
+                _roleManager,
+                _accountant,
+                _depositLimit,
+                defaultProfitMaxUnlock
+            );
+    }
+
+    function newVault(
+        address _token,
+        string calldata _name,
+        string calldata _symbol,
+        address _roleManager,
+        address _accountant,
+        uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
     ) external returns (address, address) {
         return
@@ -98,6 +122,7 @@ contract V3Deployer is Positions {
                 _symbol,
                 _roleManager,
                 _accountant,
+                _depositLimit,
                 _profitMaxUnlockTime
             );
     }
@@ -107,9 +132,9 @@ contract V3Deployer is Positions {
         string memory _name,
         string memory _symbol,
         address _roleManager,
-        uint256 _profitMaxUnlockTime,
         address _accountant,
-        address _depositLimit
+        uint256 _depositLimit,
+        uint256 _profitMaxUnlockTime
     ) internal returns (address _vault, address _debtAllocator) {
         _vault = IVaultFactory(getLatestFactory()).deploy_new_vault(
             _token,
@@ -166,11 +191,7 @@ contract V3Deployer is Positions {
         _setRole(_vault, getKeeper(), getPositionRoles(KEEPER));
 
         // Give the specific debt allocator its roles.
-        _setRole(
-            _vault,
-            _debtAllocator, 
-            getPositionRoles(DEBT_ALLOCATOR)
-        );
+        _setRole(_vault, _debtAllocator, getPositionRoles(DEBT_ALLOCATOR));
     }
 
     /**
@@ -197,7 +218,10 @@ contract V3Deployer is Positions {
      *   This temporarily gives the `ACCOUNTANT_MANAGER` role to this contract.
      * @param _vault Address of the vault to set up the accountant for.
      */
-    function _setAccountant(address _vault, address _accountant) internal virtual {
+    function _setAccountant(
+        address _vault,
+        address _accountant
+    ) internal virtual {
         // If there is an accountant set.
         if (_accountant != address(0)) {
             // Temporarily give this contract the ability to set the accountant.
