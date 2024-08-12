@@ -161,7 +161,7 @@ contract V3Deployer is Positions {
             ReleaseRegistry(
                 IProtocolAddressProvider(protocolAddressProvider)
                     .getReleaseRegistry()
-            ).getLatestFactory();
+            ).latestFactory();
     }
 
     function getKeeper() public view returns (address) {
@@ -200,8 +200,6 @@ contract V3Deployer is Positions {
      *   This does not check that the roles are !=0 because it is expected that
      *   the holder will be set to 0 if the position is not being used.
      *
-     * @param _vault Address of the vault.
-     * @param _position Holder address and roles to set.
      */
     function _setRole(
         address _vault,
