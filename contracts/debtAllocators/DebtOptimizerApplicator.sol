@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity >=0.8.18;
 
-import {DebtAllocator, DebtAllocatorFactory} from "./DebtAllocator.sol";
+import {DebtAllocator, DebtAllocatorFactory} from "./DebtAllocatorFactory.sol";
 
 contract DebtOptimizerApplicator {
     /// @notice An event emitted when a keeper is added or removed.
