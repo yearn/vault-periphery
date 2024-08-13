@@ -348,7 +348,9 @@ contract V3Deployer is Positions {
         }
 
         if (_debtAllocator == address(0)) {
-            _debtAllocator = address(new DebtAllocatorFactory(_roleManager));
+            _debtAllocator = DebtAllocatorFactory(
+                _fromAddressProvider(ALLOCATOR_FACTORY)
+            ).newDebtAllocator(_roleManager);
         }
 
         projects[_id] = Project({
