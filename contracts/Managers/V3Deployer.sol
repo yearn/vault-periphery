@@ -2,23 +2,40 @@
 pragma solidity >=0.8.18;
 
 import {Positions} from "./Positions.sol";
+import {Registry, RegistryFactory} from "../registry/RegistryFactory.sol";
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
+import {AccountantFactory} from "../accountants/AccountantFactory.sol";
+import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.sol";
 
 // TODO:
 // 1. Initiate new "project"
 // 2. Can deploy using project id
 
-
 contract V3Deployer is Positions {
+    struct Project {
+        string prefix;
+        address registry;
+        address roleManager;
+        address accountant;
+        address debtAllocator;
+    }
+
     bytes32 public constant KEEPER = keccak256("Keeper");
     /// @notice Position ID for the Registry.
-    bytes32 public constant REGISTRY = keccak256("Vault Factory");
+    bytes32 public constant RELEASE_REGISTRY = keccak256("Release Registry");
+    /// @notice Position ID for the Registry.
+    bytes32 public constant REGISTRY_FACTORY = keccak256("Registry Factory");
     /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
+    /// @notice Position ID for the Accountant.
+    bytes32 public constant ACCOUNTANT_FACTORY =
+        keccak256("Accountant Factory");
     /// @notice Position ID for Debt Allocator
     bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
     /// @notice Position ID for the Allocator Factory.
@@ -31,6 +48,8 @@ contract V3Deployer is Positions {
     /// @notice Default time until profits are fully unlocked for new vaults.
     uint256 public defaultProfitMaxUnlock = 7 days;
 
+    mapping(bytes32 => Project) public projects;
+
     constructor(address _addressProvider) {
         protocolAddressProvider = _addressProvider;
 
@@ -38,13 +57,52 @@ contract V3Deployer is Positions {
     }
 
     function newVault(
-        address _token,
+        address _asset,
+        bytes32 _projectId
+    ) external returns (address, address) {
+        string memory _prefix = projects[_projectId].prefix;
+        string memory assetSymbol = ERC20(_asset).symbol();
+
+        // Name is "{SYMBOL} {PREFIX}Vault" ex: PREFIX=yv, USDC yvVault
+        string memory _name = string(
+            abi.encodePacked(assetSymbol, " ", _prefix, "Vault")
+        );
+        // Symbol is "{PREFIX}{SYMBOL}". ex: PREFIX=yv, yvUSDC
+        string memory _symbol = string(abi.encodePacked(_prefix, assetSymbol));
+
+        return newVault(_asset, _projectId, _name, _symbol);
+    }
+
+    function newVault(
+        address _asset,
+        bytes32 _projectId,
+        string memory _name,
+        string memory _symbol
+    ) public returns (address _vault, address _allocator) {
+        Project memory project = projects[_projectId];
+        require(project.roleManager != address(0), "invalid ID");
+
+        (_vault, _allocator) = _newVault(
+            _asset,
+            _name,
+            _symbol,
+            project.roleManager,
+            project.accountant,
+            2 ** 256 - 1,
+            defaultProfitMaxUnlock
+        );
+
+        Registry(project.registry).endorseVault(_vault, 0, 1, block.timestamp);
+    }
+
+    function newVault(
+        address _asset,
         string calldata _name,
         string calldata _symbol
     ) external returns (address, address) {
         return
             _newVault(
-                _token,
+                _asset,
                 _name,
                 _symbol,
                 msg.sender,
@@ -55,14 +113,14 @@ contract V3Deployer is Positions {
     }
 
     function newVault(
-        address _token,
+        address _asset,
         string calldata _name,
         string calldata _symbol,
         address _roleManager
     ) external returns (address, address) {
         return
             _newVault(
-                _token,
+                _asset,
                 _name,
                 _symbol,
                 _roleManager,
@@ -73,7 +131,7 @@ contract V3Deployer is Positions {
     }
 
     function newVault(
-        address _token,
+        address _asset,
         string calldata _name,
         string calldata _symbol,
         address _roleManager,
@@ -81,7 +139,7 @@ contract V3Deployer is Positions {
     ) external returns (address, address) {
         return
             _newVault(
-                _token,
+                _asset,
                 _name,
                 _symbol,
                 _roleManager,
@@ -92,7 +150,7 @@ contract V3Deployer is Positions {
     }
 
     function newVault(
-        address _token,
+        address _asset,
         string calldata _name,
         string calldata _symbol,
         address _roleManager,
@@ -101,7 +159,7 @@ contract V3Deployer is Positions {
     ) external returns (address, address) {
         return
             _newVault(
-                _token,
+                _asset,
                 _name,
                 _symbol,
                 _roleManager,
@@ -112,7 +170,7 @@ contract V3Deployer is Positions {
     }
 
     function newVault(
-        address _token,
+        address _asset,
         string calldata _name,
         string calldata _symbol,
         address _roleManager,
@@ -122,7 +180,7 @@ contract V3Deployer is Positions {
     ) external returns (address, address) {
         return
             _newVault(
-                _token,
+                _asset,
                 _name,
                 _symbol,
                 _roleManager,
@@ -133,7 +191,7 @@ contract V3Deployer is Positions {
     }
 
     function _newVault(
-        address _token,
+        address _asset,
         string memory _name,
         string memory _symbol,
         address _roleManager,
@@ -142,7 +200,7 @@ contract V3Deployer is Positions {
         uint256 _profitMaxUnlockTime
     ) internal returns (address _vault, address _debtAllocator) {
         _vault = IVaultFactory(getLatestFactory()).deploy_new_vault(
-            _token,
+            _asset,
             _name,
             _symbol,
             address(this),
@@ -163,14 +221,13 @@ contract V3Deployer is Positions {
 
     function getLatestFactory() public view returns (address) {
         return
-            ReleaseRegistry(
-                IProtocolAddressProvider(protocolAddressProvider)
-                    .getReleaseRegistry()
-            ).latestFactory();
+            ReleaseRegistry(_fromAddressProvider(RELEASE_REGISTRY))
+                .latestFactory();
     }
 
-    function getKeeper() public view returns (address) {
-        return IProtocolAddressProvider(protocolAddressProvider).getKeeper();
+    function _fromAddressProvider(bytes32 _id) internal view returns (address) {
+        return
+            IProtocolAddressProvider(protocolAddressProvider).getAddress(_id);
     }
 
     function _deployAllocator(
@@ -193,7 +250,11 @@ contract V3Deployer is Positions {
         address _debtAllocator
     ) internal virtual {
         // Set the roles for the Keeper.
-        _setRole(_vault, getKeeper(), getPositionRoles(KEEPER));
+        _setRole(
+            _vault,
+            _fromAddressProvider(KEEPER),
+            getPositionRoles(KEEPER)
+        );
 
         // Give the specific debt allocator its roles.
         _setRole(_vault, _debtAllocator, getPositionRoles(DEBT_ALLOCATOR));
@@ -257,5 +318,53 @@ contract V3Deployer is Positions {
 
         // Take away the role.
         IVault(_vault).remove_role(address(this), Roles.DEPOSIT_LIMIT_MANAGER);
+    }
+
+    function registerNewProject(
+        string memory _prefix,
+        address _registry,
+        address _roleManager,
+        address _accountant,
+        address _debtAllocator
+    ) external virtual {
+        bytes32 _id = getProjectId(_prefix);
+        require(projects[_id].roleManager == address(0), "project exists");
+
+        // Default to msg sender if none given
+        if (_roleManager == address(0)) _roleManager = msg.sender;
+
+        // Deploy new Registry
+        if (_registry == address(0)) {
+            _registry = RegistryFactory(_fromAddressProvider(REGISTRY_FACTORY))
+                .createNewRegistry(
+                    string(abi.encodePacked(_prefix, " Vault Registry"))
+                );
+        }
+
+        if (_accountant == address(0)) {
+            _accountant = AccountantFactory(
+                _fromAddressProvider(ACCOUNTANT_FACTORY)
+            ).newAccountant(_roleManager, _roleManager);
+        }
+
+        if (_debtAllocator == address(0)) {
+            _debtAllocator = address(new DebtAllocatorFactory(_roleManager));
+        }
+
+        projects[_id] = Project({
+            prefix: _prefix,
+            roleManager: _roleManager,
+            registry: _registry,
+            accountant: _accountant,
+            debtAllocator: _debtAllocator
+        });
+
+        // Event
+    }
+
+    function getProjectId(
+        string memory _prefix
+    ) public view virtual returns (bytes32) {
+        return keccak256(abi.encodePacked(_prefix));
     }
 }

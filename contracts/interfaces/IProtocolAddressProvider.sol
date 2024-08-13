@@ -2,6 +2,8 @@
 pragma solidity >=0.8.18;
 
 interface IProtocolAddressProvider {
+    function getAddress(bytes32 _id) external view returns (address);
+
     function getRouter() external view returns (address);
 
     function getKeeper() external view returns (address);
