@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity >=0.8.18;
 
+import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 
 interface IBaseFee {
     function basefee_global() external view returns (uint256);
@@ -18,9 +17,11 @@ interface IBaseFee {
  *  a Yearn V3 vault to provide the needed triggers for a keeper
  *  to perform automated debt updates for the vaults strategies.
  *
- *  Each allocator contract will serve one Vault and each strategy
- *  that should be managed by this allocator will need to be added
- *  manually by setting a `targetRatio` and `maxRatio`.
+ *  Each vault that should be managed by this allocator will
+ *  need to be added by first setting a `minimumChange` for the
+ *  vault, which will act as the amount of funds to move that will
+ *  trigger a debt update. Then adding each strategy by setting a
+ *  `targetRatio` and `maxRatio`.
  *
  *  The allocator aims to allocate debt between the strategies
  *  based on their set target ratios. Which are denominated in basis
@@ -29,7 +30,7 @@ interface IBaseFee {
  *
  *  The trigger will attempt to allocate up to the `maxRatio` when
  *  the strategy has `minimumChange` amount less than the `targetRatio`.
- *  And will pull funds from the strategy when it has `minimumChange`
+ *  And will pull funds to the `targetRatio` when it has `minimumChange`
  *  more than its `maxRatio`.
  */
 contract DebtAllocator is Governance {
@@ -98,15 +99,22 @@ contract DebtAllocator is Governance {
         uint120 open;
     }
 
+    /// @notice Struct to hold the vault's info.
     struct VaultConfig {
+        // Optional flag to stop the triggers.
         bool paused;
+        // The minimum amount denominated in asset that will
+        // need to be moved to trigger a debt update.
         uint128 minimumChange;
+        // Total debt ratio currently allocated in basis points.
+        // Can't be more than 10_000.
         uint16 totalDebtRatio;
     }
 
+    /// @notice Used during the `shouldUpdateDebt` to hold the data.
     struct StrategyDebtInfo {
-        StrategyConfig strategyConfig;
         VaultConfig vaultConfig;
+        StrategyConfig strategyConfig;
         uint256 vaultAssets;
         uint256 targetDebt;
         uint256 maxDebt;
@@ -194,15 +202,9 @@ contract DebtAllocator is Governance {
 
     /**
      * @notice Debt update wrapper for the vault.
-     * @dev This can be used if a minimum time between debt updates
-     *   is desired to be used for the trigger and to enforce a max loss.
+     * @dev This contract must have the DEBT_MANAGER role assigned to them.
      *
-     *   This contract must have the DEBT_MANAGER role assigned to them.
-     *
-     *   The function signature matches the vault so no update to the
-     *   call data is required.
-     *
-     *   This will also run checks on losses realized during debt
+     *   This will also uses the `maxUpdateDebtLoss` during debt
      *   updates to assure decreases did not realize profits outside
      *   of the allowed range.
      */
@@ -445,6 +447,7 @@ contract DebtAllocator is Governance {
      * @dev A `minimumChange` for that strategy must be set first.
      * This is to prevent debt from being updated too frequently.
      *
+     * @param _vault Address of the vault
      * @param _strategy Address of the strategy to set.
      * @param _targetRatio Amount in Basis points to allocate.
      * @param _maxRatio Max ratio to give on debt increases.
@@ -503,6 +506,7 @@ contract DebtAllocator is Governance {
     /**
      * @notice Remove a strategy from this debt allocator.
      * @dev Will delete the full config for the strategy
+     * @param _vault Address of the vault
      * @param _strategy Address of the address ro remove.
      */
     function removeStrategy(
@@ -540,6 +544,7 @@ contract DebtAllocator is Governance {
      * @dev This is the minimum amount of debt to be
      * added or pulled for it to trigger an update.
      *
+     * @param _vault Address of the vault
      * @param _minimumChange The new minimum to set for the strategy.
      */
     function setMinimumChange(
@@ -558,6 +563,7 @@ contract DebtAllocator is Governance {
 
     /**
      * @notice Allows governance to pause the triggers.
+     * @param _vault Address of the vault
      * @param _status Status to set the `paused` bool to.
      */
     function setPaused(
@@ -666,6 +672,7 @@ contract DebtAllocator is Governance {
     /**
      * @notice Get a strategies full config.
      * @dev Used for customizations by inheriting the contract.
+     * @param _vault Address of the vault
      * @param _strategy Address of the strategy.
      * @return The strategies current Config.
      */
@@ -688,24 +695,37 @@ contract DebtAllocator is Governance {
         return _vaultConfigs[_vault];
     }
 
+    /**
+     * @notice Get a vaults current total debt.
+     * @param _vault Address of the vault
+     */
     function totalDebtRatio(
         address _vault
     ) external view virtual returns (uint256) {
         return getVaultConfig(_vault).totalDebtRatio;
     }
 
+    /**
+     * @notice Get a vaults minimum change required.
+     * @param _vault Address of the vault
+     */
     function minimumChange(
         address _vault
     ) external view virtual returns (uint256) {
         return getVaultConfig(_vault).minimumChange;
     }
 
+    /**
+     * @notice Get the paused status of a vault
+     * @param _vault Address of the vault
+     */
     function isPaused(address _vault) public view virtual returns (bool) {
         return getVaultConfig(_vault).paused;
     }
 
     /**
      * @notice Get a strategies target debt ratio.
+     * @param _vault Address of the vault
      * @param _strategy Address of the strategy.
      * @return The strategies current targetRatio.
      */
@@ -718,6 +738,7 @@ contract DebtAllocator is Governance {
 
     /**
      * @notice Get a strategies max debt ratio.
+     * @param _vault Address of the vault
      * @param _strategy Address of the strategy.
      * @return The strategies current maxRatio.
      */

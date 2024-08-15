@@ -313,7 +313,9 @@ def test_decrease_debt_ratio(
 
     # Underflow
     with ape.reverts():
-        debt_allocator.decreaseStrategyDebtRatio(vault, strategy, target, sender=brain)
+        debt_allocator.decreaseStrategyDebtRatio(
+            vault.address, strategy.address, target, sender=brain
+        )
 
     # Add the target
     tx = debt_allocator.increaseStrategyDebtRatio(vault, strategy, target, sender=brain)
@@ -431,6 +433,7 @@ def test_remove_strategy(
 def test_should_update_debt(
     debt_allocator, vault, strategy, brain, daddy, deposit_into_vault, amount
 ):
+    debt_allocator.setMinimumWait(0, sender=brain)
     assert debt_allocator.getStrategyConfig(vault, strategy.address) == (
         False,
         0,
@@ -511,7 +514,7 @@ def test_should_update_debt(
     )
 
     # Set a minimumWait time
-    debt_allocator.setMinimumWait(vault, MAX_INT, sender=brain)
+    debt_allocator.setMinimumWait(MAX_INT, sender=brain)
     # Should now be false
     (bool, bytes) = debt_allocator.shouldUpdateDebt(vault, strategy.address)
     assert bool == False
