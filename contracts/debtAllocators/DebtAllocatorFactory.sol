@@ -19,7 +19,7 @@ contract DebtAllocatorFactory is Clonable {
 
     constructor() {
         // Deploy a dummy allocator as the original.
-        original = address(new DebtAllocator(address(this)));
+        original = address(new DebtAllocator());
     }
 
     /**
@@ -34,7 +34,7 @@ contract DebtAllocatorFactory is Clonable {
         newAllocator = _clone();
 
         // Initialize the new allocator.
-        //DebtAllocator(newAllocator).initialize(_vault, _minimumChange);
+        DebtAllocator(newAllocator).initialize(_governance);
 
         // Emit event.
         emit NewDebtAllocator(newAllocator, _governance);

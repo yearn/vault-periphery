@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity >=0.8.18;
 
-import {DebtAllocator, DebtAllocatorFactory} from "./DebtAllocatorFactory.sol";
+import {DebtAllocator} from "./DebtAllocator.sol";
 
 contract DebtOptimizerApplicator {
     /// @notice An event emitted when a keeper is added or removed.
@@ -29,8 +29,7 @@ contract DebtOptimizerApplicator {
     /// @notice Check the Factories governance address.
     function _isGovernance() internal view virtual {
         require(
-            msg.sender ==
-                DebtAllocatorFactory(debtAllocatorFactory).governance(),
+            msg.sender == DebtAllocator(debtAllocator).governance(),
             "!governance"
         );
     }
@@ -39,20 +38,19 @@ contract DebtOptimizerApplicator {
     function _isManager() internal view virtual {
         require(
             managers[msg.sender] ||
-                msg.sender ==
-                DebtAllocatorFactory(debtAllocatorFactory).governance(),
+                msg.sender == DebtAllocator(debtAllocator).governance(),
             "!manager"
         );
     }
 
     /// @notice The address of the debt allocator factory to use for some role checks.
-    address public immutable debtAllocatorFactory;
+    address public immutable debtAllocator;
 
     /// @notice Mapping of addresses that are allowed to update debt ratios.
     mapping(address => bool) public managers;
 
-    constructor(address _debtAllocatorFactory) {
-        debtAllocatorFactory = _debtAllocatorFactory;
+    constructor(address _debtAllocator) {
+        debtAllocator = _debtAllocator;
     }
 
     /**
@@ -70,17 +68,19 @@ contract DebtOptimizerApplicator {
     }
 
     function setStrategyDebtRatios(
-        address _debtAllocator,
+        address _vault,
         StrategyDebtRatio[] calldata _strategyDebtRatios
     ) public onlyManagers {
         for (uint8 i; i < _strategyDebtRatios.length; ++i) {
             if (_strategyDebtRatios[i].maxRatio == 0) {
-                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
+                DebtAllocator(debtAllocator).setStrategyDebtRatio(
+                    _vault,
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio
                 );
             } else {
-                DebtAllocator(_debtAllocator).setStrategyDebtRatio(
+                DebtAllocator(debtAllocator).setStrategyDebtRatio(
+                    _vault,
                     _strategyDebtRatios[i].strategy,
                     _strategyDebtRatios[i].targetRatio,
                     _strategyDebtRatios[i].maxRatio
