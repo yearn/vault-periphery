@@ -323,11 +323,13 @@ contract DebtAllocator is Governance {
                 // Return true and the calldata.
                 return (
                     true,
-                    abi.encodeWithSignature(
-                        "update_debt(address,address,uint256)",
-                        _vault,
-                        _strategy,
-                        params.current_debt + strategyDebtInfo.toChange
+                    abi.encodeCall(
+                        this.update_debt,
+                        (
+                            _vault,
+                            _strategy,
+                            params.current_debt + strategyDebtInfo.toChange
+                        )
                     )
                 );
             }
@@ -377,11 +379,13 @@ contract DebtAllocator is Governance {
                 // If so return true and the calldata.
                 return (
                     true,
-                    abi.encodeWithSignature(
-                        "update_debt(address,address,uint256)",
-                        _vault,
-                        _strategy,
-                        params.current_debt - strategyDebtInfo.toChange
+                    abi.encodeCall(
+                        this.update_debt,
+                        (
+                            _vault,
+                            _strategy,
+                            params.current_debt - strategyDebtInfo.toChange
+                        )
                     )
                 );
             }
