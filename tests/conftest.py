@@ -387,9 +387,9 @@ def address_provider(deploy_address_provider):
 
 
 @pytest.fixture(scope="session")
-def deploy_debt_allocator_factory(project, daddy, brain):
+def deploy_debt_allocator_factory(project, daddy):
     def deploy_debt_allocator_factory(gov=daddy):
-        debt_allocator_factory = gov.deploy(project.DebtAllocatorFactory, brain)
+        debt_allocator_factory = gov.deploy(project.DebtAllocatorFactory)
 
         return debt_allocator_factory
 
@@ -404,8 +404,8 @@ def debt_allocator_factory(deploy_debt_allocator_factory):
 
 
 @pytest.fixture(scope="session")
-def debt_allocator(debt_allocator_factory, project, vault, daddy):
-    tx = debt_allocator_factory.newDebtAllocator(vault, sender=daddy)
+def debt_allocator(debt_allocator_factory, project, brain, daddy):
+    tx = debt_allocator_factory.newDebtAllocator(brain, sender=daddy)
 
     event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
 
@@ -415,9 +415,9 @@ def debt_allocator(debt_allocator_factory, project, vault, daddy):
 
 
 @pytest.fixture(scope="session")
-def debt_optimizer_applicator(debt_allocator_factory, project, brain):
+def debt_optimizer_applicator(debt_allocator, project, brain):
 
-    yield brain.deploy(project.DebtOptimizerApplicator, debt_allocator_factory.address)
+    yield brain.deploy(project.DebtOptimizerApplicator, debt_allocator.address)
 
 
 @pytest.fixture(scope="session")
