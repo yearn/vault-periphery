@@ -634,7 +634,7 @@ contract DebtAllocator is Governance {
      *  This may only be called by governance.
      * @param _baseFeeProvider Address of our baseFeeProvider
      */
-    function setBaseFeeOracle(
+    function setBaseFeeProvider(
         address _baseFeeProvider
     ) external virtual onlyGovernance {
         baseFeeProvider = _baseFeeProvider;

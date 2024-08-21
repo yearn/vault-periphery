@@ -208,7 +208,7 @@ contract V3Deployer is Positions {
         );
 
         // Debt Allocator
-        _debtAllocator = _deployAllocator(_vault);
+        _debtAllocator = _deployAllocator(_roleManager);
 
         // Accountant
         _setAccountant(_vault, _accountant);
@@ -231,9 +231,12 @@ contract V3Deployer is Positions {
     }
 
     function _deployAllocator(
-        address _vault
+        address _governance
     ) internal virtual returns (address _debtAllocator) {
-        address factory = getPositionHolder(ALLOCATOR_FACTORY);
+        // Deploy a new debt allocator for the vault with Brain as the gov.
+        _debtAllocator = DebtAllocatorFactory(
+            _fromAddressProvider(ALLOCATOR_FACTORY)
+        ).newDebtAllocator(_governance);
     }
 
     /**
