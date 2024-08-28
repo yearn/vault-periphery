@@ -404,13 +404,19 @@ def debt_allocator_factory(deploy_debt_allocator_factory):
 
 
 @pytest.fixture(scope="session")
-def debt_allocator(debt_allocator_factory, project, vault, daddy):
-    tx = debt_allocator_factory.newDebtAllocator(vault, sender=daddy)
+def create_debt_allocator(debt_allocator_factory, daddy):
+    def create_debt_allocator(vault):
+        tx = debt_allocator_factory.newDebtAllocator(vault, sender=daddy)
+        event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
+        debt_allocator = project.DebtAllocator.at(event.allocator)
+        return debt_allocator
 
-    event = list(tx.decode_logs(debt_allocator_factory.NewDebtAllocator))[0]
+    yield create_debt_allocator
 
-    debt_allocator = project.DebtAllocator.at(event.allocator)
 
+@pytest.fixture(scope="session")
+def debt_allocator(create_debt_allocator, vault):
+    debt_allocator = create_debt_allocator(vault)
     yield debt_allocator
 
 
