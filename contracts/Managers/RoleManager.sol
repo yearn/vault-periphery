@@ -96,12 +96,9 @@ contract RoleManager is Positions {
     ) {
         chad = _governance;
 
-        // Governance gets no roles.
+        // Governance gets all the roles.
         _setPositionHolder(GOVERNANCE, _governance);
-
-        // Czar gets all of the Roles.
-        _setPositionHolder(MANAGEMENT, _management);
-        _setPositionRoles(MANAGEMENT, Roles.ALL);
+        _setPositionRoles(GOVERNANCE, Roles.ALL);
 
         // Management reports, can update debt, queue, deposit limits and unlock time.
         _setPositionHolder(MANAGEMENT, _management);
@@ -120,6 +117,7 @@ contract RoleManager is Positions {
         _setPositionRoles(KEEPER, Roles.REPORTING_MANAGER);
 
         // Debt allocators manage debt and also need to process reports.
+        _setPositionHolder(DEBT_ALLOCATOR, _debtAllocator);
         _setPositionRoles(
             DEBT_ALLOCATOR,
             Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER
@@ -127,7 +125,6 @@ contract RoleManager is Positions {
 
         _setPositionHolder(REGISTRY, _registry);
         _setPositionHolder(ACCOUNTANT, _accountant);
-        _setPositionHolder(ALLOCATOR_FACTORY, _allocatorFactory);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -229,9 +226,7 @@ contract RoleManager is Positions {
                 _assetToVault[_asset][_apiVersion][_category]
             );
 
-        // Deploy a new debt allocator for the vault.
-        address _debtAllocator = _deployAllocator(_vault);
-
+        address _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         // Give out roles on the new vault.
         _sanctify(_vault, _debtAllocator);
 
@@ -258,28 +253,6 @@ contract RoleManager is Positions {
 
         // Emit event for new vault.
         emit AddedNewVault(_vault, _debtAllocator, _category);
-    }
-
-    /**
-     * @dev Deploys a debt allocator for the specified vault.
-     * @param _vault Address of the vault.
-     * @return _debtAllocator Address of the deployed debt allocator.
-     */
-    function _deployAllocator(
-        address _vault
-    ) internal virtual returns (address _debtAllocator) {
-        address factory = getPositionHolder(ALLOCATOR_FACTORY);
-
-        // If we have a factory set.
-        if (factory != address(0)) {
-            // Deploy a new debt allocator for the vault with Management as the gov.
-            _debtAllocator = DebtAllocatorFactory(factory).newDebtAllocator(
-                _vault
-            );
-        } else {
-            // If no factory is set we should be using one central allocator.
-            _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
-        }
     }
 
     /**
@@ -387,8 +360,7 @@ contract RoleManager is Positions {
      * @param _category Category associated with the vault.
      */
     function addNewVault(address _vault, uint256 _category) external virtual {
-        address _debtAllocator = _deployAllocator(_vault);
-        addNewVault(_vault, _category, _debtAllocator);
+        addNewVault(_vault, _category, getPositionHolder(DEBT_ALLOCATOR));
     }
 
     /**
@@ -462,7 +434,7 @@ contract RoleManager is Positions {
     function updateDebtAllocator(
         address _vault
     ) external virtual returns (address _newDebtAllocator) {
-        _newDebtAllocator = _deployAllocator(_vault);
+        _newDebtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         updateDebtAllocator(_vault, _newDebtAllocator);
     }
 
@@ -566,7 +538,7 @@ contract RoleManager is Positions {
         address[] calldata _vaults,
         address _holder,
         uint256 _role
-    ) external virtual onlyGovernance {
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
         address _vault;
         for (uint256 i = 0; i < _vaults.length; ++i) {
             _vault = _vaults[i];
@@ -620,7 +592,7 @@ contract RoleManager is Positions {
      */
     function setDefaultProfitMaxUnlock(
         uint256 _newDefaultProfitMaxUnlock
-    ) external virtual onlyGovernance {
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
         defaultProfitMaxUnlock = _newDefaultProfitMaxUnlock;
 
         emit UpdateDefaultProfitMaxUnlock(_newDefaultProfitMaxUnlock);

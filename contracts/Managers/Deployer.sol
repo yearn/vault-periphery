@@ -1,16 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {Positions} from "./Positions.sol";
 import {RoleManager} from "./RoleManager.sol";
-import {Registry, RegistryFactory} from "../registry/RegistryFactory.sol";
-import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
-import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
-import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
-import {AccountantFactory} from "../accountants/AccountantFactory.sol";
+import {Registry, RegistryFactory} from "../registry/RegistryFactory.sol";
+import {AccountantFactory, Accountant} from "../accountants/AccountantFactory.sol";
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.sol";
 
@@ -18,11 +12,12 @@ import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.s
 // 1. Initiate new "project"
 // 2. Can deploy using project id
 
-contract V3Deployer is Positions {
+contract V3Deployer {
+    event NewProject(bytes32 indexed projectId, address indexed roleManager);
+
     struct Project {
         address roleManager;
         address registry;
-        address roleManager;
         address accountant;
         address debtAllocator;
     }
@@ -46,21 +41,10 @@ contract V3Deployer is Positions {
 
     address public immutable protocolAddressProvider;
 
-    /// @notice Default time until profits are fully unlocked for new vaults.
-    uint256 public defaultProfitMaxUnlock = 7 days;
-
     mapping(bytes32 => Project) public projects;
 
     constructor(address _addressProvider) {
         protocolAddressProvider = _addressProvider;
-
-        // SEt keeper and debt allocator Roles
-    }
-
-    function getLatestFactory() public view returns (address) {
-        return
-            ReleaseRegistry(_fromAddressProvider(RELEASE_REGISTRY))
-                .latestFactory();
     }
 
     function _fromAddressProvider(bytes32 _id) internal view returns (address) {
@@ -68,35 +52,42 @@ contract V3Deployer is Positions {
             IProtocolAddressProvider(protocolAddressProvider).getAddress(_id);
     }
 
-    function newProject(address _governance) external virtual {
+    function newProject(
+        address _governance,
+        address _management
+    ) external virtual returns (address _roleManager) {
         bytes32 _id = getProjectId(_governance);
         require(projects[_id].roleManager == address(0), "project exists");
 
         // Deploy new Registry
         address _registry = RegistryFactory(
             _fromAddressProvider(REGISTRY_FACTORY)
-        ).createNewRegistry(
-                string(abi.encodePacked(_prefix, " Vault Registry"))
-            );
+        ).createNewRegistry(string(abi.encodePacked(" Vault Registry")));
 
         address _accountant = AccountantFactory(
             _fromAddressProvider(ACCOUNTANT_FACTORY)
-        ).newAccountant(_roleManager, _roleManager);
+        ).newAccountant(address(this), _roleManager);
 
         address _debtAllocator = DebtAllocatorFactory(
             _fromAddressProvider(ALLOCATOR_FACTORY)
-        ).newDebtAllocator(_roleManager);
+        ).newDebtAllocator(_management);
 
-        address _roleManager = address(
+        _roleManager = address(
             new RoleManager(
                 _governance,
-                _governance,
+                _management,
                 _fromAddressProvider(KEEPER),
                 _registry,
                 _accountant,
                 _debtAllocator
             )
         );
+
+        Registry(_registry).setEndorser(_roleManager, true);
+        Registry(_registry).transferGovernance(_governance);
+
+        Accountant(_accountant).setVaultManager(_roleManager);
+        Accountant(_accountant).setFutureFeeManager(_roleManager);
 
         projects[_id] = Project({
             roleManager: _roleManager,
@@ -106,12 +97,15 @@ contract V3Deployer is Positions {
         });
 
         // Event
+        emit NewProject(_id, _roleManager);
     }
 
     function getProjectId(
         address _governance
     ) public view virtual returns (bytes32) {
         return
-            keccak256(abi.encodePacked(_governance, chain.id, block.timestamp));
+            keccak256(
+                abi.encodePacked(_governance, block.chainid, block.timestamp)
+            );
     }
 }
