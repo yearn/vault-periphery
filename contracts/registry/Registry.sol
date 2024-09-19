@@ -45,7 +45,7 @@ contract Registry is Governance {
         uint256 vaultType
     );
 
-    /// @notice Emitted when a vault is tagged which a string.
+    /// @notice Emitted when a vault is tagged with a string.
     event VaultTagged(address indexed vault);
 
     /// @notice Emitted when gov adds ore removes a `tagger`.
