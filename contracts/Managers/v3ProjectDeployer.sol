@@ -8,11 +8,7 @@ import {AccountantFactory, Accountant} from "../accountants/AccountantFactory.so
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.sol";
 
-// TODO:
-// 1. Initiate new "project"
-// 2. Can deploy using project id
-
-contract V3Deployer {
+contract v3ProjectDeployer {
     event NewProject(bytes32 indexed projectId, address indexed roleManager);
 
     struct Project {
@@ -37,7 +33,7 @@ contract V3Deployer {
     /// @notice Position ID for the Allocator Factory.
     bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
 
-    string public apiVersion = "v3.0.2";
+    string public apiVersion = "v3.0.3";
 
     address public immutable protocolAddressProvider;
 
@@ -47,22 +43,18 @@ contract V3Deployer {
         protocolAddressProvider = _addressProvider;
     }
 
-    function _fromAddressProvider(bytes32 _id) internal view returns (address) {
-        return
-            IProtocolAddressProvider(protocolAddressProvider).getAddress(_id);
-    }
-
     function newProject(
+        string calldata name,
         address _governance,
         address _management
     ) external virtual returns (address _roleManager) {
-        bytes32 _id = getProjectId(_governance);
+        bytes32 _id = getProjectId(name, _governance);
         require(projects[_id].roleManager == address(0), "project exists");
 
         // Deploy new Registry
         address _registry = RegistryFactory(
             _fromAddressProvider(REGISTRY_FACTORY)
-        ).createNewRegistry(string(abi.encodePacked(" Vault Registry")));
+        ).createNewRegistry(string(abi.encodePacked(name, " Registry")));
 
         address _accountant = AccountantFactory(
             _fromAddressProvider(ACCOUNTANT_FACTORY)
@@ -101,11 +93,14 @@ contract V3Deployer {
     }
 
     function getProjectId(
+        string memory _name,
         address _governance
     ) public view virtual returns (bytes32) {
+        return keccak256(abi.encodePacked(_name, _governance, block.chainid));
+    }
+
+    function _fromAddressProvider(bytes32 _id) internal view returns (address) {
         return
-            keccak256(
-                abi.encodePacked(_governance, block.chainid, block.timestamp)
-            );
+            IProtocolAddressProvider(protocolAddressProvider).getAddress(_id);
     }
 }

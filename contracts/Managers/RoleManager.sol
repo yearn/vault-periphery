@@ -193,20 +193,17 @@ contract RoleManager is Positions {
         uint256 _depositLimit,
         uint256 _profitMaxUnlockTime
     ) internal virtual returns (address _vault) {
-        string memory _categoryString = Strings.toString(_category);
+        string memory _categoryString = _category != 0
+            ? string(abi.encodePacked("-", Strings.toString(_category)))
+            : "";
 
-        // Name is "{SYMBOL}-{CATEGORY} yVault"
+        // Name is "{SYMBOL}-{CATEGORY} Vault"
         string memory _name = string(
-            abi.encodePacked(
-                ERC20(_asset).symbol(),
-                "-",
-                _categoryString,
-                " yVault"
-            )
+            abi.encodePacked(ERC20(_asset).symbol(), _categoryString, " yVault")
         );
         // Symbol is "yv{SYMBOL}-{CATEGORY}".
         string memory _symbol = string(
-            abi.encodePacked("yv", ERC20(_asset).symbol(), "-", _categoryString)
+            abi.encodePacked("yv", ERC20(_asset).symbol(), _categoryString)
         );
 
         // Deploy through the registry so it is automatically endorsed.
