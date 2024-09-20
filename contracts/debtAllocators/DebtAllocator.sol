@@ -213,15 +213,13 @@ contract DebtAllocator is Governance {
         address _strategy,
         uint256 _targetDebt
     ) public virtual onlyKeepers {
-        IVault vault = IVault(_vault);
-
         // If going to 0 record full balance first.
         if (_targetDebt == 0) {
-            vault.process_report(_strategy);
+            IVault(_vault).process_report(_strategy);
         }
 
         // Update debt with the default max loss.
-        vault.update_debt(_strategy, _targetDebt, maxDebtUpdateLoss);
+        IVault(_vault).update_debt(_strategy, _targetDebt, maxDebtUpdateLoss);
 
         // Update the last time the strategies debt was updated.
         _strategyConfigs[_vault][_strategy].lastUpdate = uint96(

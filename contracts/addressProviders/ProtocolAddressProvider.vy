@@ -24,19 +24,21 @@ event UpdateGovernance:
 #### CONSTANTS ####
 
 # General Periphery Contracts.
-ROUTER: constant(bytes32) = keccak256("ROUTER")
-KEEPER: constant(bytes32) = keccak256("KEEPER")
-APR_ORACLE: constant(bytes32) = keccak256("APR ORACLE")
-RELEASE_REGISTRY: constant(bytes32) = keccak256("RELEASE REGISTRY")
-BASE_FEE_PROVIDER: constant(bytes32) = keccak256("BASE FEE PROVIDER")
-COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("COMMON REPORT TRIGGER")
+ROUTER: constant(bytes32) = keccak256("Router")
+KEEPER: constant(bytes32) = keccak256("Keeper")
+APR_ORACLE: constant(bytes32) = keccak256("APR Oracle")
+RELEASE_REGISTRY: constant(bytes32) = keccak256("Release Registry")
+BASE_FEE_PROVIDER: constant(bytes32) = keccak256("Base Fee Provider")
+COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("Common Report Trigger")
 
 # Periphery Factory contracts.
-AUCTION_FACTORY: constant(bytes32) = keccak256("AUCTION FACTORY")
-SPLITTER_FACTORY: constant(bytes32) = keccak256("SPLITTER FACTORY")
-REGISTRY_FACTORY: constant(bytes32) = keccak256("REGISTRY FACTORY")
-ALLOCATOR_FACTORY: constant(bytes32) = keccak256("ALLOCATOR FACTORY")
-ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("ACCOUNTANT FACTORY")
+AUCTION_FACTORY: constant(bytes32) = keccak256("Auction Factory")
+SPLITTER_FACTORY: constant(bytes32) = keccak256("Splitter Factory")
+REGISTRY_FACTORY: constant(bytes32) = keccak256("Registry Factory")
+ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Allocator Factory")
+ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("Accountant Factory")
+
+PROJECT_DEPLOYER: constant(bytes32) = keccak256("Project Deployer")
 
 name: public(constant(String[34])) = "Yearn V3 Protocol Address Provider"
 

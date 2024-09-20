@@ -6,10 +6,7 @@ from utils.constants import MAX_INT, ROLES
 def test_setup(debt_optimizer_applicator, debt_allocator, brain):
 
     assert debt_optimizer_applicator.managers(brain) == False
-    assert (
-        debt_optimizer_applicator.debtAllocator()
-        == debt_allocator.address
-    )
+    assert debt_optimizer_applicator.debtAllocator() == debt_allocator.address
 
 
 def test_set_managers(debt_optimizer_applicator, brain, user):
@@ -75,7 +72,13 @@ def test_set_ratios(
     assert event.newMaxRatio == max
     assert event.newTotalDebtRatio == target
     assert debt_allocator.totalDebtRatio(vault) == target
-    assert debt_allocator.getStrategyConfig(vault, strategy) == (True, target, max, 0, 0)
+    assert debt_allocator.getStrategyConfig(vault, strategy) == (
+        True,
+        target,
+        max,
+        0,
+        0,
+    )
 
     new_strategy = create_strategy()
     vault.add_strategy(new_strategy, sender=daddy)
@@ -109,5 +112,17 @@ def test_set_ratios(
             assert event.newMaxRatio == 2_000 * 1.2
 
     assert debt_allocator.totalDebtRatio(vault) == 10_000
-    assert debt_allocator.getStrategyConfig(vault, strategy) == (True, 8_000, 9_000, 0, 0)
-    assert debt_allocator.getStrategyConfig(vault, new_strategy) == (True, 2_000, 2_000 * 1.2, 0, 0)
+    assert debt_allocator.getStrategyConfig(vault, strategy) == (
+        True,
+        8_000,
+        9_000,
+        0,
+        0,
+    )
+    assert debt_allocator.getStrategyConfig(vault, new_strategy) == (
+        True,
+        2_000,
+        2_000 * 1.2,
+        0,
+        0,
+    )

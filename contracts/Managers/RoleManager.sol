@@ -487,6 +487,20 @@ contract RoleManager is Positions {
         _setRole(_vault, Position(_keeper, _positions[KEEPER].roles));
     }
 
+    function updateVaultName(
+        address _vault,
+        string calldata _name
+    ) external onlyPositionHolder(GOVERNANCE) {
+        // TODO
+    }
+
+    function updateVaultSymbol(
+        address _vault,
+        string calldata _symbol
+    ) external onlyPositionHolder(GOVERNANCE) {
+        // TODO
+    }
+
     /**
      * @notice Removes a vault from the RoleManager.
      * @dev This will NOT un-endorse the vault from the registry.
