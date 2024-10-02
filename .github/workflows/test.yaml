@@ -1,37 +1,39 @@
-name: tests
+name: test
 
 on:
-  workflow_dispatch:
   push:
     branches:
-      - master
-      - develop
+    - master
+    - develop
   pull_request:
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
-  tests:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Foundry project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
         with:
-          node-version: 18
-      - uses: ApeWorX/github-action@v2.0
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
         with:
-          python-version: '3.10'
-          ape-version-pin: "==0.6.27"
-          ape-plugins-list: 'solidity==0.6.11 vyper==0.6.13 infura==0.6.5 hardhat==0.6.13 etherscan==0.6.11'
+          version: nightly
 
-      - name: install vyper
-        run: pip install git+https://github.com/vyperlang/vyper
-        
-      - run: ape compile --force --size
-      - run: npm install hardhat
-      
-      - run: ape test
-        timeout-minutes: 40
-        env:
-          WEB3_ALCHEMY_PROJECT_ID: ${{ secrets.WEB3_ALCHEMY_PROJECT_ID }}
-          WEB3_INFURA_PROJECT_ID: ${{ secrets.WEB3_INFURA_PROJECT_ID }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
 
+      - name: Run Forge tests
+        run: |
+          forge test -vvv --fork-url ${{ secrets.ETH_RPC_URL }}
+        id: test

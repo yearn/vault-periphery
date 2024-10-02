@@ -1,34 +1,17 @@
 ## How to start
 
 ### Requirements
-    Python >=3.8.0, <=3.10
-    Yarn
-    Node.js >=14
-    Hardhat
+
+- First you will need to install [Foundry](https://book.getfoundry.sh/getting-started/installation).
+NOTE: If you are on a windows machine it is recommended to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
+- Install [Node.js](https://nodejs.org/en/download/package-manager/)
 
 ### Fork this repository
 
-    git clone https://github.com/user/tokenized-strategy-ape-mix
+    git clone https://github.com/yearn/vault-periphery
 
-    cd tokenized-strategy-ape-mix
+    cd vault-periphery
 
-### Set up your virtual environment
-
-    python3 -m venv venv
-
-    source venv/bin/activate
-
-### Install Ape and all dependencies
-
-    pip install -r requirements.txt
-    
-    yarn
-    
-    ape plugins install .
-    
-    ape compile
-    
-    ape test
     
 ### Deployment
 
