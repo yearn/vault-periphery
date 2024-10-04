@@ -40,6 +40,8 @@ interface IProtocolAddressProvider {
 
     function setAccountantFactory(address _accountantFactory) external;
 
+    function setRoleManagerFactory(address _roleManagerFactory) external;
+
     function getRouter() external view returns (address);
 
     function getKeeper() external view returns (address);
@@ -61,4 +63,6 @@ interface IProtocolAddressProvider {
     function getAllocatorFactory() external view returns (address);
 
     function getAccountantFactory() external view returns (address);
+
+    function getRoleManagerFactory() external view returns (address);
 }

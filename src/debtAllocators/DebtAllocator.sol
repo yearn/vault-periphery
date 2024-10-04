@@ -14,14 +14,14 @@ interface IBaseFee {
  * @author yearn.finance
  * @notice
  *  This Debt Allocator is meant to be used alongside
- *  a Yearn V3 vault to provide the needed triggers for a keeper
+ *  Yearn V3 vaults to provide the needed triggers for a keeper
  *  to perform automated debt updates for the vaults strategies.
  *
  *  Each vault that should be managed by this allocator will
  *  need to be added by first setting a `minimumChange` for the
- *  vault, which will act as the amount of funds to move that will
+ *  vault, which will act as the minimum amount of funds to move that will
  *  trigger a debt update. Then adding each strategy by setting a
- *  `targetRatio` and `maxRatio`.
+ *  `targetRatio` and optionally a `maxRatio`.
  *
  *  The allocator aims to allocate debt between the strategies
  *  based on their set target ratios. Which are denominated in basis

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import {MockTokenizedStrategy} from "../../Mocks/MockTokenizedStrategy.sol";
+import {MockTokenizedStrategy} from "../../mocks/MockTokenizedStrategy.sol";
 import {Setup, Accountant, IVault, Roles, MockStrategy, TestAccountant} from "./TestAccountant.t.sol";
 import {RefundAccountant} from "../../accountants/RefundAccountant.sol";
 

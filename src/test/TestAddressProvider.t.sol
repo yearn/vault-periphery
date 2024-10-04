@@ -6,7 +6,6 @@ import {Setup, IProtocolAddressProvider} from "./utils/Setup.sol";
 contract TestAddressProvider is Setup {
     function setUp() public override {
         super.setUp();
-        addressProvider = setupAddressProvider();
     }
 
     function test_address_provider_setup() public {
@@ -23,6 +22,7 @@ contract TestAddressProvider is Setup {
         assertEq(addressProvider.getRegistryFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getAllocatorFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getAccountantFactory(), ZERO_ADDRESS);
+        assertEq(addressProvider.getRoleManagerFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getAddress(bytes32("random")), ZERO_ADDRESS);
     }
 
@@ -299,6 +299,29 @@ contract TestAddressProvider is Setup {
         assertEq(addressProvider.getAccountantFactory(), newAddress);
     }
 
+    function test__set_role_manager_factory() public {
+        bytes32 id = AddressIds.ROLE_MANAGER_FACTORY;
+        address newAddress = address(0x123);
+
+        assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
+        assertEq(addressProvider.getRoleManagerFactory(), ZERO_ADDRESS);
+
+        vm.prank(user);
+        vm.expectRevert("!governance");
+        addressProvider.setRoleManagerFactory(newAddress);
+
+        assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
+        assertEq(addressProvider.getRoleManagerFactory(), ZERO_ADDRESS);
+
+        vm.prank(daddy);
+        vm.expectEmit(true, true, true, true, address(addressProvider));
+        emit UpdatedAddress(id, ZERO_ADDRESS, newAddress);
+        addressProvider.setRoleManagerFactory(newAddress);
+
+        assertEq(addressProvider.getAddress(id), newAddress);
+        assertEq(addressProvider.getRoleManagerFactory(), newAddress);
+    }
+
     function test_gov_transfers_ownership() public {
         assertEq(addressProvider.governance(), daddy);
         assertEq(addressProvider.pendingGovernance(), ZERO_ADDRESS);
@@ -392,4 +415,5 @@ library AddressIds {
     bytes32 constant REGISTRY_FACTORY = keccak256("Registry Factory");
     bytes32 constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
     bytes32 constant ACCOUNTANT_FACTORY = keccak256("Accountant Factory");
+    bytes32 constant ROLE_MANAGER_FACTORY = keccak256("Role Manager Factory");
 }

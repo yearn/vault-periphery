@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Setup, Registry, ReleaseRegistry, IVaultFactory, IVault, MockStrategy} from "../utils/Setup.sol";
-import {MockFactory} from "../../Mocks/MockFactory.sol";
+import {MockFactory} from "../../mocks/MockFactory.sol";
 
 contract TestReleaseRegistry is Setup {
     event NewRelease(

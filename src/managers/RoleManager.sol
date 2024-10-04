@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
+import {Positions} from "./Positions.sol";
 import {Registry} from "../registry/Registry.sol";
 import {Accountant} from "../accountants/Accountant.sol";
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Governance2Step} from "@periphery/utils/Governance2Step.sol";
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
-contract RoleManager is Governance2Step {
+contract RoleManager is Positions {
     /// @notice Revert message for when a vault has already been deployed.
     error AlreadyDeployed(address _vault);
 
@@ -28,26 +28,13 @@ contract RoleManager is Governance2Step {
         address indexed debtAllocator
     );
 
-    /// @notice Emitted when a new address is set for a position.
-    event UpdatePositionHolder(
-        bytes32 indexed position,
-        address indexed newAddress
-    );
-
     /// @notice Emitted when a vault is removed.
     event RemovedVault(address indexed vault);
 
-    /// @notice Emitted when a new set of roles is set for a position
-    event UpdatePositionRoles(bytes32 indexed position, uint256 newRoles);
-
-    /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
-    event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
-
-    /// @notice Position struct
-    struct Position {
-        address holder;
-        uint96 roles;
-    }
+    /// @notice Emitted when the defaultProfitMaxUnlockTime variable is updated.
+    event UpdateDefaultProfitMaxUnlockTime(
+        uint256 newDefaultProfitMaxUnlockTime
+    );
 
     /// @notice Config that holds all vault info.
     struct VaultConfig {
@@ -57,132 +44,97 @@ contract RoleManager is Governance2Step {
         uint256 index;
     }
 
-    /// @notice Only allow either governance or the position holder to call.
-    modifier onlyPositionHolder(bytes32 _positionId) {
-        _isPositionHolder(_positionId);
-        _;
-    }
-
-    /// @notice Check if the msg sender is governance or the specified position holder.
-    function _isPositionHolder(bytes32 _positionId) internal view virtual {
-        require(
-            msg.sender == governance ||
-                msg.sender == getPositionHolder(_positionId),
-            "!allowed"
-        );
-    }
-
-    // Encoded name so that it can be held as a constant.
-    bytes32 internal constant _name_ =
-        bytes32(abi.encodePacked("Yearn V3 Vault Role Manager"));
-
     /*//////////////////////////////////////////////////////////////
                            POSITION ID'S
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Position ID for "daddy".
-    bytes32 public constant DADDY = keccak256("Daddy");
+    /// @notice Position ID for "Pending Governance".
+    bytes32 public constant PENDING_GOVERNANCE =
+        keccak256("Pending Governance");
+    /// @notice Position ID for "Governance".
+    bytes32 public constant GOVERNANCE = keccak256("Governance");
     /// @notice Position ID for "brain".
-    bytes32 public constant BRAIN = keccak256("Brain");
+    bytes32 public constant MANAGEMENT = keccak256("Management");
     /// @notice Position ID for "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Position ID for "security".
-    bytes32 public constant SECURITY = keccak256("Security");
     /// @notice Position ID for the Registry.
     bytes32 public constant REGISTRY = keccak256("Registry");
     /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
     /// @notice Position ID for Debt Allocator
     bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
-    /// @notice Position ID for Strategy manager.
-    bytes32 public constant STRATEGY_MANAGER = keccak256("Strategy Manager");
-    /// @notice Position ID for the Allocator Factory.
-    bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
-
-    /// @notice Immutable address that the RoleManager position
-    // will be transferred to when a vault is removed.
-    address public immutable chad;
 
     /*//////////////////////////////////////////////////////////////
                            STORAGE
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Immutable address that the RoleManager position
+    // will be transferred to when a vault is removed.
+    address public chad;
+
     /// @notice Array storing addresses of all managed vaults.
     address[] public vaults;
 
-    /// @notice Default time until profits are fully unlocked for new vaults.
-    uint256 public defaultProfitMaxUnlock = 10 days;
+    // Encoded name so that it can be held as a constant.
+    bytes32 internal projectName;
 
-    /// @notice Mapping of position ID to position information.
-    mapping(bytes32 => Position) internal _positions;
+    /// @notice Default time until profits are fully unlocked for new vaults.
+    uint256 public defaultProfitMaxUnlockTime = 10 days;
+
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
     /// @notice Mapping of underlying asset, api version and category to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
         internal _assetToVault;
 
-    constructor(
+    constructor() {
+        chad == address(1);
+    }
+
+    function initialize(
+        string calldata _projectName,
         address _governance,
-        address _daddy,
-        address _brain,
-        address _security,
+        address _management,
         address _keeper,
-        address _strategyManager,
-        address _registry
-    ) Governance2Step(_governance) {
-        require(_daddy != address(0), "ZERO ADDRESS");
-        // Set the immutable address that will take over role manager
-        // if a vault is removed.
-        chad = _daddy;
+        address _registry,
+        address _accountant,
+        address _debtAllocator
+    ) external {
+        require(chad == address(0), "initialized");
+        require(_governance != address(0), "ZERO ADDRESS");
 
-        // Set up the initial role configs for each position.
+        projectName = bytes32(abi.encodePacked(_projectName));
+        chad = _governance;
 
-        // Daddy is given all of the roles.
-        _positions[DADDY] = Position({
-            holder: _daddy,
-            roles: uint96(Roles.ALL)
-        });
+        // Governance gets all the roles.
+        _setPositionHolder(GOVERNANCE, _governance);
+        _setPositionRoles(GOVERNANCE, Roles.ALL);
 
-        // Setup default roles for Brain.
-        _positions[BRAIN] = Position({
-            holder: _brain,
-            roles: uint96(
-                Roles.REPORTING_MANAGER |
-                    Roles.DEBT_MANAGER |
-                    Roles.QUEUE_MANAGER |
-                    Roles.DEPOSIT_LIMIT_MANAGER |
-                    Roles.DEBT_PURCHASER |
-                    Roles.PROFIT_UNLOCK_MANAGER
-            )
-        });
-
-        // Security can set the max debt for strategies to have.
-        _positions[SECURITY] = Position({
-            holder: _security,
-            roles: uint96(Roles.MAX_DEBT_MANAGER)
-        });
+        // Management reports, can update debt, queue, deposit limits and unlock time.
+        _setPositionHolder(MANAGEMENT, _management);
+        _setPositionRoles(
+            MANAGEMENT,
+            Roles.REPORTING_MANAGER |
+                Roles.DEBT_MANAGER |
+                Roles.QUEUE_MANAGER |
+                Roles.DEPOSIT_LIMIT_MANAGER |
+                Roles.DEBT_PURCHASER |
+                Roles.PROFIT_UNLOCK_MANAGER
+        );
 
         // The keeper can process reports.
-        _positions[KEEPER] = Position({
-            holder: _keeper,
-            roles: uint96(Roles.REPORTING_MANAGER)
-        });
+        _setPositionHolder(KEEPER, _keeper);
+        _setPositionRoles(KEEPER, Roles.REPORTING_MANAGER);
 
         // Debt allocators manage debt and also need to process reports.
-        _positions[DEBT_ALLOCATOR].roles = uint96(
+        _setPositionHolder(DEBT_ALLOCATOR, _debtAllocator);
+        _setPositionRoles(
+            DEBT_ALLOCATOR,
             Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER
         );
 
-        // The strategy manager can add and remove strategies.
-        _positions[STRATEGY_MANAGER] = Position({
-            holder: _strategyManager,
-            roles: uint96(
-                Roles.ADD_STRATEGY_MANAGER | Roles.REVOKE_STRATEGY_MANAGER
-            )
-        });
-
-        // Set the registry
-        _positions[REGISTRY].holder = _registry;
+        _setPositionHolder(REGISTRY, _registry);
+        _setPositionHolder(ACCOUNTANT, _accountant);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -190,90 +142,64 @@ contract RoleManager is Governance2Step {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Creates a new endorsed vault with default profit max
-     *      unlock time and doesn't set the deposit limit.
+     * @notice Creates a new endorsed vault with default profit max unlock time.
      * @param _asset Address of the underlying asset.
      * @param _category Category of the vault.
+     * @param _name Name of the vault.
+     * @param _symbol Symbol of the vault.
      * @return _vault Address of the newly created vault.
      */
     function newVault(
         address _asset,
-        uint256 _category
-    ) external virtual onlyPositionHolder(DADDY) returns (address) {
-        return _newVault(_asset, _category, 0, defaultProfitMaxUnlock);
+        uint256 _category,
+        string calldata _name,
+        string calldata _symbol
+    ) external virtual onlyPositionHolder(GOVERNANCE) returns (address) {
+        return _newVault(_asset, _category, _name, _symbol, type(uint256).max);
     }
 
     /**
      * @notice Creates a new endorsed vault with default profit max unlock time.
      * @param _asset Address of the underlying asset.
      * @param _category Category of the vault.
+     * @param _name Name of the vault.
+     * @param _symbol Symbol of the vault.
      * @param _depositLimit The deposit limit to start the vault with.
      * @return _vault Address of the newly created vault.
      */
     function newVault(
         address _asset,
         uint256 _category,
+        string calldata _name,
+        string calldata _symbol,
         uint256 _depositLimit
-    ) external virtual onlyPositionHolder(DADDY) returns (address) {
-        return
-            _newVault(_asset, _category, _depositLimit, defaultProfitMaxUnlock);
+    ) external virtual onlyPositionHolder(GOVERNANCE) returns (address) {
+        return _newVault(_asset, _category, _name, _symbol, _depositLimit);
     }
 
     /**
      * @notice Creates a new endorsed vault.
      * @param _asset Address of the underlying asset.
      * @param _category Category of the vault.
+     * @param _name Name of the vault.
+     * @param _symbol Symbol of the vault.
      * @param _depositLimit The deposit limit to start the vault with.
-     * @param _profitMaxUnlockTime Time until profits are fully unlocked.
-     * @return _vault Address of the newly created vault.
-     */
-    function newVault(
-        address _asset,
-        uint256 _category,
-        uint256 _depositLimit,
-        uint256 _profitMaxUnlockTime
-    ) external virtual onlyPositionHolder(DADDY) returns (address) {
-        return
-            _newVault(_asset, _category, _depositLimit, _profitMaxUnlockTime);
-    }
-
-    /**
-     * @notice Creates a new endorsed vault.
-     * @param _asset Address of the underlying asset.
-     * @param _category Category of the vault.
-     * @param _depositLimit The deposit limit to start the vault with.
-     * @param _profitMaxUnlockTime Time until profits are fully unlocked.
      * @return _vault Address of the newly created vault.
      */
     function _newVault(
         address _asset,
         uint256 _category,
-        uint256 _depositLimit,
-        uint256 _profitMaxUnlockTime
+        string memory _name,
+        string memory _symbol,
+        uint256 _depositLimit
     ) internal virtual returns (address _vault) {
-        string memory _categoryString = Strings.toString(_category);
-
-        // Name is "{SYMBOL}-{CATEGORY} yVault"
-        string memory _name = string(
-            abi.encodePacked(
-                ERC20(_asset).symbol(),
-                "-",
-                _categoryString,
-                " yVault"
-            )
-        );
-        // Symbol is "yv{SYMBOL}-{CATEGORY}".
-        string memory _symbol = string(
-            abi.encodePacked("yv", ERC20(_asset).symbol(), "-", _categoryString)
-        );
-
         // Deploy through the registry so it is automatically endorsed.
         _vault = Registry(getPositionHolder(REGISTRY)).newEndorsedVault(
             _asset,
             _name,
             _symbol,
             address(this),
-            _profitMaxUnlockTime
+            defaultProfitMaxUnlockTime
         );
 
         // Check that a vault does not exist for that asset, api and category.
@@ -284,9 +210,7 @@ contract RoleManager is Governance2Step {
                 _assetToVault[_asset][_apiVersion][_category]
             );
 
-        // Deploy a new debt allocator for the vault.
-        address _debtAllocator = _deployAllocator(_vault);
-
+        address _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         // Give out roles on the new vault.
         _sanctify(_vault, _debtAllocator);
 
@@ -316,28 +240,6 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @dev Deploys a debt allocator for the specified vault.
-     * @param _vault Address of the vault.
-     * @return _debtAllocator Address of the deployed debt allocator.
-     */
-    function _deployAllocator(
-        address _vault
-    ) internal virtual returns (address _debtAllocator) {
-        address factory = getPositionHolder(ALLOCATOR_FACTORY);
-
-        // If we have a factory set.
-        if (factory != address(0)) {
-            // Deploy a new debt allocator for the vault with Brain as the gov.
-            _debtAllocator = DebtAllocatorFactory(factory).newDebtAllocator(
-                _vault
-            );
-        } else {
-            // If no factory is set we should be using one central allocator.
-            _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
-        }
-    }
-
-    /**
      * @dev Assigns roles to the newly added vault.
      *
      * This will override any previously set roles for the holders. But not effect
@@ -351,19 +253,13 @@ contract RoleManager is Governance2Step {
         address _debtAllocator
     ) internal virtual {
         // Set the roles for daddy.
-        _setRole(_vault, _positions[DADDY]);
+        _setRole(_vault, _positions[GOVERNANCE]);
 
-        // Set the roles for Brain.
-        _setRole(_vault, _positions[BRAIN]);
-
-        // Set the roles for Security.
-        _setRole(_vault, _positions[SECURITY]);
+        // Set the roles for Management.
+        _setRole(_vault, _positions[MANAGEMENT]);
 
         // Set the roles for the Keeper.
         _setRole(_vault, _positions[KEEPER]);
-
-        // Set the roles for the Strategy Manager.
-        _setRole(_vault, _positions[STRATEGY_MANAGER]);
 
         // Give the specific debt allocator its roles.
         _setRole(
@@ -448,8 +344,7 @@ contract RoleManager is Governance2Step {
      * @param _category Category associated with the vault.
      */
     function addNewVault(address _vault, uint256 _category) external virtual {
-        address _debtAllocator = _deployAllocator(_vault);
-        addNewVault(_vault, _category, _debtAllocator);
+        addNewVault(_vault, _category, getPositionHolder(DEBT_ALLOCATOR));
     }
 
     /**
@@ -463,7 +358,7 @@ contract RoleManager is Governance2Step {
         address _vault,
         uint256 _category,
         address _debtAllocator
-    ) public virtual onlyPositionHolder(DADDY) {
+    ) public virtual onlyPositionHolder(GOVERNANCE) {
         // Check that a vault does not exist for that asset, api and category.
         address _asset = IVault(_vault).asset();
         string memory _apiVersion = IVault(_vault).apiVersion();
@@ -516,14 +411,13 @@ contract RoleManager is Governance2Step {
 
     /**
      * @notice Update a `_vault`s debt allocator.
-     * @dev This will deploy a new allocator using the current
-     *   allocator factory set.
+     * @dev This will use the default Debt Allocator currently set.
      * @param _vault Address of the vault to update the allocator for.
      */
     function updateDebtAllocator(
         address _vault
     ) external virtual returns (address _newDebtAllocator) {
-        _newDebtAllocator = _deployAllocator(_vault);
+        _newDebtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         updateDebtAllocator(_vault, _newDebtAllocator);
     }
 
@@ -535,7 +429,7 @@ contract RoleManager is Governance2Step {
     function updateDebtAllocator(
         address _vault,
         address _debtAllocator
-    ) public virtual onlyPositionHolder(BRAIN) {
+    ) public virtual onlyPositionHolder(MANAGEMENT) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
@@ -563,7 +457,7 @@ contract RoleManager is Governance2Step {
     function updateKeeper(
         address _vault,
         address _keeper
-    ) external virtual onlyPositionHolder(BRAIN) {
+    ) external virtual onlyPositionHolder(MANAGEMENT) {
         // Make sure the vault has been added to the role manager.
         require(vaultConfig[_vault].asset != address(0), "vault not added");
 
@@ -579,6 +473,22 @@ contract RoleManager is Governance2Step {
         _setRole(_vault, Position(_keeper, _positions[KEEPER].roles));
     }
 
+    function updateVaultName(
+        address _vault,
+        string calldata _name
+    ) external onlyPositionHolder(GOVERNANCE) {
+        require(vaultConfig[_vault].asset != address(0), "vault not added");
+        IVault(_vault).setName(_name);
+    }
+
+    function updateVaultSymbol(
+        address _vault,
+        string calldata _symbol
+    ) external onlyPositionHolder(GOVERNANCE) {
+        require(vaultConfig[_vault].asset != address(0), "vault not added");
+        IVault(_vault).setSymbol(_symbol);
+    }
+
     /**
      * @notice Removes a vault from the RoleManager.
      * @dev This will NOT un-endorse the vault from the registry.
@@ -586,7 +496,7 @@ contract RoleManager is Governance2Step {
      */
     function removeVault(
         address _vault
-    ) external virtual onlyPositionHolder(BRAIN) {
+    ) external virtual onlyPositionHolder(MANAGEMENT) {
         // Get the vault specific config.
         VaultConfig memory config = vaultConfig[_vault];
         // Make sure the vault has been added to the role manager.
@@ -627,7 +537,7 @@ contract RoleManager is Governance2Step {
         address[] calldata _vaults,
         address _holder,
         uint256 _role
-    ) external virtual onlyGovernance {
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
         address _vault;
         for (uint256 i = 0; i < _vaults.length; ++i) {
             _vault = _vaults[i];
@@ -651,41 +561,55 @@ contract RoleManager is Governance2Step {
     function setPositionRoles(
         bytes32 _position,
         uint256 _newRoles
-    ) external virtual onlyGovernance {
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
         // Cannot change the debt allocator or keeper roles since holder can be updated.
         require(
             _position != DEBT_ALLOCATOR && _position != KEEPER,
             "cannot update"
         );
-        _positions[_position].roles = uint96(_newRoles);
-
-        emit UpdatePositionRoles(_position, _newRoles);
+        _setPositionRoles(_position, _newRoles);
     }
 
     /**
      * @notice Setter function for updating a positions holder.
+     * @dev Updating `Governance` requires setting `PENDING_GOVERNANCE`
+     *  and then the pending address calling {acceptGovernance}.
      * @param _position Identifier for the position.
      * @param _newHolder New address for position.
      */
     function setPositionHolder(
         bytes32 _position,
         address _newHolder
-    ) external virtual onlyGovernance {
-        _positions[_position].holder = _newHolder;
-
-        emit UpdatePositionHolder(_position, _newHolder);
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
+        require(_position != GOVERNANCE, "!two step flow");
+        _setPositionHolder(_position, _newHolder);
     }
 
     /**
      * @notice Sets the default time until profits are fully unlocked for new vaults.
-     * @param _newDefaultProfitMaxUnlock New value for defaultProfitMaxUnlock.
+     * @param _newDefaultProfitMaxUnlockTime New value for defaultProfitMaxUnlockTime.
      */
-    function setDefaultProfitMaxUnlock(
-        uint256 _newDefaultProfitMaxUnlock
-    ) external virtual onlyGovernance {
-        defaultProfitMaxUnlock = _newDefaultProfitMaxUnlock;
+    function setDefaultProfitMaxUnlockTime(
+        uint256 _newDefaultProfitMaxUnlockTime
+    ) external virtual onlyPositionHolder(GOVERNANCE) {
+        defaultProfitMaxUnlockTime = _newDefaultProfitMaxUnlockTime;
 
-        emit UpdateDefaultProfitMaxUnlock(_newDefaultProfitMaxUnlock);
+        emit UpdateDefaultProfitMaxUnlockTime(_newDefaultProfitMaxUnlockTime);
+    }
+
+    /**
+     * @notice Accept the Governance role.
+     * @dev Caller must be the Pending Governance.
+     */
+    function acceptGovernance()
+        external
+        virtual
+        onlyPositionHolder(PENDING_GOVERNANCE)
+    {
+        // Set the Governance role to the caller.
+        _setPositionHolder(GOVERNANCE, msg.sender);
+        // Reset the Pending Governance.
+        _setPositionHolder(PENDING_GOVERNANCE, address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -696,7 +620,7 @@ contract RoleManager is Governance2Step {
      * @notice Get the name of this contract.
      */
     function name() external view virtual returns (string memory) {
-        return string(abi.encodePacked(_name_));
+        return string(abi.encodePacked(projectName, " Role Manager"));
     }
 
     /**
@@ -766,62 +690,19 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address and roles given to a specific position.
-     * @param _positionId The position identifier.
-     * @return The address that holds that position.
-     * @return The roles given to the specified position.
+     * @notice Get the address assigned to the Governance position.
+     * @return The address assigned to the Governance position.
      */
-    function getPosition(
-        bytes32 _positionId
-    ) public view virtual returns (address, uint256) {
-        Position memory _position = _positions[_positionId];
-        return (_position.holder, uint256(_position.roles));
+    function getGovernance() external view virtual returns (address) {
+        return getPositionHolder(GOVERNANCE);
     }
 
     /**
-     * @notice Get the current address assigned to a specific position.
-     * @param _positionId The position identifier.
-     * @return The current address assigned to the specified position.
+     * @notice Get the address assigned to the Management position.
+     * @return The address assigned to the Management position.
      */
-    function getPositionHolder(
-        bytes32 _positionId
-    ) public view virtual returns (address) {
-        return _positions[_positionId].holder;
-    }
-
-    /**
-     * @notice Get the current roles given to a specific position ID.
-     * @param _positionId The position identifier.
-     * @return The current roles given to the specified position ID.
-     */
-    function getPositionRoles(
-        bytes32 _positionId
-    ) public view virtual returns (uint256) {
-        return uint256(_positions[_positionId].roles);
-    }
-
-    /**
-     * @notice Get the address assigned to the Daddy position.
-     * @return The address assigned to the Daddy position.
-     */
-    function getDaddy() external view virtual returns (address) {
-        return getPositionHolder(DADDY);
-    }
-
-    /**
-     * @notice Get the address assigned to the Brain position.
-     * @return The address assigned to the Brain position.
-     */
-    function getBrain() external view virtual returns (address) {
-        return getPositionHolder(BRAIN);
-    }
-
-    /**
-     * @notice Get the address assigned to the Security position.
-     * @return The address assigned to the Security position.
-     */
-    function getSecurity() external view virtual returns (address) {
-        return getPositionHolder(SECURITY);
+    function getManagement() external view virtual returns (address) {
+        return getPositionHolder(MANAGEMENT);
     }
 
     /**
@@ -833,11 +714,11 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address assigned to the strategy manager.
-     * @return The address assigned to the strategy manager.
+     * @notice Get the address assigned to the Registry.
+     * @return The address assigned to the Registry.
      */
-    function getStrategyManager() external view virtual returns (address) {
-        return getPositionHolder(STRATEGY_MANAGER);
+    function getRegistry() external view virtual returns (address) {
+        return getPositionHolder(REGISTRY);
     }
 
     /**
@@ -849,14 +730,6 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address assigned to the Registry.
-     * @return The address assigned to the Registry.
-     */
-    function getRegistry() external view virtual returns (address) {
-        return getPositionHolder(REGISTRY);
-    }
-
-    /**
      * @notice Get the address assigned to be the debt allocator if any.
      * @return The address assigned to be the debt allocator if any.
      */
@@ -865,35 +738,19 @@ contract RoleManager is Governance2Step {
     }
 
     /**
-     * @notice Get the address assigned to the allocator factory.
-     * @return The address assigned to the allocator factory.
+     * @notice Get the roles given to the Governance position.
+     * @return The roles given to the Governance position.
      */
-    function getAllocatorFactory() external view virtual returns (address) {
-        return getPositionHolder(ALLOCATOR_FACTORY);
+    function getGovernanceRoles() external view virtual returns (uint256) {
+        return getPositionRoles(GOVERNANCE);
     }
 
     /**
-     * @notice Get the roles given to the Daddy position.
-     * @return The roles given to the Daddy position.
+     * @notice Get the roles given to the Management position.
+     * @return The roles given to the Management position.
      */
-    function getDaddyRoles() external view virtual returns (uint256) {
-        return getPositionRoles(DADDY);
-    }
-
-    /**
-     * @notice Get the roles given to the Brain position.
-     * @return The roles given to the Brain position.
-     */
-    function getBrainRoles() external view virtual returns (uint256) {
-        return getPositionRoles(BRAIN);
-    }
-
-    /**
-     * @notice Get the roles given to the Security position.
-     * @return The roles given to the Security position.
-     */
-    function getSecurityRoles() external view virtual returns (uint256) {
-        return getPositionRoles(SECURITY);
+    function getManagementRoles() external view virtual returns (uint256) {
+        return getPositionRoles(MANAGEMENT);
     }
 
     /**
@@ -910,13 +767,5 @@ contract RoleManager is Governance2Step {
      */
     function getDebtAllocatorRoles() external view virtual returns (uint256) {
         return getPositionRoles(DEBT_ALLOCATOR);
-    }
-
-    /**
-     * @notice Get the roles given to the strategy manager.
-     * @return The roles given to the strategy manager.
-     */
-    function getStrategyManagerRoles() external view virtual returns (uint256) {
-        return getPositionRoles(STRATEGY_MANAGER);
     }
 }

@@ -37,8 +37,7 @@ SPLITTER_FACTORY: constant(bytes32) = keccak256("Splitter Factory")
 REGISTRY_FACTORY: constant(bytes32) = keccak256("Registry Factory")
 ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Allocator Factory")
 ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("Accountant Factory")
-
-PROJECT_DEPLOYER: constant(bytes32) = keccak256("Project Deployer")
+ROLE_MANAGER_FACTORY: constant(bytes32) = keccak256("Role Manager Factory")
 
 name: public(constant(String[34])) = "Yearn V3 Protocol Address Provider"
 
@@ -179,6 +178,15 @@ def getAccountantFactory() -> address:
     """
     return self._get_address(ACCOUNTANT_FACTORY)
 
+@view
+@external
+def getRoleManagerFactory() -> address:
+    """
+    @notice Get the current Role Manager Factory.
+    @return Current Role Manager Factory address.
+    """
+    return self._get_address(ROLE_MANAGER_FACTORY)
+
 
 ########## SETTERS ##########
 
@@ -304,6 +312,15 @@ def setAccountantFactory(new_address: address):
     @param new_address The new Accountant Factory.
     """
     self._set_address(ACCOUNTANT_FACTORY, new_address)
+
+@external
+def setRoleManagerFactory(new_address: address):
+    """
+    @notice Sets a new address for the Role Manager Factory.
+    @dev Must be called by the governance.
+    @param new_address The new Role Manager Factory.
+    """
+    self._set_address(ROLE_MANAGER_FACTORY, new_address)
 
 
 ########## GOVERNANCE ##########

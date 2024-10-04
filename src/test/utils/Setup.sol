@@ -4,9 +4,9 @@ pragma solidity ^0.8.18;
 import {ExtendedTest} from "./ExtendedTest.sol";
 import {VyperDeployer} from "./VyperDeployer.sol";
 
-import {MockERC20} from "../../Mocks/MockERC20.sol";
-import {MockStrategy} from "../../Mocks/MockStrategy.sol";
-import {MockTokenized} from "../../Mocks/MockTokenizedStrategy.sol";
+import {MockERC20} from "../../mocks/MockERC20.sol";
+import {MockStrategy} from "../../mocks/MockStrategy.sol";
+import {MockTokenized} from "../../mocks/MockTokenizedStrategy.sol";
 
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
@@ -27,7 +27,8 @@ import {DebtAllocatorFactory} from "../../debtAllocators/DebtAllocatorFactory.so
 import {DebtAllocator} from "../../debtAllocators/DebtAllocator.sol";
 import {DebtOptimizerApplicator} from "../../debtAllocators/DebtOptimizerApplicator.sol";
 
-import {RoleManager} from "../../Managers/RoleManager.sol";
+import {RoleManager} from "../../managers/RoleManager.sol";
+import {RoleManagerFactory} from "../../managers/RoleManagerFactory.sol";
 
 import {Keeper} from "../../Keeper.sol";
 
@@ -55,25 +56,35 @@ contract Setup is ExtendedTest {
     address public strategyManager;
 
     // Contracts
+    MockERC20 public asset;
 
     VyperDeployer public vyperDeployer;
-    MockERC20 public asset;
+
     IVaultFactory public vaultFactory;
+
+    Registry public registry;
     ReleaseRegistry public releaseRegistry;
     RegistryFactory public registryFactory;
-    Registry public registry;
-    AccountantFactory public accountantFactory;
+
     Accountant public accountant;
+    AccountantFactory public accountantFactory;
+
     IProtocolAddressProvider public addressProvider;
-    DebtAllocatorFactory public debtAllocatorFactory;
+
     DebtAllocator public debtAllocator;
+    DebtAllocatorFactory public debtAllocatorFactory;
     DebtOptimizerApplicator public debtOptimizerApplicator;
+
     RoleManager public roleManager;
+    RoleManagerFactory public roleManagerFactory;
+
     Keeper public keeper;
-    ISplitterFactory public splitterFactory;
+
     ISplitter public splitter;
-    GenericDebtAllocatorFactory public genericAllocatorFactory;
+    ISplitterFactory public splitterFactory;
+
     GenericDebtAllocator public genericAllocator;
+    GenericDebtAllocatorFactory public genericAllocatorFactory;
 
     // Setup function
     function setUp() public virtual {
@@ -100,6 +111,8 @@ contract Setup is ExtendedTest {
         vyperDeployer = new VyperDeployer();
         asset = new MockERC20();
         vaultFactory = setupFactory();
+
+        addressProvider = IProtocolAddressProvider(deployAddressProvider());
 
         releaseRegistry = new ReleaseRegistry(daddy);
         registryFactory = new RegistryFactory(address(releaseRegistry));
@@ -131,39 +144,24 @@ contract Setup is ExtendedTest {
 
         keeper = new Keeper();
 
-        roleManager = new RoleManager(
-            daddy,
-            daddy,
-            brain,
-            security,
-            address(keeper),
-            address(strategyManager),
-            address(registry)
+        roleManagerFactory = new RoleManagerFactory(address(addressProvider));
+        roleManager = RoleManager(
+            roleManagerFactory.newRoleManager(
+                "Test",
+                daddy,
+                brain,
+                address(keeper),
+                address(registry),
+                address(accountant),
+                address(debtAllocator)
+            )
         );
 
         vm.startPrank(daddy);
-        roleManager.setPositionHolder(
-            roleManager.ACCOUNTANT(),
-            address(accountant)
-        );
         accountant.setVaultManager(address(roleManager));
-        roleManager.setPositionHolder(
-            roleManager.ALLOCATOR_FACTORY(),
-            address(debtAllocatorFactory)
-        );
+
         registry.setEndorser(address(roleManager), true);
         vm.stopPrank();
-
-        /**
-        roleManager = new RoleManager(
-            daddy,
-            brain,
-            address(keeper),
-            address(registry),
-            address(accountant),
-            address(debtAllocator)
-        );
-        */
 
         genericAllocatorFactory = new GenericDebtAllocatorFactory();
     }
@@ -185,7 +183,7 @@ contract Setup is ExtendedTest {
         );
     }
 
-    function setupAddressProvider()
+    function deployAddressProvider()
         public
         returns (IProtocolAddressProvider _addressProvider)
     {

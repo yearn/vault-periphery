@@ -2,13 +2,17 @@
 pragma solidity >=0.8.18;
 
 import {RoleManager} from "./RoleManager.sol";
+import {Clonable} from "@periphery/utils/Clonable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Registry, RegistryFactory} from "../registry/RegistryFactory.sol";
 import {AccountantFactory, Accountant} from "../accountants/AccountantFactory.sol";
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.sol";
 
-contract v3ProjectDeployer {
+/// @title Role Manager Factory
+/// @dev Used to either deploy single generic Role Managers or
+///     to easily configure and setup a new project that uses the Yearn V3 system.
+contract RoleManagerFactory is Clonable {
     event NewProject(bytes32 indexed projectId, address indexed roleManager);
 
     struct Project {
@@ -41,20 +45,64 @@ contract v3ProjectDeployer {
 
     constructor(address _addressProvider) {
         protocolAddressProvider = _addressProvider;
+
+        original = address(new RoleManager());
     }
 
+    /**
+     * @notice Create a new RoleManager instance
+     * @param _projectName The name of the project
+     * @param _governance The address of governance
+     * @param _management The address of management
+     * @param _keeper The address of the keeper
+     * @param _registry The address of the projects registry
+     * @param _accountant The address of the projects accountant
+     * @param _debtAllocator The address of the projects debt allocator
+     * @return _roleManager address of the newly created RoleManager
+     */
+    function newRoleManager(
+        string calldata _projectName,
+        address _governance,
+        address _management,
+        address _keeper,
+        address _registry,
+        address _accountant,
+        address _debtAllocator
+    ) external virtual returns (address _roleManager) {
+        _roleManager = _clone();
+
+        RoleManager(_roleManager).initialize(
+            _projectName,
+            _governance,
+            _management,
+            _keeper,
+            _registry,
+            _accountant,
+            _debtAllocator
+        );
+    }
+
+    /**
+     * @notice Create a new project with associated periphery contracts.
+        This will deploy and complete full setup with default configuration for
+        a new V3 project to exist.
+     * @param _name The name of the project
+     * @param _governance The address of governance to use
+     * @param _management The address of management to use
+     * @return _roleManager address of the newly created RoleManager for the project
+     */
     function newProject(
-        string calldata name,
+        string calldata _name,
         address _governance,
         address _management
     ) external virtual returns (address _roleManager) {
-        bytes32 _id = getProjectId(name, _governance);
+        bytes32 _id = getProjectId(_name, _governance);
         require(projects[_id].roleManager == address(0), "project exists");
 
         // Deploy new Registry
         address _registry = RegistryFactory(
             _fromAddressProvider(REGISTRY_FACTORY)
-        ).createNewRegistry(string(abi.encodePacked(name, " Registry")));
+        ).createNewRegistry(string(abi.encodePacked(_name, " Registry")));
 
         address _accountant = AccountantFactory(
             _fromAddressProvider(ACCOUNTANT_FACTORY)
@@ -63,18 +111,20 @@ contract v3ProjectDeployer {
         address _debtAllocator = DebtAllocatorFactory(
             _fromAddressProvider(ALLOCATOR_FACTORY)
         ).newDebtAllocator(_management);
-        /**
-        _roleManager = address(
-            new RoleManager(
-                _governance,
-                _management,
-                _fromAddressProvider(KEEPER),
-                _registry,
-                _accountant,
-                _debtAllocator
-            )
+
+        _roleManager = _clone();
+
+        RoleManager(_roleManager).initialize(
+            _name,
+            _governance,
+            _management,
+            _fromAddressProvider(KEEPER),
+            _registry,
+            _accountant,
+            _debtAllocator
         );
-        */
+
+        // Give Role Manager the needed access in the registry and accountant.
         Registry(_registry).setEndorser(_roleManager, true);
         Registry(_registry).transferGovernance(_governance);
 
@@ -88,10 +138,15 @@ contract v3ProjectDeployer {
             debtAllocator: _debtAllocator
         });
 
-        // Event
         emit NewProject(_id, _roleManager);
     }
 
+    /**
+     * @notice Generates a unique project ID
+     * @param _name The name of the project
+     * @param _governance The address of the governance
+     * @return The generated project ID
+     */
     function getProjectId(
         string memory _name,
         address _governance
@@ -99,6 +154,11 @@ contract v3ProjectDeployer {
         return keccak256(abi.encodePacked(_name, _governance, block.chainid));
     }
 
+    /**
+     * @notice Retrieves an address from the protocol address provider
+     * @param _id The ID of the address to retrieve
+     * @return The retrieved address
+     */
     function _fromAddressProvider(bytes32 _id) internal view returns (address) {
         return
             IProtocolAddressProvider(protocolAddressProvider).getAddress(_id);
