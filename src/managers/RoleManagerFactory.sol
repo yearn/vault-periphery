@@ -13,6 +13,8 @@ import {IProtocolAddressProvider} from "../interfaces/IProtocolAddressProvider.s
 /// @dev Used to either deploy single generic Role Managers or
 ///     to easily configure and setup a new project that uses the Yearn V3 system.
 contract RoleManagerFactory is Clonable {
+    event NewRoleManager(address indexed roleManager);
+
     event NewProject(bytes32 indexed projectId, address indexed roleManager);
 
     struct Project {
@@ -24,18 +26,13 @@ contract RoleManagerFactory is Clonable {
 
     bytes32 public constant KEEPER = keccak256("Keeper");
     /// @notice Position ID for the Registry.
-    bytes32 public constant RELEASE_REGISTRY = keccak256("Release Registry");
-    /// @notice Position ID for the Registry.
     bytes32 public constant REGISTRY_FACTORY = keccak256("Registry Factory");
-    /// @notice Position ID for the Accountant.
-    bytes32 public constant ACCOUNTANT = keccak256("Accountant");
     /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT_FACTORY =
         keccak256("Accountant Factory");
-    /// @notice Position ID for Debt Allocator
-    bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
-    /// @notice Position ID for the Allocator Factory.
-    bytes32 public constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
+    /// @notice Position ID for Debt Allocator Factory
+    bytes32 public constant DEBT_ALLOCATOR_FACTORY =
+        keccak256("Debt Allocator Factory");
 
     string public apiVersion = "v3.0.3";
 
@@ -80,6 +77,8 @@ contract RoleManagerFactory is Clonable {
             _accountant,
             _debtAllocator
         );
+
+        emit NewRoleManager(_roleManager);
     }
 
     /**
@@ -106,10 +105,10 @@ contract RoleManagerFactory is Clonable {
 
         address _accountant = AccountantFactory(
             _fromAddressProvider(ACCOUNTANT_FACTORY)
-        ).newAccountant(address(this), _roleManager);
+        ).newAccountant(address(this), _governance);
 
         address _debtAllocator = DebtAllocatorFactory(
-            _fromAddressProvider(ALLOCATOR_FACTORY)
+            _fromAddressProvider(DEBT_ALLOCATOR_FACTORY)
         ).newDebtAllocator(_management);
 
         _roleManager = _clone();
@@ -129,7 +128,7 @@ contract RoleManagerFactory is Clonable {
         Registry(_registry).transferGovernance(_governance);
 
         Accountant(_accountant).setVaultManager(_roleManager);
-        Accountant(_accountant).setFutureFeeManager(_roleManager);
+        Accountant(_accountant).setFutureFeeManager(_governance);
 
         projects[_id] = Project({
             roleManager: _roleManager,

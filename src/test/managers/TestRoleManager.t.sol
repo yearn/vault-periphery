@@ -5,6 +5,8 @@ import "forge-std/console2.sol";
 import {Setup, RoleManager, IVault, Roles, MockStrategy, DebtAllocator} from "../utils/Setup.sol";
 
 contract TestRoleManager is Setup {
+    error AlreadyDeployed(address _vault);
+
     event RoleSet(address indexed account, uint256 role);
 
     event AddedNewVault(
@@ -49,7 +51,7 @@ contract TestRoleManager is Setup {
     uint256 constant debt_allocator_roles =
         Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER;
 
-    function setUp() public override {
+    function setUp() public virtual override {
         super.setUp();
         vault = createVault(
             address(asset),
@@ -154,20 +156,20 @@ contract TestRoleManager is Setup {
         roleManager.setPositionHolder(id, user);
 
         bytes32[4] memory positionIds = [
-            roleManager.GOVERNANCE(),
+            roleManager.PENDING_GOVERNANCE(),
             roleManager.MANAGEMENT(),
             roleManager.REGISTRY(),
             roleManager.ACCOUNTANT()
         ];
 
         address[4] memory positionHolders = [
-            daddy,
+            address(0),
             brain,
             address(registry),
             address(accountant)
         ];
 
-        uint256[4] memory positionRoles = [daddy_roles, brain_roles, 0, 0];
+        uint256[4] memory positionRoles = [0, brain_roles, 0, 0];
 
         uint256 new_role = 42069;
 
@@ -227,14 +229,22 @@ contract TestRoleManager is Setup {
         emit UpdatePositionHolder(keeperId, user);
         roleManager.setPositionHolder(keeperId, user);
 
+        id = roleManager.GOVERNANCE();
+        vm.prank(daddy);
+        vm.expectRevert("!two step flow");
+        roleManager.setPositionHolder(id, user);
+
         // All positions should be changed now.
-        assertEq(roleManager.getGovernance(), user);
+        assertEq(roleManager.getPendingGovernance(), user);
         assertEq(roleManager.getManagement(), user);
         assertEq(roleManager.getKeeper(), user);
         assertEq(roleManager.getRegistry(), user);
         assertEq(roleManager.getAccountant(), user);
         assertEq(roleManager.getDebtAllocator(), user);
-        assertEq(roleManager.getPositionHolder(roleManager.GOVERNANCE()), user);
+        assertEq(
+            roleManager.getPositionHolder(roleManager.PENDING_GOVERNANCE()),
+            user
+        );
         assertEq(roleManager.getPositionHolder(roleManager.MANAGEMENT()), user);
         assertEq(roleManager.getPositionHolder(roleManager.KEEPER()), user);
         assertEq(roleManager.getPositionHolder(roleManager.REGISTRY()), user);
@@ -245,12 +255,11 @@ contract TestRoleManager is Setup {
         );
 
         // Check roles
-        assertEq(roleManager.getGovernanceRoles(), new_role);
         assertEq(roleManager.getManagementRoles(), new_role);
         assertEq(roleManager.getKeeperRoles(), keeper_roles);
         assertEq(roleManager.getDebtAllocatorRoles(), debt_allocator_roles);
         assertEq(
-            roleManager.getPositionRoles(roleManager.GOVERNANCE()),
+            roleManager.getPositionRoles(roleManager.PENDING_GOVERNANCE()),
             new_role
         );
         assertEq(
@@ -347,7 +356,7 @@ contract TestRoleManager is Setup {
         assertTrue(accountant.vaults(address(newVault)));
 
         // Check deposit limit
-        assertEq(newVault.maxDeposit(user), 0);
+        assertEq(newVault.maxDeposit(user), 2 ** 256 - 1);
 
         assertEq(newVault.symbol(), symbol);
         assertEq(newVault.name(), name);
@@ -441,7 +450,6 @@ contract TestRoleManager is Setup {
     function test_deploy_new_vault() public {
         uint256 category = 1;
         uint256 depositLimit = 100e18;
-        uint256 profitUnlock = 695;
         string memory name = "ksjdfl";
         string memory symbol = "sdfa";
 
@@ -464,6 +472,10 @@ contract TestRoleManager is Setup {
         );
 
         vm.prank(daddy);
+        registry.setEndorser(address(roleManager), false);
+        assertTrue(!registry.endorsers(address(roleManager)));
+
+        vm.prank(daddy);
         vm.expectRevert("!endorser");
         roleManager.newVault(
             address(asset),
@@ -476,6 +488,9 @@ contract TestRoleManager is Setup {
         vm.prank(daddy);
         registry.setEndorser(address(roleManager), true);
         assertTrue(registry.endorsers(address(roleManager)));
+
+        vm.prank(daddy);
+        accountant.setVaultManager(address(user));
 
         vm.prank(daddy);
         vm.expectRevert("!vault manager");
@@ -495,7 +510,8 @@ contract TestRoleManager is Setup {
             address(asset),
             category,
             name,
-            symbol
+            symbol,
+            depositLimit
         );
         IVault newVault = IVault(newVaultAddress);
 
@@ -535,7 +551,7 @@ contract TestRoleManager is Setup {
         assertEq(newVault.roles(brain), brain_roles);
         assertEq(newVault.roles(address(keeper)), keeper_roles);
         assertEq(newVault.roles(vaultDebtAllocator), debt_allocator_roles);
-        assertEq(newVault.profitMaxUnlockTime(), profitUnlock);
+        assertEq(newVault.profitMaxUnlockTime(), 10 days);
 
         assertEq(address(newVault.accountant()), address(accountant));
         assertTrue(accountant.vaults(address(newVault)));
@@ -570,11 +586,7 @@ contract TestRoleManager is Setup {
         IVault newVault = IVault(newVaultAddress);
 
         vm.prank(daddy);
-        bytes memory revertData = abi.encodePacked(
-            "Already Deployed ",
-            abi.encode(address(newVault))
-        );
-        vm.expectRevert(revertData);
+        vm.expectRevert();
         roleManager.newVault(
             address(asset),
             category,
@@ -832,8 +844,6 @@ contract TestRoleManager is Setup {
 
         assertEq(newVault.symbol(), symbol);
         assertEq(newVault.name(), name);
-
-        //assertEq(address(debtAllocator.vault()), address(newVault));
     }
 
     function test_add_new_vault__with_accountant() public {
@@ -865,11 +875,8 @@ contract TestRoleManager is Setup {
         assertEq(registry.numAssets(), 0);
         assertEq(registry.numEndorsedVaults(address(asset)), 0);
 
-        vm.prank(brain);
-        address debtAllocatorAddress = debtAllocatorFactory.newDebtAllocator(
-            address(newVault)
-        );
-        DebtAllocator debtAllocator = DebtAllocator(debtAllocatorAddress);
+        vm.prank(daddy);
+        newVault.set_role(daddy, Roles.ALL);
 
         vm.prank(daddy);
         newVault.set_accountant(user);
@@ -878,11 +885,7 @@ contract TestRoleManager is Setup {
         newVault.transfer_role_manager(address(roleManager));
 
         vm.prank(daddy);
-        roleManager.addNewVault(
-            address(newVault),
-            category,
-            address(debtAllocator)
-        );
+        roleManager.addNewVault(address(newVault), category);
 
         (
             address vaultAsset,
@@ -929,13 +932,9 @@ contract TestRoleManager is Setup {
 
         assertEq(newVault.symbol(), symbol);
         assertEq(newVault.name(), name);
-
-        //assertEq(address(debtAllocator.vault()), address(newVault));
     }
 
     function test_add_new_vault__duplicate_reverts() public {
-        //setupRoleManager();
-
         string memory name = " ksjdfl";
         string memory symbol = "sdfa";
         uint256 category = 1;
@@ -967,7 +966,7 @@ contract TestRoleManager is Setup {
         );
 
         vm.prank(daddy);
-        vm.expectRevert("vault already added");
+        vm.expectRevert();
         roleManager.addNewVault(
             address(newVault),
             category,
@@ -975,7 +974,7 @@ contract TestRoleManager is Setup {
         );
     }
 
-    function test_new_debt_allocator__deploys_one() public {
+    function test_new_debt_allocator__usesDefault() public {
         uint256 category = 1;
         string memory name = "sdfads";
         string memory symbol = "dsf";
@@ -998,13 +997,13 @@ contract TestRoleManager is Setup {
         roleManager.updateDebtAllocator(address(newVault));
 
         vm.prank(brain);
-        vm.expectRevert("debt allocator already deployed");
         roleManager.updateDebtAllocator(address(newVault));
 
         assertEq(
             roleManager.getDebtAllocator(address(newVault)),
             vaultDebtAllocator
         );
+        assertEq(newVault.roles(vaultDebtAllocator), debt_allocator_roles);
     }
 
     function test_new_debt_allocator__already_deployed() public {
@@ -1025,49 +1024,42 @@ contract TestRoleManager is Setup {
             address(newVault)
         );
 
+        address newDebtAllocator = user;
+
         vm.prank(brain);
-        vm.expectRevert("debt allocator already deployed");
-        roleManager.updateDebtAllocator(address(newVault));
+        roleManager.updateDebtAllocator(address(newVault), user);
 
         assertEq(
             roleManager.getDebtAllocator(address(newVault)),
-            vaultDebtAllocator
+            newDebtAllocator
         );
+        assertEq(newVault.roles(vaultDebtAllocator), 0);
+        assertEq(newVault.roles(user), debt_allocator_roles);
     }
 
-    function test_new_keeper() public {
+    function test_updateKeeper() public {
         string memory name = "sdfads";
         string memory symbol = "dsf";
 
         address newKeeper = address(0x123);
-        bytes32 keeperId = roleManager.KEEPER();
-        vm.prank(user);
+
+        vm.prank(daddy);
+        vault = IVault(roleManager.newVault(address(asset), 1, name, symbol));
+
+        assertEq(roleManager.getKeeper(), address(keeper));
+        assertEq(vault.roles(newKeeper), 0);
+        assertEq(vault.roles(address(keeper)), keeper_roles);
+
         vm.expectRevert("!allowed");
-        roleManager.setPositionHolder(keeperId, newKeeper);
-
         vm.prank(daddy);
-        vm.expectEmit(true, true, true, true);
-        emit UpdatePositionHolder(roleManager.KEEPER(), newKeeper);
-        roleManager.setPositionHolder(roleManager.KEEPER(), newKeeper);
+        roleManager.updateKeeper(address(vault), newKeeper);
 
-        assertEq(roleManager.getKeeper(), newKeeper);
-        assertEq(
-            roleManager.getPositionHolder(roleManager.KEEPER()),
-            newKeeper
-        );
+        vm.prank(brain);
+        roleManager.updateKeeper(address(vault), newKeeper);
 
-        uint256 category = 1;
-
-        vm.prank(daddy);
-        address newVaultAddress = roleManager.newVault(
-            address(asset),
-            category,
-            name,
-            symbol
-        );
-        IVault newVault = IVault(newVaultAddress);
-
-        assertEq(newVault.roles(newKeeper), keeper_roles);
+        assertEq(roleManager.getKeeper(), address(keeper));
+        assertEq(vault.roles(newKeeper), keeper_roles);
+        assertEq(vault.roles(address(keeper)), 0);
     }
 
     function test_remove_vault() public {
@@ -1119,11 +1111,11 @@ contract TestRoleManager is Setup {
         vm.expectRevert("!allowed");
         roleManager.removeVault(address(newVault));
 
-        vm.prank(daddy);
+        vm.prank(brain);
         vm.expectRevert("vault not added");
         roleManager.removeVault(user);
 
-        vm.prank(daddy);
+        vm.prank(brain);
         vm.expectEmit(true, true, true, true);
         emit RemovedVault(address(newVault));
         roleManager.removeVault(address(newVault));

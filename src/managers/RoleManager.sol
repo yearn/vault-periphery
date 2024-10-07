@@ -76,10 +76,10 @@ contract RoleManager is Positions {
     address[] public vaults;
 
     // Encoded name so that it can be held as a constant.
-    bytes32 internal projectName;
+    string internal projectName;
 
     /// @notice Default time until profits are fully unlocked for new vaults.
-    uint256 public defaultProfitMaxUnlockTime = 10 days;
+    uint256 public defaultProfitMaxUnlockTime;
 
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
@@ -103,8 +103,10 @@ contract RoleManager is Positions {
         require(chad == address(0), "initialized");
         require(_governance != address(0), "ZERO ADDRESS");
 
-        projectName = bytes32(abi.encodePacked(_projectName));
+        projectName = _projectName;
         chad = _governance;
+
+        defaultProfitMaxUnlockTime = 10 days;
 
         // Governance gets all the roles.
         _setPositionHolder(GOVERNANCE, _governance);
@@ -695,6 +697,14 @@ contract RoleManager is Positions {
      */
     function getGovernance() external view virtual returns (address) {
         return getPositionHolder(GOVERNANCE);
+    }
+
+    /**
+     * @notice Get the address assigned to the Pending Governance position.
+     * @return The address assigned to the Pending Governance position.
+     */
+    function getPendingGovernance() external view virtual returns (address) {
+        return getPositionHolder(PENDING_GOVERNANCE);
     }
 
     /**

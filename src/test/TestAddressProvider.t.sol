@@ -20,7 +20,7 @@ contract TestAddressProvider is Setup {
         assertEq(addressProvider.getAuctionFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getSplitterFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getRegistryFactory(), ZERO_ADDRESS);
-        assertEq(addressProvider.getAllocatorFactory(), ZERO_ADDRESS);
+        assertEq(addressProvider.getDebtAllocatorFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getAccountantFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getRoleManagerFactory(), ZERO_ADDRESS);
         assertEq(addressProvider.getAddress(bytes32("random")), ZERO_ADDRESS);
@@ -253,27 +253,27 @@ contract TestAddressProvider is Setup {
         assertEq(addressProvider.getRegistryFactory(), newAddress);
     }
 
-    function test__set_allocator_factory() public {
-        bytes32 id = AddressIds.ALLOCATOR_FACTORY;
+    function test__set_debt_allocator_factory() public {
+        bytes32 id = AddressIds.DEBT_ALLOCATOR_FACTORY;
         address newAddress = user;
 
         assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
-        assertEq(addressProvider.getAllocatorFactory(), ZERO_ADDRESS);
+        assertEq(addressProvider.getDebtAllocatorFactory(), ZERO_ADDRESS);
 
         vm.prank(user);
         vm.expectRevert("!governance");
-        addressProvider.setAllocatorFactory(newAddress);
+        addressProvider.setDebtAllocatorFactory(newAddress);
 
         assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
-        assertEq(addressProvider.getAllocatorFactory(), ZERO_ADDRESS);
+        assertEq(addressProvider.getDebtAllocatorFactory(), ZERO_ADDRESS);
 
         vm.prank(daddy);
         vm.expectEmit(true, true, true, true, address(addressProvider));
         emit UpdatedAddress(id, ZERO_ADDRESS, newAddress);
-        addressProvider.setAllocatorFactory(newAddress);
+        addressProvider.setDebtAllocatorFactory(newAddress);
 
         assertEq(addressProvider.getAddress(id), newAddress);
-        assertEq(addressProvider.getAllocatorFactory(), newAddress);
+        assertEq(addressProvider.getDebtAllocatorFactory(), newAddress);
     }
 
     function test__set_accountant_factory() public {
@@ -413,7 +413,8 @@ library AddressIds {
     bytes32 constant AUCTION_FACTORY = keccak256("Auction Factory");
     bytes32 constant SPLITTER_FACTORY = keccak256("Splitter Factory");
     bytes32 constant REGISTRY_FACTORY = keccak256("Registry Factory");
-    bytes32 constant ALLOCATOR_FACTORY = keccak256("Allocator Factory");
+    bytes32 constant DEBT_ALLOCATOR_FACTORY =
+        keccak256("Debt Allocator Factory");
     bytes32 constant ACCOUNTANT_FACTORY = keccak256("Accountant Factory");
     bytes32 constant ROLE_MANAGER_FACTORY = keccak256("Role Manager Factory");
 }

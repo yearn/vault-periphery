@@ -2,66 +2,65 @@
 pragma solidity ^0.8.18;
 
 import "forge-std/console2.sol";
-import {Setup, RoleManager, IVault, Roles, MockStrategy, DebtAllocator} from "../utils/Setup.sol";
+import {Setup, RoleManager, IVault, Roles, MockStrategy, DebtAllocator, Accountant, Registry} from "../utils/Setup.sol";
+import {TestRoleManager} from "./TestRoleManager.t.sol";
 
-contract TestRoleManagerFactory is Setup {
-    event RoleSet(address indexed account, uint256 role);
+contract TestRoleManagerFactory is TestRoleManager {
+    event NewProject(bytes32 indexed projectId, address indexed roleManager);
 
-    event AddedNewVault(
-        address indexed vault,
-        address indexed debtAllocator,
-        uint256 category
-    );
+    string public name = "Tezzz";
 
-    /// @notice Emitted when a vaults debt allocator is updated.
-    event UpdateDebtAllocator(
-        address indexed vault,
-        address indexed debtAllocator
-    );
-
-    /// @notice Emitted when a new address is set for a position.
-    event UpdatePositionHolder(
-        bytes32 indexed position,
-        address indexed newAddress
-    );
-
-    /// @notice Emitted when a vault is removed.
-    event RemovedVault(address indexed vault);
-
-    /// @notice Emitted when a new set of roles is set for a position
-    event UpdatePositionRoles(bytes32 indexed position, uint256 newRoles);
-
-    /// @notice Emitted when the defaultProfitMaxUnlock variable is updated.
-    event UpdateDefaultProfitMaxUnlock(uint256 newDefaultProfitMaxUnlock);
-
-    IVault public vault;
-    MockStrategy public strategy;
-
-    uint256 constant daddy_roles = Roles.ALL;
-    uint256 constant brain_roles =
-        Roles.REPORTING_MANAGER |
-            Roles.DEBT_MANAGER |
-            Roles.QUEUE_MANAGER |
-            Roles.DEPOSIT_LIMIT_MANAGER |
-            Roles.DEBT_PURCHASER |
-            Roles.PROFIT_UNLOCK_MANAGER;
-    uint256 constant keeper_roles = Roles.REPORTING_MANAGER;
-    uint256 constant debt_allocator_roles =
-        Roles.REPORTING_MANAGER | Roles.DEBT_MANAGER;
-
-    function setUp() public override {
+    // Deploy whole new project and run same tests with deployed Role Manager
+    function setUp() public virtual override {
         super.setUp();
-        vault = createVault(
-            address(asset),
-            daddy,
-            MAX_INT,
-            WEEK,
-            "Test Vault",
-            "tvTEST"
+
+        setupAddressProvider();
+
+        address newDaddy = address(234);
+        address newBrain = address(3456);
+
+        address _roleManager = roleManagerFactory.newProject(
+            name,
+            newDaddy,
+            newBrain
         );
-        strategy = createStrategy(address(asset));
+
+        roleManager = RoleManager(_roleManager);
+        daddy = newDaddy;
+        brain = newBrain;
+        accountant = Accountant(roleManager.getAccountant());
+        registry = Registry(roleManager.getRegistry());
+        debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
 
         vm.prank(daddy);
-        releaseRegistry.newRelease(address(vaultFactory));
+        accountant.acceptFeeManager();
+    }
+
+    function test_newProjectSetup() public {
+        bytes32 id = roleManagerFactory.getProjectId(name, daddy);
+
+        (
+            address _roleManager,
+            address _registry,
+            address _accountant,
+            address _debtAllocator
+        ) = roleManagerFactory.projects(id);
+        console2.log(roleManager.name());
+        assertNeq(_roleManager, address(0));
+        assertNeq(_registry, address(0));
+        assertNeq(_accountant, address(0));
+        assertNeq(_debtAllocator, address(0));
+
+        assertEq(roleManager.name(), "Tezzz Role Manager");
+    }
+
+    function setupAddressProvider() public {
+        vm.startPrank(daddy);
+        addressProvider.setAccountantFactory(address(accountantFactory));
+        addressProvider.setRegistryFactory(address(registryFactory));
+        addressProvider.setRoleManagerFactory(address(roleManagerFactory));
+        addressProvider.setDebtAllocatorFactory(address(debtAllocatorFactory));
+        addressProvider.setKeeper(address(keeper));
+        vm.stopPrank();
     }
 }

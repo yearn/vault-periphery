@@ -36,7 +36,7 @@ interface IProtocolAddressProvider {
 
     function setRegistryFactory(address _registryFactory) external;
 
-    function setAllocatorFactory(address _allocatorFactory) external;
+    function setDebtAllocatorFactory(address _debtAllocatorFactory) external;
 
     function setAccountantFactory(address _accountantFactory) external;
 
@@ -60,7 +60,7 @@ interface IProtocolAddressProvider {
 
     function getRegistryFactory() external view returns (address);
 
-    function getAllocatorFactory() external view returns (address);
+    function getDebtAllocatorFactory() external view returns (address);
 
     function getAccountantFactory() external view returns (address);
 

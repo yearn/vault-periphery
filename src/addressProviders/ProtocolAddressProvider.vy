@@ -35,7 +35,7 @@ COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("Common Report Trigger")
 AUCTION_FACTORY: constant(bytes32) = keccak256("Auction Factory")
 SPLITTER_FACTORY: constant(bytes32) = keccak256("Splitter Factory")
 REGISTRY_FACTORY: constant(bytes32) = keccak256("Registry Factory")
-ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Allocator Factory")
+DEBT_ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Debt Allocator Factory")
 ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("Accountant Factory")
 ROLE_MANAGER_FACTORY: constant(bytes32) = keccak256("Role Manager Factory")
 
@@ -162,12 +162,12 @@ def getRegistryFactory() -> address:
 
 @view
 @external
-def getAllocatorFactory() -> address:
+def getDebtAllocatorFactory() -> address:
     """
     @notice Get the current Debt Allocator Factory.
     @return Current Debt Allocator Factory address.
     """
-    return self._get_address(ALLOCATOR_FACTORY)
+    return self._get_address(DEBT_ALLOCATOR_FACTORY)
 
 @view
 @external
@@ -296,13 +296,13 @@ def setRegistryFactory(new_address: address):
     self._set_address(REGISTRY_FACTORY, new_address)
 
 @external
-def setAllocatorFactory(new_address: address):
+def setDebtAllocatorFactory(new_address: address):
     """
     @notice Sets a new address for the Debt Allocator Factory.
     @dev Must be called by the governance.
     @param new_address The new Debt Allocator Factory.
     """
-    self._set_address(ALLOCATOR_FACTORY, new_address)
+    self._set_address(DEBT_ALLOCATOR_FACTORY, new_address)
 
 @external
 def setAccountantFactory(new_address: address):
