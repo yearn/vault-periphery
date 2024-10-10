@@ -18,6 +18,8 @@ interface IProtocolAddressProvider {
 
     function getAddress(bytes32 _id) external view returns (address);
 
+    function setReplacement(address _replacement) external;
+
     function setRouter(address _router) external;
 
     function setKeeper(address _keeper) external;
@@ -41,6 +43,8 @@ interface IProtocolAddressProvider {
     function setAccountantFactory(address _accountantFactory) external;
 
     function setRoleManagerFactory(address _roleManagerFactory) external;
+
+    function getReplacement() external view returns (address);
 
     function getRouter() external view returns (address);
 

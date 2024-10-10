@@ -27,6 +27,7 @@ event UpdateGovernance:
 ROUTER: constant(bytes32) = keccak256("Router")
 KEEPER: constant(bytes32) = keccak256("Keeper")
 APR_ORACLE: constant(bytes32) = keccak256("APR Oracle")
+REPLACEMENT: constant(bytes32) = keccak256("Replacement")
 RELEASE_REGISTRY: constant(bytes32) = keccak256("Release Registry")
 BASE_FEE_PROVIDER: constant(bytes32) = keccak256("Base Fee Provider")
 COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("Common Report Trigger")
@@ -78,6 +79,16 @@ def getAddress(address_id: bytes32) -> address:
 @internal
 def _get_address(address_id: bytes32) -> address:
     return self.addresses[address_id]
+
+@view
+@external
+def getReplacement() -> address:
+    """
+    @notice Get the replacement of the address provider if it exists.
+        This will return address 0 if this is the latest version.
+    @return The replacement address provider if any.
+    """
+    return self._get_address(REPLACEMENT)
 
 @view
 @external
@@ -213,6 +224,15 @@ def _set_address(address_id: bytes32, new_address: address):
     self.addresses[address_id] = new_address
 
     log UpdatedAddress(address_id, old_address, new_address)
+
+@external
+def setReplacement(new_address: address):
+    """
+    @notice Set the replacement address provider.
+    @dev Must be called by the governance.
+    @param new_address of the replacement address provider.
+    """
+    self._set_address(REPLACEMENT, new_address)
 
 @external
 def setRouter(new_address: address):

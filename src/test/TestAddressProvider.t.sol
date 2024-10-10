@@ -12,6 +12,7 @@ contract TestAddressProvider is Setup {
         assertEq(addressProvider.name(), "Yearn V3 Protocol Address Provider");
         assertEq(addressProvider.governance(), daddy);
         assertEq(addressProvider.pendingGovernance(), ZERO_ADDRESS);
+        assertEq(addressProvider.getReplacement(), ZERO_ADDRESS);
         assertEq(addressProvider.getRouter(), ZERO_ADDRESS);
         assertEq(addressProvider.getKeeper(), ZERO_ADDRESS);
         assertEq(addressProvider.getAprOracle(), ZERO_ADDRESS);
@@ -44,6 +45,29 @@ contract TestAddressProvider is Setup {
         addressProvider.setAddress(id, newAddress);
 
         assertEq(addressProvider.getAddress(id), newAddress);
+    }
+
+    function test__set_replacement() public {
+        bytes32 id = AddressIds.REPLACEMENT;
+        address newAddress = address(0x456);
+
+        assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
+        assertEq(addressProvider.getReplacement(), ZERO_ADDRESS);
+
+        vm.prank(user);
+        vm.expectRevert("!governance");
+        addressProvider.setReplacement(newAddress);
+
+        assertEq(addressProvider.getAddress(id), ZERO_ADDRESS);
+        assertEq(addressProvider.getReplacement(), ZERO_ADDRESS);
+
+        vm.prank(daddy);
+        vm.expectEmit(true, true, true, true, address(addressProvider));
+        emit UpdatedAddress(id, ZERO_ADDRESS, newAddress);
+        addressProvider.setReplacement(newAddress);
+
+        assertEq(addressProvider.getAddress(id), newAddress);
+        assertEq(addressProvider.getReplacement(), newAddress);
     }
 
     function test__set_router() public {
@@ -407,6 +431,7 @@ library AddressIds {
     bytes32 constant ROUTER = keccak256("Router");
     bytes32 constant KEEPER = keccak256("Keeper");
     bytes32 constant APR_ORACLE = keccak256("APR Oracle");
+    bytes32 constant REPLACEMENT = keccak256("Replacement");
     bytes32 constant RELEASE_REGISTRY = keccak256("Release Registry");
     bytes32 constant BASE_FEE_PROVIDER = keccak256("Base Fee Provider");
     bytes32 constant COMMON_REPORT_TRIGGER = keccak256("Common Report Trigger");
