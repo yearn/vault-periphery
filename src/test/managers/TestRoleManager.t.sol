@@ -64,7 +64,7 @@ contract TestRoleManager is Setup {
         strategy = createStrategy(address(asset));
 
         vm.prank(daddy);
-        releaseRegistry.newRelease(address(vaultFactory));
+        releaseRegistry.newRelease(address(vaultFactory), address(strategy));
     }
 
     function test_role_manager_setup() public {

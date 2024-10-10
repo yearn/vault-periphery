@@ -7,6 +7,10 @@
 @notice
     Protocol Address provider for the periphery contracts for the Yearn V3 system.
 """
+
+interface IAddressProvider:
+    def getAddress(address_id: bytes32) -> address: view
+
 #### EVENTS ####
 
 event UpdatedAddress:
