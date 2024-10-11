@@ -120,7 +120,7 @@ contract DebtAllocator is Governance {
         uint256 maxDebt;
         uint256 currentIdle;
         uint256 minIdle;
-        uint256 max;
+        //uint256 max;
         uint256 toChange;
     }
 
@@ -296,12 +296,13 @@ contract DebtAllocator is Governance {
         if (strategyDebtInfo.targetDebt > params.current_debt) {
             strategyDebtInfo.currentIdle = IVault(_vault).totalIdle();
             strategyDebtInfo.minIdle = IVault(_vault).minimum_total_idle();
-            strategyDebtInfo.max = IVault(_strategy).maxDeposit(_vault);
 
             // We can't add more than the available idle.
             if (strategyDebtInfo.minIdle >= strategyDebtInfo.currentIdle) {
                 return (false, bytes("No Idle"));
             }
+
+            //strategyDebtInfo.max = IVault(_strategy).maxDeposit(_vault);
 
             // Add up to the max if possible
             strategyDebtInfo.toChange = Math.min(
@@ -309,7 +310,7 @@ contract DebtAllocator is Governance {
                 // Can't take more than is available.
                 Math.min(
                     strategyDebtInfo.currentIdle - strategyDebtInfo.minIdle,
-                    strategyDebtInfo.max
+                    IVault(_strategy).maxDeposit(_vault)
                 )
             );
 
@@ -339,9 +340,6 @@ contract DebtAllocator is Governance {
 
             strategyDebtInfo.currentIdle = IVault(_vault).totalIdle();
             strategyDebtInfo.minIdle = IVault(_vault).minimum_total_idle();
-            strategyDebtInfo.max = IVault(_strategy).convertToAssets(
-                IVault(_strategy).maxRedeem(_vault)
-            );
 
             if (strategyDebtInfo.minIdle > strategyDebtInfo.currentIdle) {
                 // Pull at least the amount needed for minIdle.
@@ -356,7 +354,9 @@ contract DebtAllocator is Governance {
                 strategyDebtInfo.toChange,
                 // Account for the current liquidity constraints.
                 // Use max redeem to match vault logic.
-                strategyDebtInfo.max
+                IVault(_strategy).convertToAssets(
+                    IVault(_strategy).maxRedeem(_vault)
+                )
             );
 
             // Check if it's over the threshold.

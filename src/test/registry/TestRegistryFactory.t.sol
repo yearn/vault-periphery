@@ -13,7 +13,7 @@ contract TestRegistryFactory is Setup {
             address(registryFactory.releaseRegistry()),
             address(releaseRegistry)
         );
-        assertEq(registryFactory.name(), "Custom Vault Registry Factory");
+        assertEq(registryFactory.name(), "Yearn V3 Vault Registry Factory");
     }
 
     function test__new_registry() public {
