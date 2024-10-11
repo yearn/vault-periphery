@@ -105,9 +105,6 @@ contract Registry is Governance {
     // Custom name for this Registry.
     string public name;
 
-    // A previous registry to fallback to as well.
-    address public legacyRegistry;
-
     // Mapping for any address that is allowed to tag a vault.
     mapping(address => bool) public taggers;
 
@@ -535,15 +532,5 @@ contract Registry is Governance {
         taggers[_account] = _canTag;
 
         emit UpdateTagger(_account, _canTag);
-    }
-
-    /**
-     * @notice Set a legacy registry to fallback to.
-     * @param _legacyRegistry The address of the legacy registry.
-     */
-    function setLegacyRegistry(
-        address _legacyRegistry
-    ) external virtual onlyGovernance {
-        legacyRegistry = _legacyRegistry;
     }
 }

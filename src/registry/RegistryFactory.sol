@@ -24,7 +24,7 @@ contract RegistryFactory {
     }
 
     function name() external pure virtual returns (string memory) {
-        return "Custom Vault Registry Factory";
+        return "Yearn V3 Vault Registry Factory";
     }
 
     /**
