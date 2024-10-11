@@ -6,8 +6,10 @@ import {Registry} from "../registry/Registry.sol";
 import {Accountant} from "../accountants/Accountant.sol";
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
+import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
@@ -83,6 +85,7 @@ contract RoleManager is Positions {
 
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
+
     /// @notice Mapping of underlying asset, api version and category to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
         internal _assetToVault;
@@ -648,6 +651,44 @@ contract RoleManager is Positions {
         uint256 _category
     ) external view virtual returns (address) {
         return _assetToVault[_asset][_apiVersion][_category];
+    }
+
+    /**
+     * @notice Get the latest vault for a specific asset.
+     * @dev This will default to using category 1.
+     * @param _asset The underlying asset used.
+     * @return _vault latest vault for the specified `_asset` if any.
+     */
+    function latestVault(
+        address _asset
+    ) external view virtual returns (address) {
+        return latestVault(_asset, 1);
+    }
+
+    /**
+     * @notice Get the latest vault for a specific asset.
+     * @param _asset The underlying asset used.
+     * @param _category The category of the vault.
+     * @return _vault latest vault for the specified `_asset` if any.
+     */
+    function latestVault(
+        address _asset,
+        uint256 _category
+    ) public view virtual returns (address _vault) {
+        address releaseRegistry = Registry(getPositionHolder(REGISTRY))
+            .releaseRegistry();
+        uint256 numReleases = ReleaseRegistry(releaseRegistry).numReleases();
+
+        for (uint256 i = numReleases; i > 0; --i) {
+            string memory apiVersion = IVaultFactory(
+                ReleaseRegistry(releaseRegistry).factories(i - 1)
+            ).apiVersion();
+
+            _vault = _assetToVault[_asset][apiVersion][_category];
+            if (_vault != address(0)) {
+                break;
+            }
+        }
     }
 
     /**
