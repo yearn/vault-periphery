@@ -47,28 +47,31 @@ contract ReleaseRegistry is Governance2Step {
 
     /**
      * @notice Returns the latest factory.
-     * @dev Throws if no releases are registered yet.
      * @return The address of the factory for the latest release.
      */
     function latestFactory() external view virtual returns (address) {
+        uint256 _numReleases = numReleases;
+        if (_numReleases == 0) return address(0);
         return factories[numReleases - 1];
     }
 
     /**
      * @notice Returns the latest tokenized strategy.
-     * @dev Throws if no releases are registered yet.
      * @return The address of the tokenized strategy for the latest release.
      */
     function latestTokenizedStrategy() external view virtual returns (address) {
+        uint256 _numReleases = numReleases;
+        if (_numReleases == 0) return address(0);
         return tokenizedStrategies[numReleases - 1];
     }
 
     /**
      * @notice Returns the api version of the latest release.
-     * @dev Throws if no releases are registered yet.
      * @return The api version of the latest release.
      */
     function latestRelease() external view virtual returns (string memory) {
+        uint256 _numReleases = numReleases;
+        if (_numReleases == 0) return "";
         return IFactory(factories[numReleases - 1]).apiVersion(); // dev: no release
     }
 
