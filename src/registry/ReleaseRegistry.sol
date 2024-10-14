@@ -72,7 +72,7 @@ contract ReleaseRegistry is Governance2Step {
     function latestRelease() external view virtual returns (string memory) {
         uint256 _numReleases = numReleases;
         if (_numReleases == 0) return "";
-        return IFactory(factories[numReleases - 1]).apiVersion(); // dev: no release
+        return IFactory(factories[numReleases - 1]).apiVersion();
     }
 
     /**
@@ -82,6 +82,7 @@ contract ReleaseRegistry is Governance2Step {
      *
      *   Throws if caller isn't `governance`.
      *   Throws if the api version is the same as the previous release.
+     *   Throws if the factory does not have the same api version as the tokenized strategy.
      *   Emits a `NewRelease` event.
      *
      * @param _factory The factory that will be used create new vaults.

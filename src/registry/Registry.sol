@@ -21,7 +21,7 @@ interface IVaultFactory {
  * @title YearnV3 Registry
  * @author yearn.finance
  * @notice
- *  Serves as an on chain registry to track any Yearn
+ *  Serves as an on chain registry to track any Yearn V3
  *  vaults and strategies that a certain party wants to
  *  endorse.
  *
