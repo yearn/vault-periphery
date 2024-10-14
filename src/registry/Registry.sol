@@ -306,7 +306,7 @@ contract Registry is Governance {
      * @notice Endorse an already deployed multi strategy vault.
      * @dev To be used with default values for `_releaseDelta`, `_vaultType`
      * and `_deploymentTimestamp`.
-
+     *
      * @param _vault Address of the vault to endorse.
      */
     function endorseMultiStrategyVault(address _vault) external virtual {

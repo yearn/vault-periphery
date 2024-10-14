@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.13;
+
 import "forge-std/console.sol";
 
 ///@notice This cheat codes interface is named _CheatCodes so you can use the CheatCodes interface in other testing files without errors
@@ -15,7 +16,6 @@ interface _CheatCodes {
  * and deploys the corresponding Vyper contract, returning the address
  * that the bytecode was deployed to.
  */
-
 contract VyperDeployer {
     address constant HEVM_ADDRESS =
         address(bytes20(uint160(uint256(keccak256("hevm cheat code")))));

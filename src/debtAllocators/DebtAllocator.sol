@@ -247,8 +247,9 @@ contract DebtAllocator is Governance {
         strategyDebtInfo.vaultConfig = getVaultConfig(_vault);
 
         // Don't do anything if paused.
-        if (strategyDebtInfo.vaultConfig.paused)
+        if (strategyDebtInfo.vaultConfig.paused) {
             return (false, bytes("Paused"));
+        }
 
         // Check the base fee isn't too high.
         if (!isCurrentBaseFeeAcceptable()) return (false, bytes("Base Fee"));
@@ -257,8 +258,9 @@ contract DebtAllocator is Governance {
         strategyDebtInfo.strategyConfig = getStrategyConfig(_vault, _strategy);
 
         // Make sure the strategy has been added to the allocator.
-        if (!strategyDebtInfo.strategyConfig.added)
+        if (!strategyDebtInfo.strategyConfig.added) {
             return (false, bytes("!added"));
+        }
 
         if (
             block.timestamp - strategyDebtInfo.strategyConfig.lastUpdate <=

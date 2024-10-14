@@ -40,9 +40,9 @@ COMMON_REPORT_TRIGGER: constant(bytes32) = keccak256("Common Report Trigger")
 AUCTION_FACTORY: constant(bytes32) = keccak256("Auction Factory")
 SPLITTER_FACTORY: constant(bytes32) = keccak256("Splitter Factory")
 REGISTRY_FACTORY: constant(bytes32) = keccak256("Registry Factory")
-DEBT_ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Debt Allocator Factory")
 ACCOUNTANT_FACTORY: constant(bytes32) = keccak256("Accountant Factory")
 ROLE_MANAGER_FACTORY: constant(bytes32) = keccak256("Role Manager Factory")
+DEBT_ALLOCATOR_FACTORY: constant(bytes32) = keccak256("Debt Allocator Factory")
 
 name: public(constant(String[34])) = "Yearn V3 Protocol Address Provider"
 

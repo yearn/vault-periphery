@@ -306,8 +306,8 @@ contract Accountant {
     }
 
     /**
-     * @notice Function to update the default fee configuration used for 
-        all strategies that don't have a custom config set.
+     * @notice Function to update the default fee configuration used for
+     *     all strategies that don't have a custom config set.
      * @param defaultManagement Default annual management fee to charge.
      * @param defaultPerformance Default performance fee to charge.
      * @param defaultRefund Default refund ratio to give back on losses.

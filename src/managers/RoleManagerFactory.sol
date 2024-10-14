@@ -83,8 +83,8 @@ contract RoleManagerFactory is Clonable {
 
     /**
      * @notice Create a new project with associated periphery contracts.
-        This will deploy and complete full setup with default configuration for
-        a new V3 project to exist.
+     *     This will deploy and complete full setup with default configuration for
+     *     a new V3 project to exist.
      * @param _name The name of the project
      * @param _governance The address of governance to use
      * @param _management The address of management to use

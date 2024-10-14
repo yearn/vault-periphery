@@ -210,10 +210,11 @@ contract RoleManager is Positions {
         // Check that a vault does not exist for that asset, api and category.
         // This reverts late to not waste gas when used correctly.
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0)) {
             revert AlreadyDeployed(
                 _assetToVault[_asset][_apiVersion][_category]
             );
+        }
 
         address _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         // Give out roles on the new vault.
@@ -367,10 +368,11 @@ contract RoleManager is Positions {
         // Check that a vault does not exist for that asset, api and category.
         address _asset = IVault(_vault).asset();
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0)) {
             revert AlreadyDeployed(
                 _assetToVault[_asset][_apiVersion][_category]
             );
+        }
 
         // If not the current role manager.
         if (IVault(_vault).role_manager() != address(this)) {
