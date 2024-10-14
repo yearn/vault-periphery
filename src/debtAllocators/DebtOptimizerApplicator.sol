@@ -43,7 +43,7 @@ contract DebtOptimizerApplicator {
         );
     }
 
-    /// @notice The address of the debt allocator factory to use for some role checks.
+    /// @notice The address of the debt allocator.
     address public immutable debtAllocator;
 
     /// @notice Mapping of addresses that are allowed to update debt ratios.

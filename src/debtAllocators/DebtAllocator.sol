@@ -121,7 +121,6 @@ contract DebtAllocator is Governance {
         uint256 maxDebt;
         uint256 currentIdle;
         uint256 minIdle;
-        //uint256 max;
         uint256 toChange;
     }
 
@@ -303,8 +302,6 @@ contract DebtAllocator is Governance {
                 return (false, bytes("No Idle"));
             }
 
-            //strategyDebtInfo.max = IVault(_strategy).maxDeposit(_vault);
-
             // Add up to the max if possible
             strategyDebtInfo.toChange = Math.min(
                 strategyDebtInfo.maxDebt - params.current_debt,
@@ -465,7 +462,7 @@ contract DebtAllocator is Governance {
         uint256 _targetRatio,
         uint256 _maxRatio
     ) public virtual onlyManagers {
-        VaultConfig storage vaultConfig = getVaultConfig(_vault);
+        VaultConfig memory vaultConfig = getVaultConfig(_vault);
         // Make sure a minimumChange has been set.
         require(vaultConfig.minimumChange != 0, "!minimum");
         // Cannot be more than 100%.
@@ -499,7 +496,7 @@ contract DebtAllocator is Governance {
 
         // Write to storage.
         _strategyConfigs[_vault][_strategy] = strategyConfig;
-        vaultConfig.totalDebtRatio = uint16(newTotalDebtRatio);
+        _vaultConfigs[_vault].totalDebtRatio = uint16(newTotalDebtRatio);
 
         emit UpdateStrategyDebtRatio(
             _vault,

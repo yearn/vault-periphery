@@ -8,10 +8,11 @@ NOTE: If you are on a windows machine it is recommended to use [WSL](https://lea
 
 ### Fork this repository
 
-    git clone https://github.com/yearn/vault-periphery
+    git clone --recursive https://github.com/yearn/vault-periphery
 
     cd vault-periphery
 
+    pip install vyper==0.3.7
     
 ### Deployment
 
