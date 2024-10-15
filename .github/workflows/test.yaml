@@ -22,8 +22,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
       - name: Install Vyper
-        run: apt install python3.10-vyper==0.3.7
+        run: pip install vyper==0.3.7
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
