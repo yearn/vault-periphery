@@ -552,7 +552,7 @@ contract TestRoleManager is Setup {
         assertEq(newVault.roles(brain), brain_roles);
         assertEq(newVault.roles(address(keeper)), keeper_roles);
         assertEq(newVault.roles(vaultDebtAllocator), debt_allocator_roles);
-        assertEq(newVault.profitMaxUnlockTime(), 10 days);
+        assertEq(newVault.profitMaxUnlockTime(), 7 days);
 
         assertEq(address(newVault.accountant()), address(accountant));
         assertTrue(accountant.vaults(address(newVault)));

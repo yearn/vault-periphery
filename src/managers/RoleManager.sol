@@ -52,16 +52,16 @@ contract RoleManager is Positions {
         keccak256("Pending Governance");
     /// @notice Position ID for "Governance".
     bytes32 public constant GOVERNANCE = keccak256("Governance");
-    /// @notice Position ID for "brain".
+    /// @notice Position ID for "Brain".
     bytes32 public constant MANAGEMENT = keccak256("Management");
 
-    /// @notice Position ID for "keeper".
+    /// @notice Position ID for "Keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Position ID for the Registry.
+    /// @notice Position ID for the "Registry".
     bytes32 public constant REGISTRY = keccak256("Registry");
-    /// @notice Position ID for the Accountant.
+    /// @notice Position ID for the "Accountant".
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
-    /// @notice Position ID for Debt Allocator
+    /// @notice Position ID for the "Debt Allocator".
     bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
 
     /*//////////////////////////////////////////////////////////////
@@ -106,7 +106,7 @@ contract RoleManager is Positions {
 
         chad = _governance;
         projectName = _projectName;
-        defaultProfitMaxUnlockTime = 10 days;
+        defaultProfitMaxUnlockTime = 7 days;
 
         // Governance gets all the roles.
         _setPositionHolder(GOVERNANCE, _governance);

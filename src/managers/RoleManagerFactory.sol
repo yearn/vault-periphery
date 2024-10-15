@@ -87,7 +87,7 @@ contract RoleManagerFactory is Clonable {
      *     a new V3 project to exist.
      * @param _name The name of the project
      * @param _governance The address of governance to use
-     * @param _management The address of management to use
+     * @param _management The address of management to use if any
      * @return _roleManager address of the newly created RoleManager for the project
      */
     function newProject(
@@ -107,9 +107,12 @@ contract RoleManagerFactory is Clonable {
             _fromAddressProvider(ACCOUNTANT_FACTORY)
         ).newAccountant(address(this), _governance);
 
+        // If management is not used, use governance as the default owner of the debt allocator.
         address _debtAllocator = DebtAllocatorFactory(
             _fromAddressProvider(DEBT_ALLOCATOR_FACTORY)
-        ).newDebtAllocator(_management);
+        ).newDebtAllocator(
+                _management != address(0) ? _management : _governance
+            );
 
         // Clone and initialize the RoleManager.
         _roleManager = _clone();
