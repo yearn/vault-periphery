@@ -24,17 +24,17 @@ contract RoleManagerFactory is Clonable {
         address debtAllocator;
     }
 
-    bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Position ID for the Registry.
-    bytes32 public constant REGISTRY_FACTORY = keccak256("Registry Factory");
     /// @notice Position ID for the Accountant.
     bytes32 public constant ACCOUNTANT_FACTORY =
         keccak256("Accountant Factory");
     /// @notice Position ID for Debt Allocator Factory
     bytes32 public constant DEBT_ALLOCATOR_FACTORY =
         keccak256("Debt Allocator Factory");
+    bytes32 public constant KEEPER = keccak256("Keeper");
+    /// @notice Position ID for the Registry.
+    bytes32 public constant REGISTRY_FACTORY = keccak256("Registry Factory");
 
-    string public apiVersion = "v3.0.3";
+    string public apiVersion = "3.0.3";
 
     address public immutable protocolAddressProvider;
 
@@ -98,7 +98,7 @@ contract RoleManagerFactory is Clonable {
         bytes32 _id = getProjectId(_name, _governance);
         require(projects[_id].roleManager == address(0), "project exists");
 
-        // Deploy new Registry
+        // Deploy the needed periphery contracts.
         address _registry = RegistryFactory(
             _fromAddressProvider(REGISTRY_FACTORY)
         ).createNewRegistry(string(abi.encodePacked(_name, " Registry")));
@@ -111,6 +111,7 @@ contract RoleManagerFactory is Clonable {
             _fromAddressProvider(DEBT_ALLOCATOR_FACTORY)
         ).newDebtAllocator(_management);
 
+        // Clone and initialize the RoleManager.
         _roleManager = _clone();
 
         RoleManager(_roleManager).initialize(

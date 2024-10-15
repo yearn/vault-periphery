@@ -969,6 +969,94 @@ contract TestRegistry is Setup {
         registry.transferGovernance(user);
     }
 
+    function test__set_legacy_registry() public {
+        address mockLegacyRegistry = address(1234569);
+
+        assertEq(registry.legacyRegistry(), address(0));
+
+        // Non-governance address can't set legacy registry
+        vm.prank(user);
+        vm.expectRevert("!governance");
+        registry.setLegacyRegistry(mockLegacyRegistry);
+
+        // Initially, legacy registry should be zero address
+        assertEq(registry.legacyRegistry(), address(0));
+
+        // Set legacy registry
+        vm.prank(daddy);
+        registry.setLegacyRegistry(mockLegacyRegistry);
+
+        // Check if legacy registry is set correctly
+        assertEq(registry.legacyRegistry(), mockLegacyRegistry);
+
+        // Can set to zero address
+        vm.prank(daddy);
+        registry.setLegacyRegistry(address(0));
+
+        assertEq(registry.legacyRegistry(), address(0));
+    }
+
+    function test__is_endorsed_legacy_vault() public {
+        addNewRelease(releaseRegistry, vaultFactory, address(strategy), daddy);
+
+        // Deploy a mock legacy registry
+        address mockLegacyRegistry = registryFactory.createNewRegistry(
+            "mock ",
+            daddy
+        );
+
+        // Deploy a new vault
+        string memory name = "Legacy Vault";
+        string memory symbol = "lvTest";
+
+        vm.prank(daddy);
+        address legacyVaultAddress = vaultFactory.deploy_new_vault(
+            address(asset),
+            name,
+            symbol,
+            daddy,
+            WEEK
+        );
+
+        assertEq(registry.isEndorsed(legacyVaultAddress), false);
+        assertEq(
+            Registry(mockLegacyRegistry).isEndorsed(legacyVaultAddress),
+            false
+        );
+
+        // Endorse the vault in the legacy registry
+        vm.prank(daddy);
+        Registry(mockLegacyRegistry).endorseMultiStrategyVault(
+            legacyVaultAddress
+        );
+
+        assertEq(registry.isEndorsed(legacyVaultAddress), false);
+        assertEq(
+            Registry(mockLegacyRegistry).isEndorsed(legacyVaultAddress),
+            true
+        );
+
+        // Set the mock legacy registry in the main registry
+        vm.prank(daddy);
+        registry.setLegacyRegistry(address(mockLegacyRegistry));
+
+        assertEq(registry.isEndorsed(legacyVaultAddress), true);
+        assertEq(
+            Registry(mockLegacyRegistry).isEndorsed(legacyVaultAddress),
+            true
+        );
+
+        // Check that the vault is not endorsed in the main registry
+        assertEq(registry.isLegacyVault(legacyVaultAddress), true);
+        assertEq(
+            Registry(mockLegacyRegistry).isLegacyVault(legacyVaultAddress),
+            false
+        );
+
+        (address vaultAsset, , , , , ) = registry.vaultInfo(legacyVaultAddress);
+        assertEq(vaultAsset, address(0));
+    }
+
     function test__transfer_governance() public {
         assertEq(registry.governance(), daddy);
 

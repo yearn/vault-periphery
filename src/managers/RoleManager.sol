@@ -7,10 +7,7 @@ import {Accountant} from "../accountants/Accountant.sol";
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
 import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
-import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Positions {
@@ -57,6 +54,7 @@ contract RoleManager is Positions {
     bytes32 public constant GOVERNANCE = keccak256("Governance");
     /// @notice Position ID for "brain".
     bytes32 public constant MANAGEMENT = keccak256("Management");
+
     /// @notice Position ID for "keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
     /// @notice Position ID for the Registry.
@@ -70,7 +68,7 @@ contract RoleManager is Positions {
                            STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Immutable address that the RoleManager position
+    /// @notice Immutable address that the `role_manager` position
     // will be transferred to when a vault is removed.
     address public chad;
 
@@ -91,7 +89,7 @@ contract RoleManager is Positions {
         internal _assetToVault;
 
     constructor() {
-        chad == address(1);
+        chad = address(1);
     }
 
     function initialize(
@@ -106,9 +104,8 @@ contract RoleManager is Positions {
         require(chad == address(0), "initialized");
         require(_governance != address(0), "ZERO ADDRESS");
 
-        projectName = _projectName;
         chad = _governance;
-
+        projectName = _projectName;
         defaultProfitMaxUnlockTime = 10 days;
 
         // Governance gets all the roles.
