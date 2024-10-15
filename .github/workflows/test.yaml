@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Install Vyper
-        run: pip install vyper==0.3.7
+        run: pip install vyper==0.3.7 --break-system-packages
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
