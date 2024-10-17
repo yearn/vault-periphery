@@ -2,6 +2,7 @@
 pragma solidity ^0.8.18;
 
 import "forge-std/console2.sol";
+import {MockFactory} from "../../mocks/MockFactory.sol";
 import {Setup, RoleManager, IVault, Roles, MockStrategy, DebtAllocator} from "../utils/Setup.sol";
 
 contract TestRoleManager is Setup {
@@ -64,7 +65,7 @@ contract TestRoleManager is Setup {
         strategy = createStrategy(address(asset));
 
         vm.prank(daddy);
-        releaseRegistry.newRelease(address(vaultFactory));
+        releaseRegistry.newRelease(address(vaultFactory), address(strategy));
     }
 
     function test_role_manager_setup() public {
@@ -551,7 +552,7 @@ contract TestRoleManager is Setup {
         assertEq(newVault.roles(brain), brain_roles);
         assertEq(newVault.roles(address(keeper)), keeper_roles);
         assertEq(newVault.roles(vaultDebtAllocator), debt_allocator_roles);
-        assertEq(newVault.profitMaxUnlockTime(), 10 days);
+        assertEq(newVault.profitMaxUnlockTime(), 7 days);
 
         assertEq(address(newVault.accountant()), address(accountant));
         assertTrue(accountant.vaults(address(newVault)));
@@ -1155,5 +1156,55 @@ contract TestRoleManager is Setup {
         newVault.accept_role_manager();
 
         assertEq(newVault.role_manager(), daddy);
+    }
+
+    function test_latestVault() public {
+        // Deploy multiple vaults with different API versions
+        vm.prank(daddy);
+        address vault1 = roleManager.newVault(
+            address(asset),
+            1,
+            "Vault1",
+            "V1"
+        );
+
+        assertEq(roleManager.latestVault(address(asset)), vault1);
+
+        vm.prank(daddy);
+        address vault2 = roleManager.newVault(
+            address(asset),
+            2,
+            "Vault2",
+            "V2"
+        );
+
+        assertEq(roleManager.latestVault(address(asset)), vault1);
+        assertEq(roleManager.latestVault(address(asset), 2), vault2);
+
+        MockFactory newFactory = new MockFactory("1.0.0");
+        MockStrategy newStrategy = new MockStrategy(address(asset), "1.0.0");
+
+        vm.prank(daddy);
+        address vault4 = roleManager.newVault(
+            address(newStrategy),
+            1,
+            "Vault4",
+            "V2"
+        );
+
+        assertEq(roleManager.latestVault(address(asset)), vault1);
+        assertEq(roleManager.latestVault(address(asset), 2), vault2);
+        assertEq(roleManager.latestVault(address(newStrategy)), vault4);
+        // Check for a non-existent asset
+        assertEq(roleManager.latestVault(address(0x123)), address(0));
+
+        releaseRegistry.newRelease(address(newFactory), address(newStrategy));
+
+        assertEq(roleManager.latestVault(address(asset)), vault1);
+        assertEq(roleManager.latestVault(address(asset), 2), vault2);
+        // Check that the latest vault is still vault3
+        assertEq(roleManager.latestVault(address(newStrategy)), vault4);
+        // Check for a non-existent asset
+        assertEq(roleManager.latestVault(address(0x123)), address(0));
     }
 }

@@ -6,9 +6,8 @@ import {Registry} from "../registry/Registry.sol";
 import {Accountant} from "../accountants/Accountant.sol";
 import {Roles} from "@yearn-vaults/interfaces/Roles.sol";
 import {IVault} from "@yearn-vaults/interfaces/IVault.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {DebtAllocatorFactory} from "../debtAllocators/DebtAllocatorFactory.sol";
+import {ReleaseRegistry} from "../registry/ReleaseRegistry.sol";
+import {IVaultFactory} from "@yearn-vaults/interfaces/IVaultFactory.sol";
 
 /// @title Yearn V3 Vault Role Manager.
 contract RoleManager is Positions {
@@ -53,22 +52,23 @@ contract RoleManager is Positions {
         keccak256("Pending Governance");
     /// @notice Position ID for "Governance".
     bytes32 public constant GOVERNANCE = keccak256("Governance");
-    /// @notice Position ID for "brain".
+    /// @notice Position ID for "Brain".
     bytes32 public constant MANAGEMENT = keccak256("Management");
-    /// @notice Position ID for "keeper".
+
+    /// @notice Position ID for "Keeper".
     bytes32 public constant KEEPER = keccak256("Keeper");
-    /// @notice Position ID for the Registry.
+    /// @notice Position ID for the "Registry".
     bytes32 public constant REGISTRY = keccak256("Registry");
-    /// @notice Position ID for the Accountant.
+    /// @notice Position ID for the "Accountant".
     bytes32 public constant ACCOUNTANT = keccak256("Accountant");
-    /// @notice Position ID for Debt Allocator
+    /// @notice Position ID for the "Debt Allocator".
     bytes32 public constant DEBT_ALLOCATOR = keccak256("Debt Allocator");
 
     /*//////////////////////////////////////////////////////////////
                            STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Immutable address that the RoleManager position
+    /// @notice Immutable address that the `role_manager` position
     // will be transferred to when a vault is removed.
     address public chad;
 
@@ -83,12 +83,13 @@ contract RoleManager is Positions {
 
     /// @notice Mapping of vault addresses to its config.
     mapping(address => VaultConfig) public vaultConfig;
+
     /// @notice Mapping of underlying asset, api version and category to vault.
     mapping(address => mapping(string => mapping(uint256 => address)))
         internal _assetToVault;
 
     constructor() {
-        chad == address(1);
+        chad = address(1);
     }
 
     function initialize(
@@ -103,10 +104,9 @@ contract RoleManager is Positions {
         require(chad == address(0), "initialized");
         require(_governance != address(0), "ZERO ADDRESS");
 
-        projectName = _projectName;
         chad = _governance;
-
-        defaultProfitMaxUnlockTime = 10 days;
+        projectName = _projectName;
+        defaultProfitMaxUnlockTime = 7 days;
 
         // Governance gets all the roles.
         _setPositionHolder(GOVERNANCE, _governance);
@@ -207,10 +207,11 @@ contract RoleManager is Positions {
         // Check that a vault does not exist for that asset, api and category.
         // This reverts late to not waste gas when used correctly.
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0)) {
             revert AlreadyDeployed(
                 _assetToVault[_asset][_apiVersion][_category]
             );
+        }
 
         address _debtAllocator = getPositionHolder(DEBT_ALLOCATOR);
         // Give out roles on the new vault.
@@ -364,10 +365,11 @@ contract RoleManager is Positions {
         // Check that a vault does not exist for that asset, api and category.
         address _asset = IVault(_vault).asset();
         string memory _apiVersion = IVault(_vault).apiVersion();
-        if (_assetToVault[_asset][_apiVersion][_category] != address(0))
+        if (_assetToVault[_asset][_apiVersion][_category] != address(0)) {
             revert AlreadyDeployed(
                 _assetToVault[_asset][_apiVersion][_category]
             );
+        }
 
         // If not the current role manager.
         if (IVault(_vault).role_manager() != address(this)) {
@@ -648,6 +650,44 @@ contract RoleManager is Positions {
         uint256 _category
     ) external view virtual returns (address) {
         return _assetToVault[_asset][_apiVersion][_category];
+    }
+
+    /**
+     * @notice Get the latest vault for a specific asset.
+     * @dev This will default to using category 1.
+     * @param _asset The underlying asset used.
+     * @return _vault latest vault for the specified `_asset` if any.
+     */
+    function latestVault(
+        address _asset
+    ) external view virtual returns (address) {
+        return latestVault(_asset, 1);
+    }
+
+    /**
+     * @notice Get the latest vault for a specific asset.
+     * @param _asset The underlying asset used.
+     * @param _category The category of the vault.
+     * @return _vault latest vault for the specified `_asset` if any.
+     */
+    function latestVault(
+        address _asset,
+        uint256 _category
+    ) public view virtual returns (address _vault) {
+        address releaseRegistry = Registry(getPositionHolder(REGISTRY))
+            .releaseRegistry();
+        uint256 numReleases = ReleaseRegistry(releaseRegistry).numReleases();
+
+        for (uint256 i = numReleases; i > 0; --i) {
+            string memory apiVersion = IVaultFactory(
+                ReleaseRegistry(releaseRegistry).factories(i - 1)
+            ).apiVersion();
+
+            _vault = _assetToVault[_asset][apiVersion][_category];
+            if (_vault != address(0)) {
+                break;
+            }
+        }
     }
 
     /**

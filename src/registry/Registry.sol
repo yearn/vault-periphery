@@ -21,7 +21,7 @@ interface IVaultFactory {
  * @title YearnV3 Registry
  * @author yearn.finance
  * @notice
- *  Serves as an on chain registry to track any Yearn
+ *  Serves as an on chain registry to track any Yearn V3
  *  vaults and strategies that a certain party wants to
  *  endorse.
  *
@@ -104,6 +104,9 @@ contract Registry is Governance {
 
     // Custom name for this Registry.
     string public name;
+
+    // Old version of the registry to fall back to if exists.
+    address public legacyRegistry;
 
     // Mapping for any address that is allowed to tag a vault.
     mapping(address => bool) public taggers;
@@ -209,7 +212,20 @@ contract Registry is Governance {
      * @return . The vaults endorsement status.
      */
     function isEndorsed(address _vault) external view virtual returns (bool) {
-        return vaultInfo[_vault].asset != address(0);
+        return vaultInfo[_vault].asset != address(0) || isLegacyVault(_vault);
+    }
+
+    /**
+     * @notice Check if a vault is endorsed in the legacy registry.
+     * @param _vault The vault to check.
+     * @return True if the vault is endorsed in the legacy registry, false otherwise.
+     */
+    function isLegacyVault(address _vault) public view virtual returns (bool) {
+        address _legacy = legacyRegistry;
+
+        if (_legacy == address(0)) return false;
+
+        return Registry(_legacy).isEndorsed(_vault);
     }
 
     /**
@@ -306,7 +322,7 @@ contract Registry is Governance {
      * @notice Endorse an already deployed multi strategy vault.
      * @dev To be used with default values for `_releaseDelta`, `_vaultType`
      * and `_deploymentTimestamp`.
-
+     *
      * @param _vault Address of the vault to endorse.
      */
     function endorseMultiStrategyVault(address _vault) external virtual {
@@ -532,5 +548,15 @@ contract Registry is Governance {
         taggers[_account] = _canTag;
 
         emit UpdateTagger(_account, _canTag);
+    }
+
+    /**
+     * @notice Set a legacy registry if one exists.
+     * @param _legacyRegistry The address of the legacy registry.
+     */
+    function setLegacyRegistry(
+        address _legacyRegistry
+    ) external virtual onlyGovernance {
+        legacyRegistry = _legacyRegistry;
     }
 }

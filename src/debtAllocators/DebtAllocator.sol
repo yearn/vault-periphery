@@ -17,6 +17,7 @@ interface IBaseFee {
  *  Yearn V3 vaults to provide the needed triggers for a keeper
  *  to perform automated debt updates for the vaults strategies.
  *
+ * @dev
  *  Each vault that should be managed by this allocator will
  *  need to be added by first setting a `minimumChange` for the
  *  vault, which will act as the minimum amount of funds to move that will
@@ -26,7 +27,7 @@ interface IBaseFee {
  *  The allocator aims to allocate debt between the strategies
  *  based on their set target ratios. Which are denominated in basis
  *  points and represent the percent of total assets that specific
- *  strategy should hold.
+ *  strategy should hold (i.e 1_000 == 10% of the vaults `totalAssets`).
  *
  *  The trigger will attempt to allocate up to the `maxRatio` when
  *  the strategy has `minimumChange` amount less than the `targetRatio`.
@@ -120,7 +121,6 @@ contract DebtAllocator is Governance {
         uint256 maxDebt;
         uint256 currentIdle;
         uint256 minIdle;
-        uint256 max;
         uint256 toChange;
     }
 
@@ -247,8 +247,9 @@ contract DebtAllocator is Governance {
         strategyDebtInfo.vaultConfig = getVaultConfig(_vault);
 
         // Don't do anything if paused.
-        if (strategyDebtInfo.vaultConfig.paused)
+        if (strategyDebtInfo.vaultConfig.paused) {
             return (false, bytes("Paused"));
+        }
 
         // Check the base fee isn't too high.
         if (!isCurrentBaseFeeAcceptable()) return (false, bytes("Base Fee"));
@@ -257,8 +258,9 @@ contract DebtAllocator is Governance {
         strategyDebtInfo.strategyConfig = getStrategyConfig(_vault, _strategy);
 
         // Make sure the strategy has been added to the allocator.
-        if (!strategyDebtInfo.strategyConfig.added)
+        if (!strategyDebtInfo.strategyConfig.added) {
             return (false, bytes("!added"));
+        }
 
         if (
             block.timestamp - strategyDebtInfo.strategyConfig.lastUpdate <=
@@ -296,7 +298,6 @@ contract DebtAllocator is Governance {
         if (strategyDebtInfo.targetDebt > params.current_debt) {
             strategyDebtInfo.currentIdle = IVault(_vault).totalIdle();
             strategyDebtInfo.minIdle = IVault(_vault).minimum_total_idle();
-            strategyDebtInfo.max = IVault(_strategy).maxDeposit(_vault);
 
             // We can't add more than the available idle.
             if (strategyDebtInfo.minIdle >= strategyDebtInfo.currentIdle) {
@@ -309,7 +310,7 @@ contract DebtAllocator is Governance {
                 // Can't take more than is available.
                 Math.min(
                     strategyDebtInfo.currentIdle - strategyDebtInfo.minIdle,
-                    strategyDebtInfo.max
+                    IVault(_strategy).maxDeposit(_vault)
                 )
             );
 
@@ -339,9 +340,6 @@ contract DebtAllocator is Governance {
 
             strategyDebtInfo.currentIdle = IVault(_vault).totalIdle();
             strategyDebtInfo.minIdle = IVault(_vault).minimum_total_idle();
-            strategyDebtInfo.max = IVault(_strategy).convertToAssets(
-                IVault(_strategy).maxRedeem(_vault)
-            );
 
             if (strategyDebtInfo.minIdle > strategyDebtInfo.currentIdle) {
                 // Pull at least the amount needed for minIdle.
@@ -356,7 +354,9 @@ contract DebtAllocator is Governance {
                 strategyDebtInfo.toChange,
                 // Account for the current liquidity constraints.
                 // Use max redeem to match vault logic.
-                strategyDebtInfo.max
+                IVault(_strategy).convertToAssets(
+                    IVault(_strategy).maxRedeem(_vault)
+                )
             );
 
             // Check if it's over the threshold.
@@ -408,9 +408,11 @@ contract DebtAllocator is Governance {
         address _strategy,
         uint256 _increase
     ) external virtual {
-        uint256 _currentRatio = getStrategyConfig(_vault, _strategy)
-            .targetRatio;
-        setStrategyDebtRatio(_vault, _strategy, _currentRatio + _increase);
+        setStrategyDebtRatio(
+            _vault,
+            _strategy,
+            getStrategyTargetRatio(_vault, _strategy) + _increase
+        );
     }
 
     /**
@@ -423,9 +425,11 @@ contract DebtAllocator is Governance {
         address _strategy,
         uint256 _decrease
     ) external virtual {
-        uint256 _currentRatio = getStrategyConfig(_vault, _strategy)
-            .targetRatio;
-        setStrategyDebtRatio(_vault, _strategy, _currentRatio - _decrease);
+        setStrategyDebtRatio(
+            _vault,
+            _strategy,
+            getStrategyTargetRatio(_vault, _strategy) - _decrease
+        );
     }
 
     /**
@@ -460,7 +464,7 @@ contract DebtAllocator is Governance {
         uint256 _targetRatio,
         uint256 _maxRatio
     ) public virtual onlyManagers {
-        VaultConfig storage vaultConfig = _vaultConfigs[_vault];
+        VaultConfig memory vaultConfig = getVaultConfig(_vault);
         // Make sure a minimumChange has been set.
         require(vaultConfig.minimumChange != 0, "!minimum");
         // Cannot be more than 100%.
@@ -494,7 +498,7 @@ contract DebtAllocator is Governance {
 
         // Write to storage.
         _strategyConfigs[_vault][_strategy] = strategyConfig;
-        vaultConfig.totalDebtRatio = uint16(newTotalDebtRatio);
+        _vaultConfigs[_vault].totalDebtRatio = uint16(newTotalDebtRatio);
 
         emit UpdateStrategyDebtRatio(
             _vault,
@@ -734,7 +738,7 @@ contract DebtAllocator is Governance {
     function getStrategyTargetRatio(
         address _vault,
         address _strategy
-    ) external view virtual returns (uint256) {
+    ) public view virtual returns (uint256) {
         return getStrategyConfig(_vault, _strategy).targetRatio;
     }
 
@@ -747,7 +751,7 @@ contract DebtAllocator is Governance {
     function getStrategyMaxRatio(
         address _vault,
         address _strategy
-    ) external view virtual returns (uint256) {
+    ) public view virtual returns (uint256) {
         return getStrategyConfig(_vault, _strategy).maxRatio;
     }
 
