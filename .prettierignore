@@ -1,3 +1,10 @@
 .build/
 .cache/
 venv/
+.build/
+.cache/
+venv/
+lib/
+out/
+cache/
+broadcast/

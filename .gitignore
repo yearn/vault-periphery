@@ -1,19 +1,27 @@
-pyenv.cfg
-vyper_git_commithash.txt
-bin/
-lib/
-share/
-build/
-include/
-.build
-node_modules
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+/broadcast/
+
+# Docs
+docs/
+
+# Dotenv file
 .env
+
+node_modules/
+.gas-snapshot
+
+yarn.lock
+.DS_Store
+
+.vscode
+
 **/__pycache__
 .pytest_cache
 **/.cache
-venv/
-.hypothesis/
-.idea
-.vscode
-yarn.lock
-env

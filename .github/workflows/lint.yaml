@@ -27,12 +27,3 @@ jobs:
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v5
-  black:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: 3.8
-      - run: pip install -r requirements.txt
-      - run: black --check --include "(tests|scripts)" .
