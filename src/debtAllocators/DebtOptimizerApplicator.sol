@@ -2,8 +2,9 @@
 pragma solidity >=0.8.18;
 
 import {DebtAllocator} from "./DebtAllocator.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
-contract DebtOptimizerApplicator {
+contract DebtOptimizerApplicator is Multicall {
     /// @notice An event emitted when a keeper is added or removed.
     event UpdateManager(address indexed manager, bool allowed);
 
