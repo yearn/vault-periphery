@@ -144,4 +144,60 @@ contract TestDebtOptimizerApplicator is Setup {
         assertEq(strategyConfig.targetRatio, 2_000);
         assertEq(strategyConfig.maxRatio, 2_400); // 2_000 * 1.2
     }
+
+    function test_set_ratios_multicall(uint8 _vaultCount) public {
+        vm.assume(_vaultCount > 0);
+
+        vm.prank(brain);
+        debtAllocator.setManager(address(debtOptimizerApplicator), true);
+
+        bytes[] memory multicallData = new bytes[](_vaultCount);
+        IVault[] memory vaults = new IVault[](_vaultCount);
+        for (uint8 i; i < _vaultCount; ++i) {
+            vaults[i] = createVault(
+                address(asset),
+                daddy,
+                MAX_INT,
+                WEEK,
+                string(abi.encodePacked("Test Vault ", i)),
+                "tvTEST"
+            );
+
+            vm.prank(brain);
+            debtAllocator.setMinimumChange(address(vaults[i]), 1);
+
+            DebtOptimizerApplicator.StrategyDebtRatio[]
+                memory strategyDebtRatios = new DebtOptimizerApplicator.StrategyDebtRatio[](
+                    1
+                );
+            strategyDebtRatios[0] = DebtOptimizerApplicator.StrategyDebtRatio(
+                address(strategy),
+                2_000,
+                (i % 2 == 0) ? 0 : 3_000 // alternate between setting and not setting maxDebt
+            );
+
+            multicallData[i] = abi.encodeCall(
+                debtOptimizerApplicator.setStrategyDebtRatios,
+                (address(vaults[i]), strategyDebtRatios)
+            );
+        }
+
+        vm.prank(user);
+        vm.expectRevert("!manager");
+        debtOptimizerApplicator.multicall(multicallData);
+
+        vm.prank(brain);
+        debtOptimizerApplicator.multicall(multicallData);
+
+        for (uint8 i; i < _vaultCount; ++i) {
+            DebtAllocator.StrategyConfig memory strategyConfig = debtAllocator
+                .getStrategyConfig(address(vaults[i]), address(strategy));
+            assertTrue(strategyConfig.added);
+            assertEq(strategyConfig.targetRatio, 2_000);
+            assertEq(
+                strategyConfig.maxRatio,
+                (i % 2 == 0) ? (2_000 * 12) / 10 : 3_000
+            );
+        }
+    }
 }
