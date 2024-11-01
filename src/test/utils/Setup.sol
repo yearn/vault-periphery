@@ -262,7 +262,7 @@ contract Setup is ExtendedTest {
     }
 
     function createStrategy(address _asset) public returns (MockStrategy) {
-        return new MockStrategy(_asset, "3.0.3");
+        return new MockStrategy(_asset, "3.0.4");
     }
 
     function deployMockTokenized(

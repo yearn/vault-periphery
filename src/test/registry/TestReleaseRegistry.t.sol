@@ -30,7 +30,7 @@ contract TestReleaseRegistry is Setup {
         assertEq(releaseRegistry.numReleases(), 0);
         assertEq(releaseRegistry.factories(0), address(0));
         assertEq(releaseRegistry.tokenizedStrategies(0), address(0));
-        assertEq(releaseRegistry.releaseTargets("3.0.3"), 0);
+        assertEq(releaseRegistry.releaseTargets("3.0.4"), 0);
     }
 
     function test_new_release() public {
