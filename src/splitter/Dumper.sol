@@ -5,7 +5,7 @@ import {Governance} from "@periphery/utils/Governance.sol";
 import {Accountant, ERC20, SafeERC20} from "../accountants/Accountant.sol";
 
 interface IAuction {
-    function kick(address _token) external view returns (uint256);
+    function kick(address _token) external returns (uint256);
 }
 
 contract Dumper is Governance {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import {Setup, ISplitter, ISplitterFactory, IVault, MockTokenized} from "../utils/Setup.sol";
+import {Setup, ISplitter, ISplitterFactory, IVault, Accountant, MockTokenized} from "../utils/Setup.sol";
+
 
 contract TestSplitter is Setup {
     event UpdateManagerRecipient(address indexed newManagerRecipient);
@@ -12,7 +13,6 @@ contract TestSplitter is Setup {
 
     IVault public vault;
     MockTokenized public mockTokenized;
-
     function setUp() public override {
         super.setUp();
         (splitterFactory, splitter) = setupSplitter();
