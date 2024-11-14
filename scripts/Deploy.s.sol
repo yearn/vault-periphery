@@ -16,8 +16,8 @@ contract Deploy is Script {
 
         // Append constructor args to the bytecode
         bytes memory bytecode = abi.encodePacked(
-            vm.getCode("registry/ReleaseRegistry.sol:ReleaseRegistry"),
-            abi.encode(initGov)
+            vm.getCode("splitter/Dumper.sol:Dumper"),
+            abi.encode()
         );
 
         // Use salt of 0.
