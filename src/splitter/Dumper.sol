@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GNU AGPLv3
 pragma solidity >=0.8.18;
 
+import {ISplitter} from "../interfaces/ISplitter.sol";
 import {Governance} from "@periphery/utils/Governance.sol";
-import {Accountant, ERC20, SafeERC20} from "../accountants/Accountant.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IAuction {
     function kick(address _token) external returns (uint256);
@@ -16,36 +18,26 @@ contract Dumper is Governance {
         _;
     }
 
-    Accountant public immutable accountant;
-
-    address public immutable splitter;
+    ISplitter public immutable feeRecipient;
 
     address public splitToken;
-
-    address public auction;
 
     mapping(address => bool) public allowed;
 
     constructor(
         address _governance,
-        address _accountant,
-        address _splitter,
+        address _feeRecipient,
         address _splitToken
     ) Governance(_governance) {
-        require(_accountant != address(0), "ZERO ADDRESS");
-        require(_splitter != address(0), "ZERO ADDRESS");
+        require(_feeRecipient != address(0), "ZERO ADDRESS");
         require(_splitToken != address(0), "ZERO ADDRESS");
-        accountant = Accountant(_accountant);
-        splitter = _splitter;
+        feeRecipient = ISplitter(_feeRecipient);
         splitToken = _splitToken;
     }
 
     // Send the split token to the Splitter contract.
     function distribute() external {
-        ERC20(splitToken).safeTransfer(
-            splitter,
-            ERC20(splitToken).balanceOf(address(this)) - 1
-        );
+        feeRecipient.distributeToken(splitToken);
     }
 
     function dumpToken(address _token) external onlyAllowed {
@@ -53,38 +45,22 @@ contract Dumper is Governance {
     }
 
     function dumpTokens(address[] calldata _tokens) external onlyAllowed {
-        for (uint256 i; i < _tokens.length; ++i) {
+        for (uint256 i = 0; i < _tokens.length; i++) {
             _dumpToken(_tokens[i]);
         }
     }
 
     function _dumpToken(address _token) internal {
-        uint256 accountantBalance = ERC20(_token).balanceOf(
-            address(accountant)
-        );
-        if (accountantBalance > 0) {
-            accountant.distribute(_token);
-        }
-        ERC20(_token).safeTransfer(
-            auction,
-            ERC20(_token).balanceOf(address(this)) - 1
-        );
-        IAuction(auction).kick(_token);
+        feeRecipient.fundAuction(_token);
+        IAuction(feeRecipient.auction()).kick(_token);
     }
 
-    // Claim the fees from the accountant
-    function claimToken(address _token) external onlyAllowed {
-        accountant.distribute(_token);
+    function unwrapVault(address _vault) external onlyAllowed {
+        feeRecipient.unwrapVault(_vault);
     }
 
-    function claimTokens(address[] calldata _tokens) external onlyAllowed {
-        for (uint256 i; i < _tokens.length; ++i) {
-            accountant.distribute(_tokens[i]);
-        }
-    }
-
-    function claimToken(address _token, uint256 _amount) external onlyAllowed {
-        accountant.distribute(_token, _amount);
+    function unwrapVaults(address[] calldata _vaults) external onlyAllowed {
+        feeRecipient.unwrapVaults(_vaults);
     }
 
     function sweep(address _token) external onlyGovernance {
@@ -97,10 +73,6 @@ contract Dumper is Governance {
     function setSplitToken(address _splitToken) external onlyGovernance {
         require(_splitToken != address(0), "ZERO ADDRESS");
         splitToken = _splitToken;
-    }
-
-    function setAuction(address _auction) external onlyGovernance {
-        auction = _auction;
     }
 
     function setAllowed(

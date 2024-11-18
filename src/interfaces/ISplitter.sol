@@ -45,7 +45,7 @@ interface ISplitter {
     function setAuction(address newAuction) external;
 
     function setManager(address newManager) external;
-
+    function setMangerRecipient(address rec) external;
     function setManagerRecipient(address newManagerRecipient) external;
 
     function setSplitee(address newSplitee) external;
