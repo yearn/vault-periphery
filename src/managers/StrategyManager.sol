@@ -111,7 +111,9 @@ contract StrategyManager is Governance2Step {
         delete pendingTimeLock;
     }
 
-    function hasPassedTimeLock(address _strategy) external view virtual returns (bool) {
+    function hasPassedTimeLock(
+        address _strategy
+    ) external view virtual returns (bool) {
         _hasPassedTimeLock(strategies[_strategy].timestampSet);
         return true;
     }
@@ -123,7 +125,10 @@ contract StrategyManager is Governance2Step {
         );
     }
 
-    function isValidCategory(address _strategy, address _vault) external view virtual returns (bool) {
+    function isValidCategory(
+        address _strategy,
+        address _vault
+    ) external view virtual returns (bool) {
         _isValidCategory(strategies[_strategy].value, _vault);
         return true;
     }
