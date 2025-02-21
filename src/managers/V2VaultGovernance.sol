@@ -63,22 +63,9 @@ contract V2VaultGovernance is Governance2Step {
         IV2Vault(_vault).setSymbol(_symbol);
     }
 
-    // Timelock or never allow?
-    /**
-    function setGovernance(address _vault, address _governance) external onlyGovernance {
-        IV2Vault(_vault).setGovernance(_governance);
-    }
-    */
-
     function acceptGovernance(address _vault) external onlyGovernance {
         IV2Vault(_vault).acceptGovernance();
     }
-
-    /**
-    function setManagement(address _vault, address _management) external onlyGovernance {
-        IV2Vault(_vault).setManagement(_management);
-    }
-    */
 
     function setGuardian(
         address _vault,
