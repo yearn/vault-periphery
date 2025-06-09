@@ -76,6 +76,9 @@ contract TrueMarketAccountant is Governance {
             tokenSplit.trueMarketSplit,
             tokenSplit.yearnSplit
         );
+        emit AddressUpdated(SplitType.AUCTION, _auction);
+        emit AddressUpdated(SplitType.TRUE_MARKET, _trueMarketRecipient);
+        emit AddressUpdated(SplitType.YEARN, _yearnRecipient);
     }
 
     function report(
@@ -85,9 +88,7 @@ contract TrueMarketAccountant is Governance {
     ) external returns (uint256 totalFees, uint256 refunds) {
         // Retrieve the strategy's params from the vault.
         IVault vault = IVault(msg.sender);
-        IVault.StrategyParams memory strategyParams = vault.strategies(
-            strategy
-        );
+
         // Only charge performance fees if there is a gain.
         if (gain > 0) {
             // If we are skipping the healthcheck this report
@@ -98,20 +99,25 @@ contract TrueMarketAccountant is Governance {
                 // Setting `maxGain` to 0 will disable the healthcheck on profits.
             } else if (maxGain > 0) {
                 require(
-                    gain <= (strategyParams.current_debt * (maxGain)) / MAX_BPS,
+                    gain <=
+                        (vault.strategies(strategy).current_debt * (maxGain)) /
+                            MAX_BPS,
                     "too much gain"
                 );
             }
 
-            // 100% performance fee
-            totalFees = gain;
-
             // Only take fee if there's no loss.
             uint256 supply = vault.totalSupply();
             uint256 assets = vault.totalAssets();
+
+            // If PPS is less than 1
             if (assets < supply) {
                 uint256 needed = supply - assets;
+                // Take no fees until it has recovered.
                 totalFees = gain < needed ? 0 : gain - needed;
+            } else {
+                // Take 100% of the yield.
+                totalFees = gain;
             }
         } else {
             // If we are skipping the healthcheck this report
@@ -122,7 +128,9 @@ contract TrueMarketAccountant is Governance {
                 // Setting `maxLoss` to 10_000 will disable the healthcheck on losses.
             } else if (maxLoss < MAX_BPS) {
                 require(
-                    loss <= (strategyParams.current_debt * (maxLoss)) / MAX_BPS,
+                    loss <=
+                        (vault.strategies(strategy).current_debt * (maxLoss)) /
+                            MAX_BPS,
                     "too much loss"
                 );
             }
