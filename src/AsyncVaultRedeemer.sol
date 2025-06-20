@@ -25,7 +25,7 @@ contract AsyncVaultRedeemer is Governance {
         uint256 unlockTimestamp
     );
     event MaxLossUpdated(uint256 newMaxLoss);
-    
+
     struct RedeemRequest {
         uint192 shares;
         uint64 requestedAt;
@@ -44,10 +44,7 @@ contract AsyncVaultRedeemer is Governance {
 
     EnumerableSet.AddressSet _requesters;
 
-    constructor(
-        address _governance,
-        address _vault
-    ) Governance(_governance) {
+    constructor(address _governance, address _vault) Governance(_governance) {
         vault = IVault(_vault);
         maxLoss = 1;
     }
@@ -84,7 +81,18 @@ contract AsyncVaultRedeemer is Governance {
         processRedeem(_shares);
     }
 
-    function processRequests(address[] calldata _users, uint256[] calldata _shares) external onlyGovernance {
+    function processRequests(
+        address[] calldata _users
+    ) external onlyGovernance {
+        for (uint256 i = 0; i < _users.length; i++) {
+            _processRequest(_users[i], redeemRequests[_users[i]].shares);
+        }
+    }
+
+    function processRequests(
+        address[] calldata _users,
+        uint256[] calldata _shares
+    ) external onlyGovernance {
         require(_users.length == _shares.length, "length mismatch");
 
         for (uint256 i = 0; i < _users.length; i++) {
@@ -92,11 +100,19 @@ contract AsyncVaultRedeemer is Governance {
         }
     }
 
+    function processAllRequests() external onlyGovernance {
+        uint256 length = _requesters.length();
+        for (uint256 i = 0; i < length; i++) {
+            address user = _requesters.at(i);
+            _processRequest(user, redeemRequests[user].shares);
+        }
+    }
+
     function _processRequest(address _user, uint256 _shares) internal {
+        require(_shares > 0, "zero shares");
         require(_requesters.contains(_user), "not found");
 
         RedeemRequest memory request = redeemRequests[_user];
-
         require(request.shares >= _shares, "not enough shares");
 
         redeemRequests[_user].shares -= uint192(_shares);
@@ -131,11 +147,7 @@ contract AsyncVaultRedeemer is Governance {
 
         pendingRedemptions += _shares;
 
-        emit RedeemRequested(
-            msg.sender,
-            _shares,
-            block.timestamp
-        );
+        emit RedeemRequested(msg.sender, _shares, block.timestamp);
     }
 
     function setMaxLoss(uint256 _maxLoss) external onlyGovernance {
