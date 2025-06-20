@@ -7,6 +7,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 import {Governance} from "@periphery/utils/Governance.sol";
 
 /// @title AsyncVaultRedeemer
@@ -14,6 +16,7 @@ import {Governance} from "@periphery/utils/Governance.sol";
 ///    User calls `requestRedeem` which will transfer the shares to the contract.
 ///    Then call `processRedeem` to redeem the shares once the cooldown period has passed.
 contract AsyncVaultRedeemer is Governance {
+    using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for ERC20;
 
     event RedeemRequested(
@@ -21,23 +24,17 @@ contract AsyncVaultRedeemer is Governance {
         uint256 indexed shares,
         uint256 unlockTimestamp
     );
-    event WithdrawWindowUpdated(uint256 newWithdrawWindow);
-    event WithdrawCooldownUpdated(uint256 newWithdrawCooldown);
-
+    event MaxLossUpdated(uint256 newMaxLoss);
+    
     struct RedeemRequest {
-        uint256 shares;
-        uint256 unlockTimestamp;
+        uint192 shares;
+        uint64 requestedAt;
     }
 
     /// @notice The vault that the shares are being redeemed from.
     IVault public immutable vault;
 
-    /// @notice The cooldown period after a withdraw request before the user can withdraw.
-    uint256 public withdrawCooldown;
-
-    /// @notice The window of time after a withdraw request has cooled down that the withdraw can be processed.
-    /// If this window passes without the user calling `withdraw`, the user will need to recall `requestWithdraw`.
-    uint256 public withdrawWindow;
+    uint256 public maxLoss;
 
     /// @notice The amount of shares that are pending redemption.
     uint256 public pendingRedemptions;
@@ -45,22 +42,14 @@ contract AsyncVaultRedeemer is Governance {
     /// @notice The withdraw requests of users.
     mapping(address => RedeemRequest) public redeemRequests;
 
+    EnumerableSet.AddressSet _requesters;
+
     constructor(
         address _governance,
-        address _vault,
-        uint256 _withdrawCooldown,
-        uint256 _withdrawWindow
+        address _vault
     ) Governance(_governance) {
         vault = IVault(_vault);
-
-        require(_withdrawCooldown < 365 days, "too long");
-        require(_withdrawWindow > 1 days, "too short");
-
-        withdrawCooldown = _withdrawCooldown;
-        emit WithdrawCooldownUpdated(_withdrawCooldown);
-
-        withdrawWindow = _withdrawWindow;
-        emit WithdrawWindowUpdated(_withdrawWindow);
+        maxLoss = 1;
     }
 
     function available_withdraw_limit(
@@ -69,76 +58,90 @@ contract AsyncVaultRedeemer is Governance {
         address[] memory
     ) public view returns (uint256) {
         if (owner == address(this)) {
+            // TODO: Replicate vault logic. Or just use totalIdle?
             return type(uint256).max;
         } else {
             return 0;
         }
     }
 
-    function processRedeem(uint256 _shares) external {
+    // NOTE: Should this be allowed?
+    function processRedeem(uint256 _shares) public {
         RedeemRequest memory request = redeemRequests[msg.sender];
 
-        require(request.unlockTimestamp < block.timestamp, "not ready");
-        require(
-            request.unlockTimestamp + withdrawWindow > block.timestamp,
-            "window passed"
-        );
         require(request.shares >= _shares, "not enough shares");
 
-        redeemRequests[msg.sender].shares -= _shares;
+        redeemRequests[msg.sender].shares -= uint192(_shares);
         pendingRedemptions -= _shares;
 
-        vault.redeem(_shares, msg.sender, address(this));
+        vault.redeem(_shares, msg.sender, address(this), maxLoss);
+    }
+
+    // NOTE: Atomic redemtion if liquidity is available.
+    // Dont need this if we dont use this is the withdraw limit module
+    function requestAndProcessRedeem(uint256 _shares) external {
+        requestRedeem(_shares);
+        processRedeem(_shares);
+    }
+
+    function processRequests(address[] calldata _users, uint256[] calldata _shares) external onlyGovernance {
+        require(_users.length == _shares.length, "length mismatch");
+
+        for (uint256 i = 0; i < _users.length; i++) {
+            _processRequest(_users[i], _shares[i]);
+        }
+    }
+
+    function _processRequest(address _user, uint256 _shares) internal {
+        require(_requesters.contains(_user), "not found");
+
+        RedeemRequest memory request = redeemRequests[_user];
+
+        require(request.shares >= _shares, "not enough shares");
+
+        redeemRequests[_user].shares -= uint192(_shares);
+        pendingRedemptions -= _shares;
+
+        if (request.shares == _shares) {
+            _requesters.remove(_user);
+        }
+
+        vault.redeem(_shares, _user, address(this), maxLoss);
     }
 
     /**
-     * @notice Requests a redemption of shares from the strategy.
-     * @dev This will override any existing redeem request.
+     * @notice Requests a redemption of shares from the vault.
+     * @dev This will override time of existing redeem request.
      * @param _shares The amount of shares to redeem.
      */
-    function requestRedeem(uint256 _shares) external {
+    function requestRedeem(uint256 _shares) public {
         _shares = Math.min(_shares, vault.balanceOf(msg.sender));
+        require(_shares > 0, "zero shares");
 
-        // Can use 0 to requeue the request
-        if (_shares > 0) {
-            vault.transferFrom(msg.sender, address(this), _shares);
-        }
+        RedeemRequest memory request = redeemRequests[msg.sender];
+
+        vault.transferFrom(msg.sender, address(this), _shares);
 
         redeemRequests[msg.sender] = RedeemRequest({
-            shares: redeemRequests[msg.sender].shares + _shares,
-            unlockTimestamp: block.timestamp + withdrawCooldown
+            shares: request.shares + uint192(_shares), // Add to existing request
+            requestedAt: uint64(block.timestamp)
         });
+
+        _requesters.add(msg.sender);
 
         pendingRedemptions += _shares;
 
         emit RedeemRequested(
             msg.sender,
             _shares,
-            block.timestamp + withdrawCooldown
+            block.timestamp
         );
     }
 
-    /**
-     * @dev Set the withdraw cooldown.
-     * @param _withdrawCooldown The withdraw cooldown.
-     */
-    function setWithdrawCooldown(
-        uint256 _withdrawCooldown
-    ) external onlyGovernance {
-        require(_withdrawCooldown < 365 days, "too long");
-        withdrawCooldown = _withdrawCooldown;
-        emit WithdrawCooldownUpdated(_withdrawCooldown);
-    }
+    function setMaxLoss(uint256 _maxLoss) external onlyGovernance {
+        require(_maxLoss < 10_000, "too high");
+        maxLoss = _maxLoss;
 
-    /**
-     * @dev Set the withdraw window.
-     * @param _withdrawWindow The withdraw window.
-     */
-    function setWithdrawWindow(
-        uint256 _withdrawWindow
-    ) external onlyGovernance {
-        require(_withdrawWindow > 1 days, "too short");
-        withdrawWindow = _withdrawWindow;
-        emit WithdrawWindowUpdated(_withdrawWindow);
+        emit MaxLossUpdated(_maxLoss);
     }
 }
