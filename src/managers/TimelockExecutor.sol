@@ -8,6 +8,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 contract TimelockExecutor is Governance {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    event ExecutorAdded(address executor);
+    event ExecutorRemoved(address executor);
+
     modifier onlyExecutor() {
         require(isExecutor(msg.sender), "TimelockExecutor: not executor");
         _;
@@ -57,10 +60,12 @@ contract TimelockExecutor is Governance {
     function addExecutor(address executor) external onlyGovernance {
         require(!isExecutor(executor), "TimelockExecutor: already executor");
         _executors.add(executor);
+        emit ExecutorAdded(executor);
     }
 
     function removeExecutor(address executor) external onlyGovernance {
         require(isExecutor(executor), "TimelockExecutor: not executor");
         _executors.remove(executor);
+        emit ExecutorRemoved(executor);
     }
 }
