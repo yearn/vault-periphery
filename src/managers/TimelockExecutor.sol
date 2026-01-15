@@ -30,23 +30,21 @@ contract TimelockExecutor is Governance {
     function execute(
         address target,
         uint256 value,
-        bytes memory data,
+        bytes calldata payload,
         bytes32 predecessor,
-        bytes32 salt,
-        uint256 delay
+        bytes32 salt
     ) external onlyExecutor {
-        TIMELOCK.schedule(target, value, data, predecessor, salt, delay);
+        TIMELOCK.execute(target, value, payload, predecessor, salt);
     }
 
     function executeBatch(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory data,
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata payloads,
         bytes32 predecessor,
-        bytes32 salt,
-        uint256 delay
+        bytes32 salt
     ) external onlyExecutor {
-        TIMELOCK.scheduleBatch(targets, values, data, predecessor, salt, delay);
+        TIMELOCK.executeBatch(targets, values, payloads, predecessor, salt);
     }
 
     function isExecutor(address executor) public view returns (bool) {

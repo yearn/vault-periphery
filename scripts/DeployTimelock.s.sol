@@ -16,9 +16,9 @@ contract DeployTimelock is Script {
 
     // Salt bases for deterministic addresses
     bytes32 public constant TIMELOCK_SALT =
-        keccak256("yearn.timelock.controller.v1");
+        keccak256("yearn.timelock.controller");
     bytes32 public constant EXECUTOR_SALT =
-        keccak256("yearn.timelock.executor.v1");
+        keccak256("yearn.timelock.executor");
 
     // Deployer address - SET THIS before running the script
     address public constant DEPLOYER =
