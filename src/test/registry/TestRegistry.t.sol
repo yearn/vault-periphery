@@ -33,7 +33,7 @@ contract TestRegistry is Setup {
 
     function setUp() public override {
         super.setUp();
-        strategy = new MockStrategy(address(asset), "3.0.4");
+        strategy = new MockStrategy(address(asset), vaultFactory.apiVersion());
     }
 
     function test__set_up() public {
@@ -724,7 +724,10 @@ contract TestRegistry is Setup {
         vm.prank(daddy);
         registry.endorseSingleStrategyVault(address(strategy));
 
-        MockStrategy secondStrategy = new MockStrategy(address(asset), "3.0.4");
+        MockStrategy secondStrategy = new MockStrategy(
+            address(asset),
+            vaultFactory.apiVersion()
+        );
         vm.prank(daddy);
         registry.endorseSingleStrategyVault(address(secondStrategy));
 

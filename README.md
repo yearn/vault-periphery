@@ -12,7 +12,7 @@ git clone --recursive https://github.com/yearn/vault-periphery
 
 cd vault-periphery
 
-pip install vyper==0.3.7
+pip install vyper==0.3.10
 
 make build
 
