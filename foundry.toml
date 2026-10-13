@@ -13,3 +13,7 @@ remappings = [
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+[profile.ci]
+optimizer = true
+optimizer_runs = 200
