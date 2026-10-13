@@ -37,7 +37,10 @@ contract DebtAllocatorKeeper is Governance, Multicall {
         _;
     }
 
-    constructor(address _debtAllocator, address _governance) Governance(_governance) {
+    constructor(
+        address _debtAllocator,
+        address _governance
+    ) Governance(_governance) {
         require(_debtAllocator != address(0), "ZERO ADDRESS");
         require(_governance != address(0), "ZERO ADDRESS");
 
@@ -49,7 +52,10 @@ contract DebtAllocatorKeeper is Governance, Multicall {
      * @param _keeper The caller to add or remove.
      * @param _allowed If the caller can move debt.
      */
-    function setKeeper(address _keeper, bool _allowed) external virtual onlyGovernance {
+    function setKeeper(
+        address _keeper,
+        bool _allowed
+    ) external virtual onlyGovernance {
         require(_keeper != address(0), "ZERO ADDRESS");
 
         keepers[_keeper] = _allowed;
@@ -62,7 +68,10 @@ contract DebtAllocatorKeeper is Governance, Multicall {
      * @param _vault The vault whose debt can be moved or ratios can be set.
      * @param _allowed If the vault can be updated.
      */
-    function setAllowedVault(address _vault, bool _allowed) public virtual onlyGovernance {
+    function setAllowedVault(
+        address _vault,
+        bool _allowed
+    ) public virtual onlyGovernance {
         require(_vault != address(0), "ZERO ADDRESS");
 
         allowedVaults[_vault] = _allowed;
@@ -74,36 +83,47 @@ contract DebtAllocatorKeeper is Governance, Multicall {
      * @notice Move debt through the configured DebtAllocator.
      * @dev This contract must be set as a keeper on the DebtAllocator.
      */
-    function update_debt(address _vault, address _strategy, uint256 _targetDebt)
-        external
-        virtual
-        onlyKeepers
-        onlyAllowedVault(_vault)
-    {
-        DebtAllocator(DEBT_ALLOCATOR).update_debt(_vault, _strategy, _targetDebt);
+    function update_debt(
+        address _vault,
+        address _strategy,
+        uint256 _targetDebt
+    ) external virtual onlyKeepers onlyAllowedVault(_vault) {
+        DebtAllocator(DEBT_ALLOCATOR).update_debt(
+            _vault,
+            _strategy,
+            _targetDebt
+        );
     }
 
     /**
      * @notice Set a target debt ratio for an allowed vault.
      */
-    function setStrategyDebtRatio(address _vault, address _strategy, uint256 _targetRatio)
-        external
-        virtual
-        onlyKeepers
-        onlyAllowedVault(_vault)
-    {
-        DebtAllocator(DEBT_ALLOCATOR).setStrategyDebtRatio(_vault, _strategy, _targetRatio);
+    function setStrategyDebtRatio(
+        address _vault,
+        address _strategy,
+        uint256 _targetRatio
+    ) external virtual onlyKeepers onlyAllowedVault(_vault) {
+        DebtAllocator(DEBT_ALLOCATOR).setStrategyDebtRatio(
+            _vault,
+            _strategy,
+            _targetRatio
+        );
     }
 
     /**
      * @notice Set a target and max debt ratio for an allowed vault.
      */
-    function setStrategyDebtRatio(address _vault, address _strategy, uint256 _targetRatio, uint256 _maxRatio)
-        external
-        virtual
-        onlyKeepers
-        onlyAllowedVault(_vault)
-    {
-        DebtAllocator(DEBT_ALLOCATOR).setStrategyDebtRatio(_vault, _strategy, _targetRatio, _maxRatio);
+    function setStrategyDebtRatio(
+        address _vault,
+        address _strategy,
+        uint256 _targetRatio,
+        uint256 _maxRatio
+    ) external virtual onlyKeepers onlyAllowedVault(_vault) {
+        DebtAllocator(DEBT_ALLOCATOR).setStrategyDebtRatio(
+            _vault,
+            _strategy,
+            _targetRatio,
+            _maxRatio
+        );
     }
 }

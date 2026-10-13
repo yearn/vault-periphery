@@ -12,15 +12,28 @@ contract TestDebtAllocatorKeeper is Setup {
     function setUp() public override {
         super.setUp();
 
-        vault = createVault(address(asset), daddy, MAX_INT, WEEK, "Test Vault", "tvTEST");
+        vault = createVault(
+            address(asset),
+            daddy,
+            MAX_INT,
+            WEEK,
+            "Test Vault",
+            "tvTEST"
+        );
         strategy = createStrategy(address(asset));
 
-        debtAllocatorKeeper = new DebtAllocatorKeeper(address(debtAllocator), brain);
+        debtAllocatorKeeper = new DebtAllocatorKeeper(
+            address(debtAllocator),
+            brain
+        );
     }
 
     function test_setup() public view {
         assertEq(debtAllocatorKeeper.governance(), brain);
-        assertEq(address(debtAllocatorKeeper.DEBT_ALLOCATOR()), address(debtAllocator));
+        assertEq(
+            address(debtAllocatorKeeper.DEBT_ALLOCATOR()),
+            address(debtAllocator)
+        );
         assertFalse(debtAllocatorKeeper.keepers(user));
         assertFalse(debtAllocatorKeeper.allowedVaults(address(vault)));
     }
@@ -73,30 +86,49 @@ contract TestDebtAllocatorKeeper is Setup {
 
         vm.prank(user);
         vm.expectRevert("!keeper");
-        debtAllocatorKeeper.update_debt(address(vault), address(strategy), amount);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(strategy),
+            amount
+        );
 
         vm.prank(brain);
         debtAllocatorKeeper.setKeeper(user, true);
 
         vm.prank(user);
         vm.expectRevert("!allowed");
-        debtAllocatorKeeper.update_debt(address(vault), address(strategy), amount);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(strategy),
+            amount
+        );
 
         vm.prank(brain);
         debtAllocatorKeeper.setAllowedVault(address(vault), true);
 
         vm.prank(user);
         vm.expectRevert("!keeper");
-        debtAllocatorKeeper.update_debt(address(vault), address(strategy), amount);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(strategy),
+            amount
+        );
 
         vm.prank(brain);
         debtAllocator.setKeeper(address(debtAllocatorKeeper), true);
 
         vm.prank(daddy);
-        vault.add_role(address(debtAllocator), Roles.DEBT_MANAGER | Roles.REPORTING_MANAGER);
+        vault.add_role(
+            address(debtAllocator),
+            Roles.DEBT_MANAGER | Roles.REPORTING_MANAGER
+        );
 
         vm.prank(user);
-        debtAllocatorKeeper.update_debt(address(vault), address(strategy), amount);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(strategy),
+            amount
+        );
 
         assertEq(vault.totalIdle(), 0);
         assertEq(vault.totalDebt(), amount);
@@ -129,10 +161,18 @@ contract TestDebtAllocatorKeeper is Setup {
         vm.stopPrank();
 
         vm.prank(user);
-        debtAllocatorKeeper.update_debt(address(vault), address(strategy), amount / 2);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(strategy),
+            amount / 2
+        );
 
         vm.prank(user);
-        debtAllocatorKeeper.update_debt(address(vault), address(secondStrategy), amount / 2);
+        debtAllocatorKeeper.update_debt(
+            address(vault),
+            address(secondStrategy),
+            amount / 2
+        );
 
         assertEq(vault.totalIdle(), 0);
         assertEq(vault.totalDebt(), amount);
@@ -147,30 +187,50 @@ contract TestDebtAllocatorKeeper is Setup {
 
         vm.prank(user);
         vm.expectRevert("!keeper");
-        debtAllocatorKeeper.setStrategyDebtRatio(address(vault), address(strategy), target, max);
+        debtAllocatorKeeper.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            target,
+            max
+        );
 
         vm.prank(brain);
         debtAllocatorKeeper.setKeeper(user, true);
 
         vm.prank(user);
         vm.expectRevert("!allowed");
-        debtAllocatorKeeper.setStrategyDebtRatio(address(vault), address(strategy), target, max);
+        debtAllocatorKeeper.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            target,
+            max
+        );
 
         vm.prank(brain);
         debtAllocatorKeeper.setAllowedVault(address(vault), true);
 
         vm.prank(user);
         vm.expectRevert("!manager");
-        debtAllocatorKeeper.setStrategyDebtRatio(address(vault), address(strategy), target, max);
+        debtAllocatorKeeper.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            target,
+            max
+        );
 
         vm.prank(brain);
         debtAllocator.setManager(address(debtAllocatorKeeper), true);
 
         vm.prank(user);
-        debtAllocatorKeeper.setStrategyDebtRatio(address(vault), address(strategy), target, max);
+        debtAllocatorKeeper.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            target,
+            max
+        );
 
-        DebtAllocator.StrategyConfig memory strategyConfig =
-            debtAllocator.getStrategyConfig(address(vault), address(strategy));
+        DebtAllocator.StrategyConfig memory strategyConfig = debtAllocator
+            .getStrategyConfig(address(vault), address(strategy));
         assertTrue(strategyConfig.added);
         assertEq(strategyConfig.targetRatio, target);
         assertEq(strategyConfig.maxRatio, max);
@@ -185,11 +245,15 @@ contract TestDebtAllocatorKeeper is Setup {
         debtAllocator.setManager(address(debtAllocatorKeeper), true);
         debtAllocatorKeeper.setKeeper(brain, true);
         debtAllocatorKeeper.setAllowedVault(address(vault), true);
-        debtAllocatorKeeper.setStrategyDebtRatio(address(vault), address(strategy), target);
+        debtAllocatorKeeper.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            target
+        );
         vm.stopPrank();
 
-        DebtAllocator.StrategyConfig memory strategyConfig =
-            debtAllocator.getStrategyConfig(address(vault), address(strategy));
+        DebtAllocator.StrategyConfig memory strategyConfig = debtAllocator
+            .getStrategyConfig(address(vault), address(strategy));
         assertTrue(strategyConfig.added);
         assertEq(strategyConfig.targetRatio, target);
         assertEq(strategyConfig.maxRatio, (target * 12) / 10);
@@ -216,14 +280,26 @@ contract TestDebtAllocatorKeeper is Setup {
 
         bytes[] memory calls = new bytes[](4);
         calls[0] = abi.encodeWithSignature(
-            "setStrategyDebtRatio(address,address,uint256,uint256)", address(vault), address(strategy), 4_000, 4_000
+            "setStrategyDebtRatio(address,address,uint256,uint256)",
+            address(vault),
+            address(strategy),
+            4_000,
+            4_000
         );
         calls[1] = abi.encodeWithSignature(
-            "setStrategyDebtRatio(address,address,uint256)", address(vault), address(secondStrategy), 2_000
+            "setStrategyDebtRatio(address,address,uint256)",
+            address(vault),
+            address(secondStrategy),
+            2_000
         );
-        calls[2] = abi.encodeCall(debtAllocatorKeeper.update_debt, (address(vault), address(strategy), amount / 2));
-        calls[3] =
-            abi.encodeCall(debtAllocatorKeeper.update_debt, (address(vault), address(secondStrategy), amount / 2));
+        calls[2] = abi.encodeCall(
+            debtAllocatorKeeper.update_debt,
+            (address(vault), address(strategy), amount / 2)
+        );
+        calls[3] = abi.encodeCall(
+            debtAllocatorKeeper.update_debt,
+            (address(vault), address(secondStrategy), amount / 2)
+        );
 
         vm.prank(user);
         vm.expectRevert("!keeper");
@@ -242,13 +318,16 @@ contract TestDebtAllocatorKeeper is Setup {
         vm.prank(user);
         debtAllocatorKeeper.multicall(calls);
 
-        DebtAllocator.StrategyConfig memory strategyConfig =
-            debtAllocator.getStrategyConfig(address(vault), address(strategy));
+        DebtAllocator.StrategyConfig memory strategyConfig = debtAllocator
+            .getStrategyConfig(address(vault), address(strategy));
         assertTrue(strategyConfig.added);
         assertEq(strategyConfig.targetRatio, 4_000);
         assertEq(strategyConfig.maxRatio, 4_000);
 
-        strategyConfig = debtAllocator.getStrategyConfig(address(vault), address(secondStrategy));
+        strategyConfig = debtAllocator.getStrategyConfig(
+            address(vault),
+            address(secondStrategy)
+        );
         assertTrue(strategyConfig.added);
         assertEq(strategyConfig.targetRatio, 2_000);
         assertEq(strategyConfig.maxRatio, 2_400);
